@@ -55,6 +55,7 @@ VITE_GOOGLE_PLACES_API_KEY=
 VITE_OPENAI_API_KEY=
 VITE_OPENAI_MODEL=gpt-5.2
 VITE_SUPABASE_URL=https://rwiviwmyqguaazqyzdny.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_SUPABASE_ANON_KEY=
 ```
 
@@ -65,7 +66,9 @@ VITE_SUPABASE_ANON_KEY=
 Supabaseを未設定でもアプリはLocalStorageで動作します。Supabaseを利用する場合は、Vercelまたはローカルの環境変数に以下を設定します。
 
 - `VITE_SUPABASE_URL=https://rwiviwmyqguaazqyzdny.supabase.co`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` または `VITE_SUPABASE_ANON_KEY`
+
+ブラウザアプリでは `VITE_SUPABASE_PUBLISHABLE_KEY` の利用を推奨します。どちらも設定されている場合は `VITE_SUPABASE_PUBLISHABLE_KEY` を優先します。
 
 ### customers テーブル
 
