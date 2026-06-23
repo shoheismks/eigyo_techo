@@ -34,6 +34,12 @@ npm run dev
 http://127.0.0.1:5173/
 ```
 
+## 公開URL
+
+```text
+https://eigyo-techo.vercel.app/
+```
+
 ## ビルド
 
 ```bash
