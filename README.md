@@ -2,6 +2,12 @@
 
 営業先を探し、保存し、連絡先取得、AIメール作成、案件管理まで行うスマホファーストの営業支援Webアプリです。
 
+## 公開URL
+
+```text
+https://eigyo-techo.vercel.app/
+```
+
 ## 主な機能
 
 - 営業先検索
@@ -34,12 +40,6 @@ npm run dev
 http://127.0.0.1:5173/
 ```
 
-## 公開URL
-
-```text
-https://eigyo-techo.vercel.app/
-```
-
 ## ビルド
 
 ```bash
@@ -54,7 +54,7 @@ npm run build
 VITE_GOOGLE_PLACES_API_KEY=
 VITE_OPENAI_API_KEY=
 VITE_OPENAI_MODEL=gpt-5.2
-VITE_SUPABASE_URL=
+VITE_SUPABASE_URL=https://rwiviwmyqguaazqyzdny.supabase.co
 VITE_SUPABASE_ANON_KEY=
 ```
 
@@ -64,7 +64,7 @@ VITE_SUPABASE_ANON_KEY=
 
 Supabaseを未設定でもアプリはLocalStorageで動作します。Supabaseを利用する場合は、Vercelまたはローカルの環境変数に以下を設定します。
 
-- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_URL=https://rwiviwmyqguaazqyzdny.supabase.co`
 - `VITE_SUPABASE_ANON_KEY`
 
 ### customers テーブル
@@ -103,16 +103,14 @@ RLSを有効にする場合は、利用形態に合わせて `select`, `insert`,
 
 ## Vercel公開手順
 
-1. GitHubにリポジトリを作成します。
-2. このプロジェクトをGitHubへpushします。
-3. Vercelで `Add New Project` を選び、GitHubリポジトリをimportします。
-4. Framework Preset は `Vite` を選びます。
-5. Build Command は `npm run build` のままで問題ありません。
-6. Output Directory は `dist` のままで問題ありません。
-7. Vercelの `Environment Variables` に必要な環境変数を登録します。
-8. Deployします。
+1. GitHubリポジトリをVercelでimportします。
+2. Framework Preset は `Vite` を選びます。
+3. Build Command は `npm run build` のままで問題ありません。
+4. Output Directory は `dist` のままで問題ありません。
+5. Vercelの `Environment Variables` に必要な環境変数を登録します。
+6. Deployします。
 
-## API連携について
+## API連携
 
 ### Google Places
 
