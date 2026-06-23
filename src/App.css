@@ -722,6 +722,54 @@ textarea:focus {
   font-weight: 800;
 }
 
+.sync-status-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+}
+
+.sync-status-card.cloud {
+  border-color: rgba(94, 226, 160, 0.4);
+}
+
+.sync-status-card.local {
+  border-color: rgba(255, 211, 106, 0.36);
+}
+
+.sync-status-card div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sync-status-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.sync-status-card strong {
+  color: var(--white);
+  font-size: 1rem;
+}
+
+.sync-status-card .ghost-button {
+  width: 100%;
+}
+
+.sync-status-card p {
+  margin: 0;
+  color: #ffbec7;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 .empty-state {
   padding: 22px;
 }

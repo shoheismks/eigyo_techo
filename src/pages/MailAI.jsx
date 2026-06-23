@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { SALES_PURPOSES, createMailDrafts } from '../services/mailDraftService.js';
 import { createGmailDraft } from '../services/gmailService.js';
 import { createOutlookDraft } from '../services/outlookService.js';
+import {
+  fetchMailDrafts,
+  normalizeGeneratedDrafts,
+  readLocalMailDrafts,
+  upsertMailDrafts,
+} from '../services/mailDraftSyncService.js';
 
 export default function MailAI({ customers }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
@@ -14,6 +20,7 @@ export default function MailAI({ customers }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [draftSyncNotice, setDraftSyncNotice] = useState('');
   const [copiedDraftId, setCopiedDraftId] = useState('');
   const [gmailLoadingDraftId, setGmailLoadingDraftId] = useState('');
   const [outlookLoadingDraftId, setOutlookLoadingDraftId] = useState('');
@@ -29,6 +36,37 @@ export default function MailAI({ customers }) {
     [customerId, customers],
   );
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadDrafts() {
+      if (!selectedCustomer?.id) {
+        setDrafts([]);
+        return;
+      }
+
+      try {
+        const savedDrafts = await fetchMailDrafts(selectedCustomer.id);
+        if (!ignore) {
+          setDrafts(savedDrafts);
+          setDraftSyncNotice(savedDrafts.length > 0 ? '保存済みメール案を読み込みました' : '');
+        }
+      } catch {
+        if (!ignore) {
+          const localDrafts = readLocalMailDrafts(selectedCustomer.id);
+          setDrafts(localDrafts);
+          setDraftSyncNotice('メール案はLocalStorageから読み込みます');
+        }
+      }
+    }
+
+    loadDrafts();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedCustomer?.id]);
+
   async function handleCreateDrafts() {
     setIsGenerating(true);
     setError('');
@@ -43,9 +81,25 @@ export default function MailAI({ customers }) {
         purpose,
         senderName,
       });
-      setDrafts(result.drafts);
+      const generatedDrafts = normalizeGeneratedDrafts({
+        customer: selectedCustomer,
+        drafts: result.drafts,
+        productName,
+        purpose,
+        source: result.source,
+      });
+      setDrafts(generatedDrafts);
       setGenerationSource(result.source);
       setFallbackReason(result.fallbackReason);
+      setDraftSyncNotice('');
+
+      try {
+        const savedDrafts = await upsertMailDrafts(generatedDrafts);
+        setDrafts(savedDrafts);
+        setDraftSyncNotice('メール案を保存しました');
+      } catch {
+        setDraftSyncNotice('メール案はLocalStorageに保存しました');
+      }
     } catch {
       setError('メール案の作成に失敗しました');
       setDrafts([]);
@@ -203,6 +257,7 @@ export default function MailAI({ customers }) {
       )}
 
       {notice && <p className="notice-text">{notice}</p>}
+      {draftSyncNotice && <p className="notice-text">{draftSyncNotice}</p>}
       {error && <p className="error-text">{error}</p>}
 
       <section className="mail-drafts">

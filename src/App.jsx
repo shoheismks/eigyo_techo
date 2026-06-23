@@ -16,13 +16,28 @@ const pages = {
 
 export default function App() {
   const [activePage, setActivePage] = useState('Home');
-  const { customers, addCustomer, updateCustomer, removeCustomer, isSaved } = useCustomers();
+  const {
+    customers,
+    addCustomer,
+    updateCustomer,
+    removeCustomer,
+    isSaved,
+    reloadFromCloud,
+    syncError,
+    syncState,
+  } = useCustomers();
 
   return (
     <div className="app-shell">
       <div className="app-frame">
         {activePage === 'Home' && (
-          <Home customers={customers} setActivePage={setActivePage} />
+          <Home
+            customers={customers}
+            setActivePage={setActivePage}
+            syncState={syncState}
+            syncError={syncError}
+            reloadFromCloud={reloadFromCloud}
+          />
         )}
         {activePage === 'LeadSearch' && (
           <LeadSearch addCustomer={addCustomer} isSaved={isSaved} />

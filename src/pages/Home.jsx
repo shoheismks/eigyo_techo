@@ -30,7 +30,13 @@ function withScore(customer) {
   };
 }
 
-export default function Home({ customers, setActivePage }) {
+export default function Home({
+  customers,
+  setActivePage,
+  syncState = 'local',
+  syncError = '',
+  reloadFromCloud,
+}) {
   const today = todayString();
   const scoredCustomers = customers.map(withScore);
   const followToday = scoredCustomers.filter(
@@ -180,6 +186,17 @@ export default function Home({ customers, setActivePage }) {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className={`sync-status-card ${syncState === 'supabase' ? 'cloud' : 'local'}`}>
+        <div>
+          <span>保存先</span>
+          <strong>{syncState === 'supabase' ? 'Supabase' : syncState === 'syncing' ? '同期中...' : 'LocalStorage'}</strong>
+        </div>
+        <button className="ghost-button" onClick={reloadFromCloud} disabled={syncState === 'syncing'}>
+          クラウドから再読み込み
+        </button>
+        {syncError && <p>{syncError}</p>}
       </section>
     </main>
   );

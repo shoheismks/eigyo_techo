@@ -6,6 +6,10 @@ export function canUseSupabase() {
   return hasSupabaseConfig && Boolean(supabase) && navigator.onLine;
 }
 
+export function hasCloudConfig() {
+  return hasSupabaseConfig && Boolean(supabase);
+}
+
 export async function fetchRemoteCustomers() {
   if (!canUseSupabase()) {
     return [];
@@ -36,6 +40,10 @@ export async function upsertRemoteCustomers(customers) {
   if (error) {
     throw error;
   }
+}
+
+export async function upsertRemoteCustomer(customer) {
+  await upsertRemoteCustomers([customer]);
 }
 
 export async function deleteRemoteCustomer(id) {

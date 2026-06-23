@@ -4,7 +4,9 @@ import {
   canUseSupabase,
   deleteRemoteCustomer,
   fetchRemoteCustomers,
+  hasCloudConfig,
   mergeCustomers,
+  upsertRemoteCustomer,
   upsertRemoteCustomers,
 } from '../services/customerSyncService.js';
 
@@ -77,36 +79,47 @@ function saveLocalCustomers(customers) {
 }
 
 export function useCustomers() {
-  const [customers, setCustomers] = useState(readLocalCustomers);
+  const [customers, setCustomers] = useState(() =>
+    canUseSupabase() ? [] : readLocalCustomers(),
+  );
   const [syncState, setSyncState] = useState(canUseSupabase() ? 'syncing' : 'local');
+  const [syncError, setSyncError] = useState(getLocalReason);
 
   useEffect(() => {
     let ignore = false;
 
     async function syncFromSupabase() {
       if (!canUseSupabase()) {
+        setCustomers(readLocalCustomers());
         setSyncState('local');
+        setSyncError(getLocalReason());
         return;
       }
 
       try {
+        setSyncState('syncing');
+        setSyncError('');
         const localCustomers = readLocalCustomers();
         const remoteCustomers = (await fetchRemoteCustomers()).map(normalizeCustomer);
         const mergedCustomers = mergeCustomers(localCustomers, remoteCustomers).map(normalizeCustomer);
-
-        if (ignore) {
-          return;
-        }
-
-        setCustomers(mergedCustomers);
-        saveLocalCustomers(mergedCustomers);
 
         if (localCustomers.length > 0) {
           await upsertRemoteCustomers(mergedCustomers);
         }
 
+        const refreshedCustomers = (await fetchRemoteCustomers()).map(normalizeCustomer);
+        const nextCustomers = refreshedCustomers.length > 0 ? refreshedCustomers : mergedCustomers;
+
+        if (ignore) {
+          return;
+        }
+
+        setCustomers(nextCustomers);
+        saveLocalCustomers(nextCustomers);
         setSyncState('supabase');
-      } catch {
+      } catch (error) {
+        setCustomers(readLocalCustomers());
+        setSyncError(toSyncError(error));
         setSyncState('local');
       }
     }
@@ -125,10 +138,7 @@ export function useCustomers() {
   useEffect(() => {
     function handleOnline() {
       if (canUseSupabase()) {
-        upsertRemoteCustomers(customers).then(
-          () => setSyncState('supabase'),
-          () => setSyncState('local'),
-        );
+        reloadFromCloud();
       }
     }
 
@@ -153,6 +163,28 @@ export function useCustomers() {
     [customers],
   );
 
+  async function reloadFromCloud() {
+    if (!canUseSupabase()) {
+      setCustomers(readLocalCustomers());
+      setSyncState(hasCloudConfig() ? 'local' : 'local');
+      setSyncError(getLocalReason());
+      return;
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      const remoteCustomers = (await fetchRemoteCustomers()).map(normalizeCustomer);
+      setCustomers(remoteCustomers);
+      saveLocalCustomers(remoteCustomers);
+      setSyncState('supabase');
+    } catch (error) {
+      setCustomers(readLocalCustomers());
+      setSyncError(toSyncError(error));
+      setSyncState('local');
+    }
+  }
+
   function addCustomer(customer) {
     const normalized = normalizeCustomer({
       ...customer,
@@ -172,7 +204,7 @@ export function useCustomers() {
       });
 
       const nextCustomers = exists ? current : [normalized, ...current];
-      syncCustomers(nextCustomers, exists ? [] : [normalized]);
+      syncCustomers(nextCustomers, exists ? null : normalized);
       return nextCustomers;
     });
   }
@@ -185,7 +217,7 @@ export function useCustomers() {
           : customer,
       );
       const updatedCustomer = nextCustomers.find((customer) => customer.id === id);
-      syncCustomers(nextCustomers, updatedCustomer ? [updatedCustomer] : []);
+      syncCustomers(nextCustomers, updatedCustomer);
       return nextCustomers;
     });
   }
@@ -196,7 +228,12 @@ export function useCustomers() {
       saveLocalCustomers(nextCustomers);
 
       if (canUseSupabase()) {
-        deleteRemoteCustomer(id).catch(() => setSyncState('local'));
+        deleteRemoteCustomer(id)
+          .then(reloadFromCloud)
+          .catch((error) => {
+            setSyncError(toSyncError(error));
+            setSyncState('local');
+          });
       }
 
       return nextCustomers;
@@ -213,19 +250,31 @@ export function useCustomers() {
     });
   }
 
-  function syncCustomers(nextCustomers, changedCustomers = []) {
+  function syncCustomers(nextCustomers, changedCustomer = null) {
     saveLocalCustomers(nextCustomers);
 
     if (!canUseSupabase()) {
       setSyncState('local');
+      if (hasCloudConfig()) {
+        setSyncError(getLocalReason('Supabaseに接続できません。LocalStorageに保存しました。'));
+      } else {
+        setSyncError(getLocalReason());
+      }
       return;
     }
 
-    const targetCustomers = changedCustomers.length > 0 ? changedCustomers : nextCustomers;
-    upsertRemoteCustomers(targetCustomers).then(
-      () => setSyncState('supabase'),
-      () => setSyncState('local'),
-    );
+    const writePromise = changedCustomer
+      ? upsertRemoteCustomer(changedCustomer)
+      : upsertRemoteCustomers(nextCustomers);
+
+    setSyncState('syncing');
+    setSyncError('');
+    writePromise
+      .then(reloadFromCloud)
+      .catch((error) => {
+        setSyncError(toSyncError(error));
+        setSyncState('local');
+      });
   }
 
   return {
@@ -234,6 +283,29 @@ export function useCustomers() {
     updateCustomer,
     removeCustomer,
     isSaved,
+    reloadFromCloud,
+    syncError,
     syncState,
   };
+}
+
+function toSyncError(error) {
+  const message = error?.message || '';
+  if (message.includes('Could not find the table')) {
+    return 'Supabaseのcustomersテーブルが見つかりません。SQLを実行してください。';
+  }
+
+  return 'Supabase接続に失敗しました。LocalStorageで動作しています。';
+}
+
+function getLocalReason(fallback = '') {
+  if (!hasCloudConfig()) {
+    return 'Supabase環境変数が未設定です。LocalStorageで動作しています。';
+  }
+
+  if (!navigator.onLine) {
+    return 'オフラインのためLocalStorageで動作しています。';
+  }
+
+  return fallback;
 }
