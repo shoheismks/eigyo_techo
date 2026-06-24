@@ -14,6 +14,7 @@ const STORAGE_KEY = 'eigyo-techo-customers';
 
 const defaultCustomer = {
   placeId: '',
+  corporateNumber: '',
   companyName: '',
   industry: '',
   area: '',

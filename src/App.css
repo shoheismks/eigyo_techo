@@ -552,6 +552,45 @@ textarea:focus {
   font-weight: 800;
 }
 
+.enrich-action-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.enrich-action-row span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.enrich-card {
+  gap: 16px;
+}
+
+.enrich-links {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.enrich-links a {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--blue-strong);
+  padding: 8px 10px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
 .mini-list {
   display: grid;
   gap: 8px;
@@ -1116,7 +1155,7 @@ textarea:focus {
   width: min(calc(100% - 24px), 496px);
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1138,6 +1177,22 @@ textarea:focus {
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 900;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav {
+    gap: 4px;
+    padding: 6px;
+  }
+
+  .bottom-nav button {
+    min-height: 50px;
+    font-size: 0.62rem;
+  }
+
+  .bottom-nav button span {
+    font-size: 1rem;
+  }
 }
 
 .bottom-nav button span {

@@ -82,6 +82,7 @@ function toSupabaseRow(customer) {
   return {
     id: customer.id,
     place_id: customer.placeId,
+    corporate_number: customer.corporateNumber,
     company_name: customer.companyName,
     industry: customer.industry,
     area: customer.area,
@@ -110,6 +111,7 @@ function fromSupabaseRow(row) {
   return {
     id: row.id,
     placeId: row.place_id ?? row.placeId ?? '',
+    corporateNumber: row.corporate_number ?? row.corporateNumber ?? '',
     companyName: row.company_name ?? row.companyName ?? '',
     industry: row.industry ?? '',
     area: row.area ?? '',

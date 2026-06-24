@@ -1,6 +1,7 @@
 create table if not exists public.customers (
   id text primary key,
   place_id text,
+  corporate_number text,
   company_name text,
   industry text,
   area text,
@@ -23,6 +24,8 @@ create table if not exists public.customers (
   created_at timestamptz,
   updated_at timestamptz
 );
+
+alter table public.customers add column if not exists corporate_number text;
 
 alter table public.customers enable row level security;
 

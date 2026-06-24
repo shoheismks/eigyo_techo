@@ -4,11 +4,13 @@ import LeadSearch from './pages/LeadSearch.jsx';
 import Customers from './pages/Customers.jsx';
 import Pipeline from './pages/Pipeline.jsx';
 import MailAI from './pages/MailAI.jsx';
+import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import { useCustomers } from './hooks/useCustomers.js';
 
 const pages = {
   Home: { label: 'ホーム', icon: '⌂' },
   LeadSearch: { label: '検索', icon: '⌕' },
+  CompanyEnrich: { label: '補完', icon: '＋' },
   Customers: { label: '得意先', icon: '□' },
   Pipeline: { label: '案件', icon: '▤' },
   MailAI: { label: 'メール', icon: '✉' },
@@ -41,6 +43,9 @@ export default function App() {
         )}
         {activePage === 'LeadSearch' && (
           <LeadSearch addCustomer={addCustomer} isSaved={isSaved} />
+        )}
+        {activePage === 'CompanyEnrich' && (
+          <CompanyEnrich addCustomer={addCustomer} isSaved={isSaved} />
         )}
         {activePage === 'Customers' && (
           <Customers
