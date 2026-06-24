@@ -63,7 +63,7 @@ export default function Pipeline({ customers, updateCustomer }) {
                     <article className={`pipeline-card ${statusLabels[customer.status]}`} key={customer.id}>
                       <div className="pipeline-card-heading">
                         <h3>{customer.companyName}</h3>
-                        <p>{customer.industry} / {customer.area}</p>
+                        <p>{customer.industry || '業種未設定'} / {customer.area || 'エリア未設定'}</p>
                       </div>
 
                       <div className="score-panel">

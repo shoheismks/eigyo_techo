@@ -38,17 +38,19 @@ export function calculateCompanyScore(company) {
     reasons.push('食品関連業種 +20');
   }
 
-  const memoText = [company.memo, company.pipelineMemo].filter(Boolean).join(' ');
+  const memoText = [company.memo, company.pipelineMemo, company.companyNote]
+    .filter(Boolean)
+    .join(' ');
   const matchedMemoKeyword = MEMO_KEYWORDS.find((keyword) => memoText.includes(keyword));
   if (matchedMemoKeyword) {
     score += 10;
-    reasons.push(`注目キーワード「${matchedMemoKeyword}」 +10`);
+    reasons.push(`注目キーワード「${matchedMemoKeyword}」+10`);
   }
 
   const statusScore = STATUS_SCORES[company.status] ?? 0;
   if (statusScore !== 0) {
     score += statusScore;
-    reasons.push(`ステータス「${company.status}」 ${formatScore(statusScore)}`);
+    reasons.push(`ステータス「${company.status}」${formatScore(statusScore)}`);
   }
 
   return {

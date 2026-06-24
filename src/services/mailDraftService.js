@@ -55,24 +55,24 @@ function buildContext({ customer, productName, purpose, senderName, products }) 
   const proposedProducts = (customer.proposedProducts ?? [])
     .map((productId) => products.find((product) => product.id === productId))
     .filter(Boolean);
-  const product = productName.trim() || '貴社の営業活動を支援するサービス';
+  const selectedProduct =
+    products.find((product) => product.name === productName) ?? proposedProducts[0];
+  const product = productName.trim() || selectedProduct?.name || '貴社向け商材';
   const sender = senderName.trim() || '営業担当';
   const latestHistory = [...(customer.dealHistories ?? [])]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  const productDetails = buildProductDetails(selectedProduct, proposedProducts);
   const tagNote = (customer.tags ?? []).length > 0
     ? `営業手帳では「${customer.tags.join('、')}」のタグで管理しています。`
     : '';
   const historyNote = latestHistory?.summary
-    ? `直近の接点では「${latestHistory.summary}」という記録があり、次の一手として「${latestHistory.nextAction || '追加提案'}」が適していると考えています。`
+    ? `直近の接点では「${latestHistory.summary}」という履歴があり、次の一手として「${latestHistory.nextAction || '追加提案'}」が適しています。`
     : '';
-  const productNote = proposedProducts.length > 0
-    ? `提案候補として、${proposedProducts.map((item) => `「${item.name}」`).join('、')}を想定しています。`
-    : '';
-  const companyNote = customer.memo
-    ? `営業手帳のメモに「${customer.memo}」とあり、今回のご案内が検討材料になるのではないかと考えております。`
-    : `${customer.area || '貴社エリア'}で${customer.industry || '事業'}を展開されている貴社に合わせて、具体的な活用イメージをご提案できると考えております。`;
+  const companyNote = customer.companyNote || customer.memo || customer.pipelineMemo
+    ? `社内メモ: ${[customer.companyNote, customer.memo, customer.pipelineMemo].filter(Boolean).join(' / ')}`
+    : `${customer.area || '貴社エリア'}で${customer.industry || '事業'}を展開されている点に合わせて、具体的な活用イメージをご提案します。`;
   const nextAction = purpose === 'サンプル提案'
-    ? 'まずはサンプル資料またはデモをご確認いただけますと幸いです。'
+    ? 'まずはサンプルまたは商品資料をご確認いただければ幸いです。'
     : '一度オンラインで15分ほど、情報交換のお時間をいただけますでしょうか。';
 
   return {
@@ -88,9 +88,32 @@ function buildContext({ customer, productName, purpose, senderName, products }) 
     product,
     purpose,
     sender,
-    companyNote: [companyNote, tagNote, historyNote, productNote].filter(Boolean).join('\n'),
+    companyNote: [companyNote, tagNote, historyNote, productDetails].filter(Boolean).join('\n'),
     nextAction,
   };
+}
+
+function buildProductDetails(selectedProduct, proposedProducts) {
+  const products = selectedProduct ? [selectedProduct] : proposedProducts;
+  if (products.length === 0) {
+    return '';
+  }
+
+  return `提案商品: ${products
+    .map((product) => {
+      const details = [
+        product.name,
+        product.manufacturerName ? `メーカー: ${product.manufacturerName}` : '',
+        product.origin ? `産地: ${product.origin}` : '',
+        product.temperatureZone ? `温度帯: ${product.temperatureZone}` : '',
+        product.packageStyle ? `荷姿: ${product.packageStyle}` : '',
+        product.desiredSellingPrice !== ''
+          ? `希望販売価格: ${Number(product.desiredSellingPrice).toLocaleString('ja-JP')}円/${product.sellingPriceUnit}`
+          : '',
+      ].filter(Boolean);
+      return details.join('、');
+    })
+    .join(' / ')}`;
 }
 
 function toOpenAIInput(context) {
@@ -102,12 +125,10 @@ function toOpenAIInput(context) {
     inquiryUrl: context.inquiryUrl,
     memo: [
       context.memo,
+      context.companyNote,
       context.tags.length > 0 ? `タグ: ${context.tags.join('、')}` : '',
       context.dealHistories.length > 0
         ? `商談履歴: ${context.dealHistories.map((history) => `${history.date || '日付未設定'} ${history.type} ${history.summary} 次:${history.nextAction}`).join(' / ')}`
-        : '',
-      context.proposedProducts.length > 0
-        ? `提案商品: ${context.proposedProducts.map((product) => `${product.name} ${product.description || ''}`).join(' / ')}`
         : '',
     ].filter(Boolean).join('\n'),
     productName: context.product,
@@ -143,15 +164,13 @@ function buildPoliteDraft(context) {
   return `${context.companyName}
 ご担当者様
 
-突然のご連絡失礼いたします。
-${context.sender}と申します。
-
+突然のご連絡失礼いたします。${context.sender}と申します。
 本日は「${context.product}」のご提案でご連絡いたしました。
+
 ${context.companyNote}
 
 ${context.nextAction}
-ご興味がございましたら、候補日をいくつかお送りいただけますと幸いです。
-
+ご興味がございましたら、商品資料またはサンプルのご案内をお送りいたします。
 ご多忙のところ恐れ入りますが、ご検討のほどよろしくお願いいたします。
 
 --
@@ -170,8 +189,6 @@ ${context.companyNote}
 ${context.nextAction}
 ご都合のよい日程を2、3候補いただけますでしょうか。
 
-よろしくお願いいたします。
-
 --
 ${context.sender}`;
 }
@@ -180,10 +197,8 @@ function buildProposalDraft(context) {
   return `${context.companyName}
 ご担当者様
 
-突然のご連絡失礼いたします。
-${context.sender}と申します。
-
-貴社の${context.industry}領域において、業務効率化や新しい顧客接点づくりにお役立ていただける可能性があると考え、「${context.product}」をご提案いたします。
+突然のご連絡失礼いたします。${context.sender}と申します。
+貴社の${context.industry}領域において、新しい提案づくりや差別化にお役立ていただける可能性があると考え、「${context.product}」をご提案いたします。
 
 ${context.companyNote}
 

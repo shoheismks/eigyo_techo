@@ -1,29 +1,22 @@
 import { useMemo, useState } from 'react';
 import CompanyCard from '../components/CompanyCard.jsx';
 import { discoverContactInfo } from '../services/contactDiscoveryService.js';
+import { PIPELINE_STATUSES } from './Pipeline.jsx';
 
-const STATUS_FILTERS = [
-  'すべて',
-  '未接触',
-  '送信済',
-  '返信あり',
-  '商談中',
-  '見積提出',
-  '成約',
-  '失注',
-];
+const ALL = 'すべて';
+const STATUS_FILTERS = [ALL, ...PIPELINE_STATUSES];
 
 export default function Customers({ customers, updateCustomer, removeCustomer, onOpenDetail }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('すべて');
-  const [tagFilter, setTagFilter] = useState('すべて');
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [tagFilter, setTagFilter] = useState(ALL);
   const [sortMode, setSortMode] = useState('created');
   const [loadingCustomerId, setLoadingCustomerId] = useState('');
   const [contactErrors, setContactErrors] = useState({});
 
   const tagOptions = useMemo(
     () => [
-      'すべて',
+      ALL,
       ...new Set(customers.flatMap((customer) => customer.tags ?? []).filter(Boolean)),
     ],
     [customers],
@@ -32,8 +25,8 @@ export default function Customers({ customers, updateCustomer, removeCustomer, o
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const nextCustomers = customers.filter((customer) => {
-      const matchesStatus = statusFilter === 'すべて' || customer.status === statusFilter;
-      const matchesTag = tagFilter === 'すべて' || (customer.tags ?? []).includes(tagFilter);
+      const matchesStatus = statusFilter === ALL || customer.status === statusFilter;
+      const matchesTag = tagFilter === ALL || (customer.tags ?? []).includes(tagFilter);
       const searchableText = [
         customer.companyName,
         customer.industry,
@@ -41,6 +34,7 @@ export default function Customers({ customers, updateCustomer, removeCustomer, o
         customer.address,
         customer.email,
         customer.memo,
+        customer.companyNote,
         ...(customer.tags ?? []),
       ].join(' ').toLowerCase();
       const matchesSearch = !normalizedQuery || searchableText.includes(normalizedQuery);
@@ -86,7 +80,7 @@ export default function Customers({ customers, updateCustomer, removeCustomer, o
       <section className="page-header">
         <p className="eyebrow">Customers</p>
         <h1>得意先一覧</h1>
-        <p>保存した営業先のステータス、メモ、連絡先、優先スコアを管理します。</p>
+        <p>保存した営業先のステータス、タグ、メモ、連絡先、優先スコアを管理します。</p>
       </section>
 
       <div className="segmented-control" aria-label="ステータスで絞り込み">
@@ -106,7 +100,7 @@ export default function Customers({ customers, updateCustomer, removeCustomer, o
           検索
           <input
             value={searchQuery}
-            placeholder="会社名・タグ・メモで検索"
+            placeholder="会社名・タグ・メモ・備考で検索"
             onChange={(event) => setSearchQuery(event.target.value)}
           />
         </label>

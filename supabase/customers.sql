@@ -14,6 +14,7 @@ create table if not exists public.customers (
   status text,
   tags jsonb,
   memo text,
+  company_note text,
   next_follow_up_date date,
   is_do_not_contact boolean default false,
   do_not_contact_reason text,
@@ -33,6 +34,7 @@ create table if not exists public.customers (
 
 alter table public.customers add column if not exists corporate_number text;
 alter table public.customers add column if not exists tags jsonb;
+alter table public.customers add column if not exists company_note text;
 alter table public.customers add column if not exists next_follow_up_date date;
 alter table public.customers add column if not exists is_do_not_contact boolean default false;
 alter table public.customers add column if not exists do_not_contact_reason text;

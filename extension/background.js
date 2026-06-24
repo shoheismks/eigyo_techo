@@ -1,4 +1,5 @@
-const APP_URL = 'http://localhost:5173/';
+const APP_ORIGIN = 'https://eigyo-techo.vercel.app';
+const APP_IMPORT_URL = `${APP_ORIGIN}/import`;
 const MENU_ID = 'add-to-eigyo-techo';
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -23,9 +24,9 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
 
   try {
     await openAppWithCompanyName(companyName);
-    notify('営業手帳に送信しました', `「${companyName}」を営業手帳に送信しました。`);
+    notify('営業手帳を開きました', `「${companyName}」を営業手帳に送信しました。`);
   } catch {
-    notify('送信に失敗しました', '営業手帳を localhost:5173 で起動してください。');
+    notify('送信に失敗しました', '営業手帳を開けませんでした。');
   }
 });
 
@@ -34,12 +35,15 @@ chrome.runtime.onMessage.addListener((message) => {
     return;
   }
 
-  notify(message.ok ? '営業手帳に追加しました' : '営業手帳に追加できませんでした', message.message || '');
+  notify(
+    message.ok ? '営業手帳に追加しました' : '営業手帳に追加できませんでした',
+    message.message || '',
+  );
 });
 
 async function openAppWithCompanyName(companyName) {
-  const url = `${APP_URL}?importCompany=${encodeURIComponent(companyName)}`;
-  const tabs = await chrome.tabs.query({ url: ['http://localhost:5173/*', 'http://127.0.0.1:5173/*'] });
+  const url = `${APP_IMPORT_URL}?companyName=${encodeURIComponent(companyName)}`;
+  const tabs = await chrome.tabs.query({ url: [`${APP_ORIGIN}/*`] });
   const targetTab = tabs[0];
 
   if (targetTab?.id) {

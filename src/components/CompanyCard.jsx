@@ -1,12 +1,4 @@
-const PIPELINE_STATUSES = [
-  '未接触',
-  '送信済',
-  '返信あり',
-  '商談中',
-  '見積提出',
-  '成約',
-  '失注',
-];
+import { PIPELINE_STATUSES } from '../pages/Pipeline.jsx';
 
 const statusTone = {
   未接触: 'neutral',
@@ -39,7 +31,7 @@ export default function CompanyCard({
     <article className={`company-card ${compact ? 'compact' : ''} ${company.isDoNotContact ? 'ng-card' : ''}`}>
       <div className="card-topline">
         <span className={`status-pill ${tone}`}>{company.status}</span>
-        <span className="area-chip">{company.area}</span>
+        <span className="area-chip">{company.area || 'エリア未設定'}</span>
       </div>
       {company.isDoNotContact && (
         <p className="ng-banner">配信停止・NG {company.doNotContactReason ? `/ ${company.doNotContactReason}` : ''}</p>
@@ -47,7 +39,7 @@ export default function CompanyCard({
 
       <div className="company-heading">
         <h3>{company.companyName}</h3>
-        <p>{company.industry}</p>
+        <p>{company.industry || '業種未設定'}</p>
       </div>
 
       <div className="score-panel">
@@ -70,7 +62,7 @@ export default function CompanyCard({
             電話
           </span>
           <span className={company.email ? 'info-badge ready' : 'info-badge muted'}>
-            {company.email ? `✉️ ${company.email}` : 'メール未取得'}
+            {company.email ? `メール ${company.email}` : 'メール未取得'}
           </span>
           <span className={company.inquiryUrl ? 'info-badge ready' : 'info-badge muted'}>
             {company.inquiryUrl ? '問い合わせあり' : '問い合わせ未取得'}

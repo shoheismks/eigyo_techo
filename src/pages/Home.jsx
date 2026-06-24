@@ -1,15 +1,7 @@
 import { calculateCompanyScore } from '../services/scoringService.js';
+import { PIPELINE_STATUSES } from './Pipeline.jsx';
 
 const ACTIVE_DONE_STATUSES = ['成約', '失注'];
-const PIPELINE_STATUSES = [
-  '未接触',
-  '送信済',
-  '返信あり',
-  '商談中',
-  '見積提出',
-  '成約',
-  '失注',
-];
 
 function todayString() {
   const now = new Date();
@@ -78,11 +70,6 @@ export default function Home({
     return summary;
   }, {});
 
-  const meetingCount = statusCounts['商談中'] ?? 0;
-  const estimateCount = statusCounts['見積提出'] ?? 0;
-  const wonCount = statusCounts['成約'] ?? 0;
-  const lostCount = statusCounts['失注'] ?? 0;
-
   return (
     <main className="page">
       <section className="hero-panel dashboard-hero">
@@ -90,7 +77,7 @@ export default function Home({
           <p className="eyebrow">Today dashboard</p>
           <h1>営業手帳</h1>
           <p className="hero-copy">
-            今日フォローすべき案件と、優先度の高い営業先をすぐ確認できます。
+            今日フォローすべき案件と、優先度の高い営業先を朝すぐ確認できます。
           </p>
         </div>
         <button className="hero-action" onClick={() => setActivePage('Pipeline')}>
@@ -101,10 +88,10 @@ export default function Home({
       <section className="dashboard-metrics" aria-label="今日の営業指標">
         <DashboardMetric label="本日フォロー" value={followToday.length} tone="blue" />
         <DashboardMetric label="今週フォロー" value={followThisWeek.length} tone="blue" />
-        <DashboardMetric label="商談中" value={meetingCount} tone="orange" />
-        <DashboardMetric label="見積提出" value={estimateCount} tone="purple" />
-        <DashboardMetric label="成約" value={wonCount} tone="gold" />
-        <DashboardMetric label="失注" value={lostCount} tone="red" />
+        <DashboardMetric label="商談中" value={statusCounts['商談中'] ?? 0} tone="orange" />
+        <DashboardMetric label="見積提出" value={statusCounts['見積提出'] ?? 0} tone="purple" />
+        <DashboardMetric label="成約" value={statusCounts['成約'] ?? 0} tone="gold" />
+        <DashboardMetric label="失注" value={statusCounts['失注'] ?? 0} tone="red" />
       </section>
 
       <section className="section-block follow-section">

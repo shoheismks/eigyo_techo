@@ -27,6 +27,7 @@ const defaultCustomer = {
   status: '未接触',
   tags: [],
   memo: '',
+  companyNote: '',
   nextFollowUpDate: '',
   isDoNotContact: false,
   doNotContactReason: '',
@@ -53,7 +54,31 @@ function normalizeStatus(status) {
   return legacyStatusMap[status] ?? status ?? '未接触';
 }
 
-function normalizeCustomer(customer) {
+function normalizeReply(reply = {}) {
+  return {
+    id: reply.id ?? crypto.randomUUID(),
+    type: reply.type ?? '返信',
+    summary: reply.summary ?? '',
+    createdAt: reply.createdAt ?? new Date().toISOString(),
+    createdBy: reply.createdBy ?? '',
+    replies: Array.isArray(reply.replies) ? reply.replies.map(normalizeReply) : [],
+  };
+}
+
+function normalizeDealHistory(history = {}) {
+  return {
+    id: history.id ?? crypto.randomUUID(),
+    date: history.date ?? '',
+    type: history.type ?? 'メール',
+    summary: history.summary ?? '',
+    nextAction: history.nextAction ?? '',
+    createdAt: history.createdAt ?? new Date().toISOString(),
+    createdBy: history.createdBy ?? '',
+    replies: Array.isArray(history.replies) ? history.replies.map(normalizeReply) : [],
+  };
+}
+
+function normalizeCustomer(customer = {}) {
   const baseCustomer = {
     ...defaultCustomer,
     ...customer,
@@ -62,6 +87,8 @@ function normalizeCustomer(customer) {
     createdAt: customer.createdAt ?? new Date().toISOString(),
     updatedAt: customer.updatedAt ?? new Date().toISOString(),
     tags: Array.isArray(customer.tags) ? customer.tags : [],
+    memo: customer.memo ?? '',
+    companyNote: customer.companyNote ?? '',
     nextFollowUpDate: customer.nextFollowUpDate ?? customer.nextFollowDate ?? '',
     nextFollowDate: customer.nextFollowDate ?? customer.nextFollowUpDate ?? '',
     isDoNotContact: Boolean(customer.isDoNotContact),
@@ -81,16 +108,6 @@ function normalizeCustomer(customer) {
   };
 }
 
-function normalizeDealHistory(history) {
-  return {
-    id: history.id ?? crypto.randomUUID(),
-    date: history.date ?? '',
-    type: history.type ?? 'メール',
-    summary: history.summary ?? '',
-    nextAction: history.nextAction ?? '',
-  };
-}
-
 function readLocalCustomers() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -102,6 +119,27 @@ function readLocalCustomers() {
 
 function saveLocalCustomers(customers) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+}
+
+function toSyncError(error) {
+  const message = error?.message || '';
+  if (message.includes('Could not find the table')) {
+    return 'Supabaseのcustomersテーブルが見つかりません。SQLを実行してください。';
+  }
+
+  return 'Supabase接続に失敗しました。LocalStorageで動作しています。';
+}
+
+function getLocalReason(fallback = '') {
+  if (!hasCloudConfig()) {
+    return 'Supabase環境変数が未設定です。LocalStorageで動作しています。';
+  }
+
+  if (!navigator.onLine) {
+    return 'オフラインのためLocalStorageで動作しています。';
+  }
+
+  return fallback;
 }
 
 export function useCustomers() {
@@ -179,7 +217,7 @@ export function useCustomers() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [customers]);
+  }, []);
 
   const sortedCustomers = useMemo(
     () =>
@@ -192,7 +230,7 @@ export function useCustomers() {
   async function reloadFromCloud() {
     if (!canUseSupabase()) {
       setCustomers(readLocalCustomers());
-      setSyncState(hasCloudConfig() ? 'local' : 'local');
+      setSyncState('local');
       setSyncError(getLocalReason());
       return;
     }
@@ -209,6 +247,33 @@ export function useCustomers() {
       setSyncError(toSyncError(error));
       setSyncState('local');
     }
+  }
+
+  function syncCustomers(nextCustomers, changedCustomer = null) {
+    saveLocalCustomers(nextCustomers);
+
+    if (!canUseSupabase()) {
+      setSyncState('local');
+      setSyncError(
+        hasCloudConfig()
+          ? getLocalReason('Supabaseに接続できません。LocalStorageに保存しました。')
+          : getLocalReason(),
+      );
+      return;
+    }
+
+    const writePromise = changedCustomer
+      ? upsertRemoteCustomer(changedCustomer)
+      : upsertRemoteCustomers(nextCustomers);
+
+    setSyncState('syncing');
+    setSyncError('');
+    writePromise
+      .then(reloadFromCloud)
+      .catch((error) => {
+        setSyncError(toSyncError(error));
+        setSyncState('local');
+      });
   }
 
   function addCustomer(customer) {
@@ -253,7 +318,7 @@ export function useCustomers() {
     if (exists) {
       return {
         ok: false,
-        reason: '既に営業手帳に追加されています',
+        reason: 'すでに営業手帳に追加されています',
       };
     }
 
@@ -320,33 +385,6 @@ export function useCustomers() {
     });
   }
 
-  function syncCustomers(nextCustomers, changedCustomer = null) {
-    saveLocalCustomers(nextCustomers);
-
-    if (!canUseSupabase()) {
-      setSyncState('local');
-      if (hasCloudConfig()) {
-        setSyncError(getLocalReason('Supabaseに接続できません。LocalStorageに保存しました。'));
-      } else {
-        setSyncError(getLocalReason());
-      }
-      return;
-    }
-
-    const writePromise = changedCustomer
-      ? upsertRemoteCustomer(changedCustomer)
-      : upsertRemoteCustomers(nextCustomers);
-
-    setSyncState('syncing');
-    setSyncError('');
-    writePromise
-      .then(reloadFromCloud)
-      .catch((error) => {
-        setSyncError(toSyncError(error));
-        setSyncState('local');
-      });
-  }
-
   return {
     customers: sortedCustomers,
     addCustomer,
@@ -358,25 +396,4 @@ export function useCustomers() {
     syncError,
     syncState,
   };
-}
-
-function toSyncError(error) {
-  const message = error?.message || '';
-  if (message.includes('Could not find the table')) {
-    return 'Supabaseのcustomersテーブルが見つかりません。SQLを実行してください。';
-  }
-
-  return 'Supabase接続に失敗しました。LocalStorageで動作しています。';
-}
-
-function getLocalReason(fallback = '') {
-  if (!hasCloudConfig()) {
-    return 'Supabase環境変数が未設定です。LocalStorageで動作しています。';
-  }
-
-  if (!navigator.onLine) {
-    return 'オフラインのためLocalStorageで動作しています。';
-  }
-
-  return fallback;
 }

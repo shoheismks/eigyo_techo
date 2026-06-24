@@ -1,173 +1,220 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  PRODUCT_CATEGORIES,
+  TEMPERATURE_ZONES,
+  formatPrice,
+} from '../hooks/useProducts.js';
 
-const emptyProduct = {
-  name: '',
-  category: '',
-  description: '',
-  cost: '',
-  sellingPrice: '',
-  grossMarginRate: '',
-  memo: '',
-};
+const ALL = 'すべて';
 
-export default function Products({ products, addProduct, updateProduct, removeProduct }) {
-  const [form, setForm] = useState(emptyProduct);
-  const [editingId, setEditingId] = useState('');
+function includesText(value, keyword) {
+  return String(value ?? '').toLowerCase().includes(keyword);
+}
 
-  const editingProduct = products.find((product) => product.id === editingId);
+function uniqueValues(products, field) {
+  return [...new Set(products.map((product) => product[field]).filter(Boolean))].sort();
+}
 
-  function handleSubmit(event) {
-    event.preventDefault();
+export default function Products({ products, removeProduct, onOpenProductDetail }) {
+  const [keyword, setKeyword] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState(ALL);
+  const [temperatureFilter, setTemperatureFilter] = useState(ALL);
+  const [manufacturerFilter, setManufacturerFilter] = useState(ALL);
 
-    if (!form.name.trim()) {
-      return;
-    }
+  const manufacturers = useMemo(
+    () => uniqueValues(products, 'manufacturerName'),
+    [products],
+  );
 
-    if (editingId) {
-      updateProduct(editingId, form);
-    } else {
-      addProduct(form);
-    }
+  const filteredProducts = useMemo(() => {
+    const normalizedKeyword = keyword.trim().toLowerCase();
 
-    setForm(emptyProduct);
-    setEditingId('');
-  }
+    return products.filter((product) => {
+      const matchesKeyword =
+        !normalizedKeyword ||
+        [
+          product.name,
+          product.category,
+          product.manufacturerName,
+          product.origin,
+          product.temperatureZone,
+          product.packageStyle,
+          product.memo,
+        ].some((value) => includesText(value, normalizedKeyword));
 
-  function startEdit(product) {
-    setEditingId(product.id);
-    setForm({
-      name: product.name,
-      category: product.category,
-      description: product.description,
-      cost: product.cost,
-      sellingPrice: product.sellingPrice,
-      grossMarginRate: product.grossMarginRate,
-      memo: product.memo,
+      const matchesCategory =
+        categoryFilter === ALL || product.category === categoryFilter;
+      const matchesTemperature =
+        temperatureFilter === ALL || product.temperatureZone === temperatureFilter;
+      const matchesManufacturer =
+        manufacturerFilter === ALL || product.manufacturerName === manufacturerFilter;
+
+      return (
+        matchesKeyword &&
+        matchesCategory &&
+        matchesTemperature &&
+        matchesManufacturer
+      );
     });
-  }
-
-  function cancelEdit() {
-    setEditingId('');
-    setForm(emptyProduct);
-  }
+  }, [categoryFilter, keyword, manufacturerFilter, products, temperatureFilter]);
 
   return (
     <main className="page">
       <section className="page-header">
         <p className="eyebrow">Products</p>
         <h1>商品マスター</h1>
-        <p>提案に使う商品、価格、粗利、メモを登録します。</p>
+        <p>営業メールや商談で使う商品情報、価格、資料、スペックをまとめて管理します。</p>
       </section>
 
-      <form className="search-panel" onSubmit={handleSubmit}>
+      <section className="search-panel">
         <div className="section-heading">
-          <h2>{editingProduct ? '商品編集' : '商品追加'}</h2>
-          {editingProduct && <button type="button" className="text-button" onClick={cancelEdit}>取消</button>}
+          <h2>商品検索</h2>
+          <button
+            type="button"
+            className="primary-button compact-button"
+            onClick={() => onOpenProductDetail('new')}
+          >
+            商品追加
+          </button>
         </div>
+
         <label className="field-label">
-          商品名
+          キーワード
           <input
-            value={form.name}
-            placeholder="例: 和牛ベーコン"
-            onChange={(event) => setForm({ ...form, name: event.target.value })}
+            value={keyword}
+            placeholder="商品名、メーカー、産地、荷姿、メモで検索"
+            onChange={(event) => setKeyword(event.target.value)}
           />
         </label>
-        <label className="field-label">
-          カテゴリ
-          <input
-            value={form.category}
-            placeholder="例: 食肉加工品"
-            onChange={(event) => setForm({ ...form, category: event.target.value })}
-          />
-        </label>
-        <label className="field-label">
-          説明
-          <textarea
-            value={form.description}
-            placeholder="商品の特徴、用途、提案先など"
-            onChange={(event) => setForm({ ...form, description: event.target.value })}
-          />
-        </label>
+
         <div className="date-grid">
           <label className="field-label">
-            原価
-            <input
-              value={form.cost}
-              inputMode="decimal"
-              onChange={(event) => setForm({ ...form, cost: event.target.value })}
-            />
+            カテゴリー
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+            >
+              <option>{ALL}</option>
+              {PRODUCT_CATEGORIES.map((category) => (
+                <option key={category}>{category}</option>
+              ))}
+            </select>
           </label>
+
           <label className="field-label">
-            販売価格
-            <input
-              value={form.sellingPrice}
-              inputMode="decimal"
-              onChange={(event) => setForm({ ...form, sellingPrice: event.target.value })}
-            />
+            温度帯
+            <select
+              value={temperatureFilter}
+              onChange={(event) => setTemperatureFilter(event.target.value)}
+            >
+              <option>{ALL}</option>
+              {TEMPERATURE_ZONES.map((zone) => (
+                <option key={zone}>{zone}</option>
+              ))}
+            </select>
           </label>
         </div>
+
         <label className="field-label">
-          粗利率
-          <input
-            value={form.grossMarginRate}
-            placeholder="例: 35%"
-            onChange={(event) => setForm({ ...form, grossMarginRate: event.target.value })}
-          />
+          メーカー名
+          <select
+            value={manufacturerFilter}
+            onChange={(event) => setManufacturerFilter(event.target.value)}
+          >
+            <option>{ALL}</option>
+            {manufacturers.map((manufacturer) => (
+              <option key={manufacturer}>{manufacturer}</option>
+            ))}
+          </select>
         </label>
-        <label className="field-label">
-          メモ
-          <textarea
-            value={form.memo}
-            placeholder="サンプル可否、ロット、注意点など"
-            onChange={(event) => setForm({ ...form, memo: event.target.value })}
-          />
-        </label>
-        <button className="primary-button" type="submit">
-          {editingProduct ? '更新' : '追加'}
-        </button>
-      </form>
+      </section>
 
       <section className="result-stack">
         <div className="section-heading">
           <h2>商品一覧</h2>
-          <span>{products.length}件</span>
+          <span>{filteredProducts.length}件</span>
         </div>
-        {products.length > 0 ? (
-          products.map((product) => (
+
+        {filteredProducts.length > 0 ? (
+          filteredProducts.map((product) => (
             <article className="product-card" key={product.id}>
-              <div className="company-heading">
-                <h3>{product.name}</h3>
-                <p>{product.category || 'カテゴリ未設定'}</p>
+              <div className="product-card-main">
+                {product.imageFile?.dataUrl ? (
+                  <img
+                    className="product-thumb"
+                    src={product.imageFile.dataUrl}
+                    alt={`${product.name}の商品画像`}
+                  />
+                ) : (
+                  <div className="product-thumb placeholder">No Image</div>
+                )}
+
+                <div className="company-heading">
+                  <h3>{product.name}</h3>
+                  <p>
+                    {product.category || 'カテゴリー未設定'} / {product.temperatureZone || '温度帯未設定'}
+                  </p>
+                </div>
               </div>
+
               <dl className="company-details">
                 <div>
-                  <dt>説明</dt>
-                  <dd>{product.description || '未入力'}</dd>
+                  <dt>メーカー</dt>
+                  <dd>{product.manufacturerName || '未入力'}</dd>
+                </div>
+                <div>
+                  <dt>産地</dt>
+                  <dd>{product.origin || '未入力'}</dd>
+                </div>
+                <div>
+                  <dt>荷姿</dt>
+                  <dd>{product.packageStyle || '未入力'}</dd>
                 </div>
                 <div>
                   <dt>原価</dt>
-                  <dd>{product.cost || '未入力'}</dd>
+                  <dd>
+                    {formatPrice(product.costPrice) || '未入力'}
+                    {product.costPrice !== '' ? `円/${product.costUnit}` : ''}
+                  </dd>
                 </div>
                 <div>
-                  <dt>価格</dt>
-                  <dd>{product.sellingPrice || '未入力'}</dd>
+                  <dt>希望価格</dt>
+                  <dd>
+                    {formatPrice(product.desiredSellingPrice) || '未入力'}
+                    {product.desiredSellingPrice !== '' ? `円/${product.sellingPriceUnit}` : ''}
+                  </dd>
                 </div>
                 <div>
-                  <dt>粗利</dt>
+                  <dt>粗利率</dt>
                   <dd>{product.grossMarginRate || '未入力'}</dd>
                 </div>
               </dl>
+
+              <div className="lead-badges">
+                <span className={`info-badge ${product.productMaterialFile ? 'ready' : 'muted'}`}>
+                  商品資料 {product.productMaterialFile ? 'あり' : 'なし'}
+                </span>
+                <span className={`info-badge ${product.specSheetFile ? 'ready' : 'muted'}`}>
+                  スペック {product.specSheetFile ? 'あり' : 'なし'}
+                </span>
+              </div>
+
               {product.memo && <p className="inline-helper">{product.memo}</p>}
+
               <div className="card-actions">
-                <button className="ghost-button" onClick={() => startEdit(product)}>編集</button>
-                <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>削除</button>
+                <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>
+                  詳細・編集
+                </button>
+                <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>
+                  削除
+                </button>
               </div>
             </article>
           ))
         ) : (
           <div className="empty-state">
-            <h3>商品が未登録です</h3>
-            <p>営業メールや提案商品に使う商品を追加してください。</p>
+            <h3>商品が見つかりません</h3>
+            <p>検索条件を変えるか、商品マスターに新しい商品を追加してください。</p>
           </div>
         )}
       </section>

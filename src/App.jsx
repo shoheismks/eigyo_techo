@@ -7,23 +7,36 @@ import MailAI from './pages/MailAI.jsx';
 import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
 import Products from './pages/Products.jsx';
+import ProductDetail from './pages/ProductDetail.jsx';
 import { useCustomers } from './hooks/useCustomers.js';
 import { useProducts } from './hooks/useProducts.js';
 
 const pages = {
-  Home: { label: 'ホーム', icon: '⌂' },
-  LeadSearch: { label: '検索', icon: '⌕' },
-  CompanyEnrich: { label: '補完', icon: '＋' },
-  Customers: { label: '得意先', icon: '□' },
-  Pipeline: { label: '案件', icon: '▤' },
-  Products: { label: '商品', icon: '◇' },
-  MailAI: { label: 'メール', icon: '✉' },
+  Home: { label: 'ホーム', icon: 'H' },
+  LeadSearch: { label: '検索', icon: 'S' },
+  CompanyEnrich: { label: '補完', icon: 'E' },
+  Customers: { label: '得意先', icon: 'C' },
+  Pipeline: { label: '案件', icon: 'P' },
+  Products: { label: '商品', icon: 'B' },
+  MailAI: { label: 'メール', icon: 'M' },
 };
 
+function isImportPath() {
+  return window.location.pathname === '/import';
+}
+
+function getImportCompanyName() {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get('companyName') || params.get('importCompany') || '').trim();
+}
+
 export default function App() {
-  const [activePage, setActivePage] = useState('Home');
+  const [activePage, setActivePage] = useState(() => (isImportPath() ? 'Import' : 'Home'));
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
   const [extensionNotice, setExtensionNotice] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importHandled, setImportHandled] = useState(false);
   const {
     customers,
     addCustomer,
@@ -38,10 +51,16 @@ export default function App() {
   const { products, addProduct, updateProduct, removeProduct } = useProducts();
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+  const selectedProduct = products.find((product) => product.id === selectedProductId);
 
   function openCustomerDetail(customerId) {
     setSelectedCustomerId(customerId);
     setActivePage('CustomerDetail');
+  }
+
+  function openProductDetail(productId) {
+    setSelectedProductId(productId === 'new' ? '' : productId);
+    setActivePage('ProductDetail');
   }
 
   function handleExtensionImport(companyName) {
@@ -80,31 +99,7 @@ export default function App() {
       );
     }
 
-    function handleUrlImport() {
-      const params = new URLSearchParams(window.location.search);
-      const companyName = params.get('importCompany');
-      if (!companyName) {
-        return;
-      }
-
-      const result = handleExtensionImport(companyName);
-      window.postMessage(
-        {
-          type: 'EIGYO_TECHO_IMPORT_RESULT',
-          requestId: 'url-import',
-          ok: result.ok,
-          message: result.reason,
-        },
-        window.location.origin,
-      );
-      params.delete('importCompany');
-      const nextSearch = params.toString();
-      const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
-      window.history.replaceState({}, '', nextUrl);
-    }
-
     window.addEventListener('message', handleMessage);
-    window.setTimeout(handleUrlImport, 0);
 
     return () => {
       window.removeEventListener('message', handleMessage);
@@ -112,10 +107,45 @@ export default function App() {
     };
   });
 
+  useEffect(() => {
+    if (!isImportPath() || importHandled) {
+      return;
+    }
+
+    setImportHandled(true);
+    const companyName = getImportCompanyName();
+
+    if (!companyName) {
+      setImportError('会社名が指定されていません。');
+      setActivePage('Import');
+      return;
+    }
+
+    const result = handleExtensionImport(companyName);
+    window.postMessage(
+      {
+        type: 'EIGYO_TECHO_IMPORT_RESULT',
+        requestId: 'url-import',
+        ok: result.ok,
+        message: result.reason,
+      },
+      window.location.origin,
+    );
+
+    setActivePage('Customers');
+    window.history.replaceState({}, '', '/');
+  }, [importHandled]);
+
   return (
     <div className="app-shell">
       <div className="app-frame">
         {extensionNotice && <div className="extension-toast">{extensionNotice}</div>}
+        {activePage === 'Import' && (
+          <ImportPage
+            error={importError}
+            onGoCustomers={() => setActivePage('Customers')}
+          />
+        )}
         {activePage === 'Home' && (
           <Home
             customers={customers}
@@ -153,9 +183,16 @@ export default function App() {
         {activePage === 'Products' && (
           <Products
             products={products}
+            removeProduct={removeProduct}
+            onOpenProductDetail={openProductDetail}
+          />
+        )}
+        {activePage === 'ProductDetail' && (
+          <ProductDetail
+            product={selectedProduct}
             addProduct={addProduct}
             updateProduct={updateProduct}
-            removeProduct={removeProduct}
+            setActivePage={setActivePage}
           />
         )}
         {activePage === 'MailAI' && <MailAI customers={customers} products={products} />}
@@ -174,5 +211,32 @@ export default function App() {
         </nav>
       </div>
     </div>
+  );
+}
+
+function ImportPage({ error, onGoCustomers }) {
+  return (
+    <main className="page">
+      <section className="page-header">
+        <p className="eyebrow">Import</p>
+        <h1>会社名を追加</h1>
+        <p>Chrome拡張から受け取った会社名を営業手帳へ追加します。</p>
+      </section>
+
+      {error ? (
+        <section className="empty-state">
+          <h3>追加できませんでした</h3>
+          <p>{error}</p>
+          <button className="primary-button" onClick={onGoCustomers}>
+            得意先一覧へ
+          </button>
+        </section>
+      ) : (
+        <section className="empty-state">
+          <h3>取り込み中...</h3>
+          <p>会社名を確認しています。</p>
+        </section>
+      )}
+    </main>
   );
 }

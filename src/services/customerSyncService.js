@@ -38,6 +38,19 @@ export async function upsertRemoteCustomers(customers) {
     .upsert(rows, { onConflict: 'id' });
 
   if (error) {
+    if (isMissingColumnError(error, 'company_note')) {
+      const fallbackRows = rows.map(({ company_note: _companyNote, ...row }) => row);
+      const { error: fallbackError } = await supabase
+        .from(TABLE_NAME)
+        .upsert(fallbackRows, { onConflict: 'id' });
+
+      if (!fallbackError) {
+        return;
+      }
+
+      throw fallbackError;
+    }
+
     throw error;
   }
 }
@@ -95,6 +108,7 @@ function toSupabaseRow(customer) {
     status: customer.status,
     tags: customer.tags,
     memo: customer.memo,
+    company_note: customer.companyNote,
     next_follow_up_date: customer.nextFollowUpDate || customer.nextFollowDate || null,
     is_do_not_contact: customer.isDoNotContact,
     do_not_contact_reason: customer.doNotContactReason,
@@ -128,8 +142,9 @@ function fromSupabaseRow(row) {
     emailType: row.email_type ?? row.emailType ?? '',
     inquiryUrl: row.inquiry_url ?? row.inquiryUrl ?? '',
     status: row.status ?? '未接触',
-    tags: row.tags ?? row.tags ?? [],
+    tags: row.tags ?? [],
     memo: row.memo ?? '',
+    companyNote: row.company_note ?? row.companyNote ?? '',
     nextFollowUpDate: row.next_follow_up_date ?? row.nextFollowUpDate ?? row.next_follow_date ?? '',
     isDoNotContact: Boolean(row.is_do_not_contact ?? row.isDoNotContact ?? false),
     doNotContactReason: row.do_not_contact_reason ?? row.doNotContactReason ?? '',
@@ -146,4 +161,9 @@ function fromSupabaseRow(row) {
     createdAt: row.created_at ?? row.createdAt ?? new Date().toISOString(),
     updatedAt: row.updated_at ?? row.updatedAt ?? '',
   };
+}
+
+function isMissingColumnError(error, columnName) {
+  const message = error?.message || error?.details || '';
+  return message.includes(columnName) && message.includes('column');
 }
