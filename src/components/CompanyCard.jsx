@@ -48,8 +48,8 @@ export default function CompanyCard({
           <strong>{company.score ?? 0}</strong>
         </div>
         <div>
-          <span>Rank</span>
-          <strong>{company.rank ?? '★☆☆☆☆'}</strong>
+          <span>顧客ランク</span>
+          <strong>{company.customerRank || company.rank || 'D'}</strong>
         </div>
       </div>
 

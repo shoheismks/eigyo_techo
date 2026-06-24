@@ -72,8 +72,8 @@ export default function Pipeline({ customers, updateCustomer }) {
                           <strong>{customer.score}</strong>
                         </div>
                         <div>
-                          <span>Rank</span>
-                          <strong>{customer.rank}</strong>
+                          <span>顧客ランク</span>
+                          <strong>{customer.customerRank || customer.rank}</strong>
                         </div>
                       </div>
 

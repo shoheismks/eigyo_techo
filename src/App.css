@@ -278,6 +278,12 @@ h3 {
   font-weight: 800;
 }
 
+.external-button {
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
 .compact-button {
   min-height: 40px;
   padding: 0 14px;

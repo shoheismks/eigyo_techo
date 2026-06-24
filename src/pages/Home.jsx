@@ -25,10 +25,6 @@ function followDate(customer) {
 }
 
 function withScore(customer) {
-  if (typeof customer.score === 'number' && customer.rank && customer.scoreReasons) {
-    return customer;
-  }
-
   return {
     ...customer,
     ...calculateCompanyScore(customer),
@@ -45,6 +41,7 @@ export default function Home({
   const today = todayString();
   const weekEnd = addDaysString(today, 6);
   const scoredCustomers = customers.map(withScore);
+  const sRankCount = scoredCustomers.filter((customer) => customer.customerRank === 'S').length;
   const followToday = scoredCustomers.filter(
     (customer) =>
       followDate(customer) &&
@@ -86,6 +83,7 @@ export default function Home({
       </section>
 
       <section className="dashboard-metrics" aria-label="今日の営業指標">
+        <DashboardMetric label="Sランク顧客" value={sRankCount} tone="gold" />
         <DashboardMetric label="本日フォロー" value={followToday.length} tone="blue" />
         <DashboardMetric label="今週フォロー" value={followThisWeek.length} tone="blue" />
         <DashboardMetric label="商談中" value={statusCounts['商談中'] ?? 0} tone="orange" />
@@ -196,7 +194,7 @@ export default function Home({
                 <span className="top-score-index">{index + 1}</span>
                 <span className="top-score-main">
                   <strong>{customer.companyName}</strong>
-                  <small>{customer.status}</small>
+                  <small>{customer.status} / {customer.customerRank}ランク</small>
                 </span>
                 <span className="top-score-value">{customer.score}</span>
               </button>

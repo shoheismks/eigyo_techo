@@ -18,6 +18,10 @@ const emptyReply = {
   createdBy: '',
 };
 
+function googleSearchUrl(companyName) {
+  return `https://www.google.com/search?q=${encodeURIComponent(companyName)}`;
+}
+
 function hasCorrection(history) {
   return (history.replies ?? []).some(
     (reply) => reply.type === '訂正' || hasCorrection(reply),
@@ -193,6 +197,27 @@ export default function CustomerDetail({
           <h2>会社情報</h2>
           <button className="text-button" onClick={() => setActivePage('Customers')}>一覧へ</button>
         </div>
+
+        <a
+          className="ghost-button external-button"
+          href={googleSearchUrl(customer.companyName)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Google検索
+        </a>
+
+        <div className="score-panel">
+          <div>
+            <span>Score</span>
+            <strong>{customer.score ?? 0}</strong>
+          </div>
+          <div>
+            <span>顧客ランク</span>
+            <strong>{customer.customerRank || customer.rank || 'D'}</strong>
+          </div>
+        </div>
+
         <label className="field-label">
           会社名
           <input value={customer.companyName} onChange={(event) => updateField('companyName', event.target.value)} />
@@ -215,12 +240,12 @@ export default function CustomerDetail({
             <input value={customer.phone} onChange={(event) => updateField('phone', event.target.value)} />
           </label>
           <label className="field-label">
-            Email
+            メールアドレス
             <input value={customer.email} onChange={(event) => updateField('email', event.target.value)} />
           </label>
         </div>
         <label className="field-label">
-          公式サイト
+          公式サイトURL
           <input value={customer.website} onChange={(event) => updateField('website', event.target.value)} />
         </label>
         <label className="field-label">
@@ -235,6 +260,15 @@ export default function CustomerDetail({
             onChange={(event) => updateField('companyNote', event.target.value)}
           />
         </label>
+
+        <div className="score-reasons">
+          <p>スコア理由</p>
+          <ul>
+            {(customer.scoreReasons ?? []).map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       <section className="detail-section">

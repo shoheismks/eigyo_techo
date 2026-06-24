@@ -11,6 +11,7 @@ import {
 } from '../services/customerSyncService.js';
 
 const STORAGE_KEY = 'eigyo-techo-customers';
+const VALID_STATUSES = ['未接触', '送信済', '返信あり', '商談中', '見積提出', '成約', '失注'];
 
 const defaultCustomer = {
   placeId: '',
@@ -39,7 +40,8 @@ const defaultCustomer = {
   nextFollowDate: '',
   pipelineMemo: '',
   score: 0,
-  rank: '★☆☆☆☆',
+  rank: 'D',
+  customerRank: 'D',
   scoreReasons: [],
   updatedAt: '',
 };
@@ -51,7 +53,16 @@ const legacyStatusMap = {
 };
 
 function normalizeStatus(status) {
-  return legacyStatusMap[status] ?? status ?? '未接触';
+  const normalized = legacyStatusMap[status] ?? status;
+  return VALID_STATUSES.includes(normalized) ? normalized : '未接触';
+}
+
+function normalizeContactStatus(status, customer) {
+  if (['未取得', '取得済', '取得失敗'].includes(status)) {
+    return status;
+  }
+
+  return customer.email || customer.inquiryUrl ? '取得済' : '未取得';
 }
 
 function normalizeReply(reply = {}) {
@@ -97,10 +108,9 @@ function normalizeCustomer(customer = {}) {
       ? customer.dealHistories.map(normalizeDealHistory)
       : [],
     proposedProducts: Array.isArray(customer.proposedProducts) ? customer.proposedProducts : [],
-    contactStatus:
-      customer.contactStatus ?? (customer.email || customer.inquiryUrl ? '取得済' : '未取得'),
     pipelineMemo: customer.pipelineMemo ?? customer.memo ?? '',
   };
+  baseCustomer.contactStatus = normalizeContactStatus(customer.contactStatus, baseCustomer);
 
   return {
     ...baseCustomer,
