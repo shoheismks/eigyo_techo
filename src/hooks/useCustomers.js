@@ -235,6 +235,50 @@ export function useCustomers() {
     });
   }
 
+  function importCompanyName(companyName) {
+    const normalizedCompanyName = companyName.trim().replace(/\s+/g, ' ');
+
+    if (!normalizedCompanyName) {
+      return {
+        ok: false,
+        reason: '会社名が空です',
+      };
+    }
+
+    const exists = customers.some(
+      (customer) =>
+        customer.companyName.trim().toLowerCase() === normalizedCompanyName.toLowerCase(),
+    );
+
+    if (exists) {
+      return {
+        ok: false,
+        reason: '既に営業手帳に追加されています',
+      };
+    }
+
+    const importedCustomer = normalizeCustomer({
+      id: crypto.randomUUID(),
+      companyName: normalizedCompanyName,
+      status: '未接触',
+      source: 'chrome-extension',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    setCustomers((current) => {
+      const nextCustomers = [importedCustomer, ...current];
+      syncCustomers(nextCustomers, importedCustomer);
+      return nextCustomers;
+    });
+
+    return {
+      ok: true,
+      reason: '営業手帳に追加しました',
+      customerId: importedCustomer.id,
+    };
+  }
+
   function updateCustomer(id, updates) {
     setCustomers((current) => {
       const nextCustomers = current.map((customer) =>
@@ -306,6 +350,7 @@ export function useCustomers() {
   return {
     customers: sortedCustomers,
     addCustomer,
+    importCompanyName,
     updateCustomer,
     removeCustomer,
     isSaved,
