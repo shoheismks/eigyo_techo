@@ -318,6 +318,23 @@ textarea:focus {
   padding: 16px;
 }
 
+.company-card.ng-card,
+.ng-panel {
+  border-color: rgba(255, 107, 123, 0.58);
+  background: linear-gradient(180deg, rgba(48, 18, 29, 0.96), rgba(18, 10, 16, 0.96));
+}
+
+.ng-banner {
+  margin: 0;
+  border: 1px solid rgba(255, 107, 123, 0.36);
+  border-radius: 8px;
+  background: rgba(255, 107, 123, 0.14);
+  color: #ffbec7;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
 .company-card.compact {
   box-shadow: none;
 }
@@ -1084,6 +1101,49 @@ textarea:focus {
   font-size: 0.86rem;
 }
 
+.detail-section,
+.product-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 26, 43, 0.96), rgba(10, 15, 26, 0.96));
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+
+.switch-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.switch-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+
+.history-list,
+.product-check-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
 .pipeline-count.gray,
 .pipeline-card.gray {
   border-color: rgba(157, 176, 201, 0.3);
@@ -1155,7 +1215,7 @@ textarea:focus {
   width: min(calc(100% - 24px), 496px);
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1175,7 +1235,7 @@ textarea:focus {
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 900;
 }
 
@@ -1187,7 +1247,7 @@ textarea:focus {
 
   .bottom-nav button {
     min-height: 50px;
-    font-size: 0.62rem;
+    font-size: 0.55rem;
   }
 
   .bottom-nav button span {

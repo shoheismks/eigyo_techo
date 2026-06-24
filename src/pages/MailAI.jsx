@@ -9,8 +9,9 @@ import {
   upsertMailDrafts,
 } from '../services/mailDraftSyncService.js';
 
-export default function MailAI({ customers }) {
+export default function MailAI({ customers, products = [] }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
+  const [productId, setProductId] = useState('');
   const [productName, setProductName] = useState('');
   const [purpose, setPurpose] = useState('新規営業');
   const [senderName, setSenderName] = useState('');
@@ -35,6 +36,16 @@ export default function MailAI({ customers }) {
     () => customers.find((customer) => customer.id === customerId) ?? customers[0],
     [customerId, customers],
   );
+  const selectedProduct = useMemo(
+    () => products.find((product) => product.id === productId),
+    [products, productId],
+  );
+
+  useEffect(() => {
+    if (selectedProduct) {
+      setProductName(selectedProduct.name);
+    }
+  }, [selectedProduct]);
 
   useEffect(() => {
     let ignore = false;
@@ -80,6 +91,7 @@ export default function MailAI({ customers }) {
         productName,
         purpose,
         senderName,
+        products,
       });
       const generatedDrafts = normalizeGeneratedDrafts({
         customer: selectedCustomer,
@@ -201,6 +213,18 @@ export default function MailAI({ customers }) {
         </label>
 
         <label className="field-label">
+          商品マスター
+          <select value={productId} onChange={(event) => setProductId(event.target.value)}>
+            <option value="">手入力</option>
+            {products.map((product) => (
+              <option value={product.id} key={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field-label">
           商材名
           <input
             value={productName}
@@ -227,13 +251,15 @@ export default function MailAI({ customers }) {
           />
         </label>
 
-        <button
-          className="primary-button"
-          disabled={!selectedCustomer || isGenerating}
-          onClick={handleCreateDrafts}
-        >
-          {isGenerating ? 'AI生成中...' : 'メール案を作成'}
-        </button>
+        {!selectedCustomer?.isDoNotContact && (
+          <button
+            className="primary-button"
+            disabled={!selectedCustomer || isGenerating}
+            onClick={handleCreateDrafts}
+          >
+            {isGenerating ? 'AI生成中...' : 'メール案を作成'}
+          </button>
+        )}
       </section>
 
       {selectedCustomer && (
@@ -246,7 +272,15 @@ export default function MailAI({ customers }) {
             <span>送信先メール</span>
             <strong>{selectedCustomer.email || 'メールアドレスが未登録です'}</strong>
           </div>
+          <div>
+            <span>タグ</span>
+            <strong>{(selectedCustomer.tags ?? []).join(', ') || '未設定'}</strong>
+          </div>
         </section>
+      )}
+
+      {selectedCustomer?.isDoNotContact && (
+        <p className="error-text">この顧客は配信停止・NGのため、メール作成ボタンを表示しません。</p>
       )}
 
       {generationSource && (
@@ -277,14 +311,14 @@ export default function MailAI({ customers }) {
                   </button>
                   <button
                     className="ghost-button"
-                    disabled={!selectedCustomer?.email || gmailLoadingDraftId === draft.id}
+                    disabled={selectedCustomer?.isDoNotContact || !selectedCustomer?.email || gmailLoadingDraftId === draft.id}
                     onClick={() => handleCreateGmailDraft(draft)}
                   >
                     {gmailLoadingDraftId === draft.id ? '作成中...' : 'Gmail下書き作成'}
                   </button>
                   <button
                     className="ghost-button"
-                    disabled={!selectedCustomer?.email || outlookLoadingDraftId === draft.id}
+                    disabled={selectedCustomer?.isDoNotContact || !selectedCustomer?.email || outlookLoadingDraftId === draft.id}
                     onClick={() => handleCreateOutlookDraft(draft)}
                   >
                     {outlookLoadingDraftId === draft.id ? '作成中...' : 'Outlook下書き作成'}

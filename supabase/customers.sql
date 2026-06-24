@@ -12,7 +12,13 @@ create table if not exists public.customers (
   email_type text,
   inquiry_url text,
   status text,
+  tags jsonb,
   memo text,
+  next_follow_up_date date,
+  is_do_not_contact boolean default false,
+  do_not_contact_reason text,
+  deal_histories jsonb,
+  proposed_products jsonb,
   source text,
   contact_status text,
   last_contact_date date,
@@ -26,6 +32,12 @@ create table if not exists public.customers (
 );
 
 alter table public.customers add column if not exists corporate_number text;
+alter table public.customers add column if not exists tags jsonb;
+alter table public.customers add column if not exists next_follow_up_date date;
+alter table public.customers add column if not exists is_do_not_contact boolean default false;
+alter table public.customers add column if not exists do_not_contact_reason text;
+alter table public.customers add column if not exists deal_histories jsonb;
+alter table public.customers add column if not exists proposed_products jsonb;
 
 alter table public.customers enable row level security;
 

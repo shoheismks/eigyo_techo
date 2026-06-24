@@ -25,7 +25,13 @@ const defaultCustomer = {
   emailType: '',
   inquiryUrl: '',
   status: '未接触',
+  tags: [],
   memo: '',
+  nextFollowUpDate: '',
+  isDoNotContact: false,
+  doNotContactReason: '',
+  dealHistories: [],
+  proposedProducts: [],
   source: 'Manual',
   contactStatus: '未取得',
   lastContactDate: '',
@@ -55,6 +61,15 @@ function normalizeCustomer(customer) {
     status: normalizeStatus(customer.status),
     createdAt: customer.createdAt ?? new Date().toISOString(),
     updatedAt: customer.updatedAt ?? new Date().toISOString(),
+    tags: Array.isArray(customer.tags) ? customer.tags : [],
+    nextFollowUpDate: customer.nextFollowUpDate ?? customer.nextFollowDate ?? '',
+    nextFollowDate: customer.nextFollowDate ?? customer.nextFollowUpDate ?? '',
+    isDoNotContact: Boolean(customer.isDoNotContact),
+    doNotContactReason: customer.doNotContactReason ?? '',
+    dealHistories: Array.isArray(customer.dealHistories)
+      ? customer.dealHistories.map(normalizeDealHistory)
+      : [],
+    proposedProducts: Array.isArray(customer.proposedProducts) ? customer.proposedProducts : [],
     contactStatus:
       customer.contactStatus ?? (customer.email || customer.inquiryUrl ? '取得済' : '未取得'),
     pipelineMemo: customer.pipelineMemo ?? customer.memo ?? '',
@@ -63,6 +78,16 @@ function normalizeCustomer(customer) {
   return {
     ...baseCustomer,
     ...calculateCompanyScore(baseCustomer),
+  };
+}
+
+function normalizeDealHistory(history) {
+  return {
+    id: history.id ?? crypto.randomUUID(),
+    date: history.date ?? '',
+    type: history.type ?? 'メール',
+    summary: history.summary ?? '',
+    nextAction: history.nextAction ?? '',
   };
 }
 

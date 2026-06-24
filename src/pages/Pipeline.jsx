@@ -117,9 +117,10 @@ export default function Pipeline({ customers, updateCustomer }) {
                           次回フォロー日
                           <input
                             type="date"
-                            value={customer.nextFollowDate}
+                            value={customer.nextFollowUpDate || customer.nextFollowDate}
                             onChange={(event) =>
                               updateCustomer(customer.id, {
+                                nextFollowUpDate: event.target.value,
                                 nextFollowDate: event.target.value,
                               })
                             }

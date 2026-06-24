@@ -19,6 +19,19 @@ function todayString() {
   return `${year}-${month}-${date}`;
 }
 
+function addDaysString(baseDate, days) {
+  const nextDate = new Date(baseDate);
+  nextDate.setDate(nextDate.getDate() + days);
+  const year = nextDate.getFullYear();
+  const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const date = String(nextDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
+}
+
+function followDate(customer) {
+  return customer.nextFollowUpDate || customer.nextFollowDate || '';
+}
+
 function withScore(customer) {
   if (typeof customer.score === 'number' && customer.rank && customer.scoreReasons) {
     return customer;
@@ -38,14 +51,24 @@ export default function Home({
   reloadFromCloud,
 }) {
   const today = todayString();
+  const weekEnd = addDaysString(today, 6);
   const scoredCustomers = customers.map(withScore);
   const followToday = scoredCustomers.filter(
     (customer) =>
-      customer.nextFollowDate &&
-      customer.nextFollowDate <= today &&
-      !ACTIVE_DONE_STATUSES.includes(customer.status),
+      followDate(customer) &&
+      followDate(customer) <= today &&
+      !ACTIVE_DONE_STATUSES.includes(customer.status) &&
+      !customer.isDoNotContact,
   );
-  const overdueFollows = followToday.filter((customer) => customer.nextFollowDate < today);
+  const followThisWeek = scoredCustomers.filter(
+    (customer) =>
+      followDate(customer) &&
+      followDate(customer) > today &&
+      followDate(customer) <= weekEnd &&
+      !ACTIVE_DONE_STATUSES.includes(customer.status) &&
+      !customer.isDoNotContact,
+  );
+  const overdueFollows = followToday.filter((customer) => followDate(customer) < today);
   const topScoredCustomers = [...scoredCustomers]
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
@@ -77,6 +100,7 @@ export default function Home({
 
       <section className="dashboard-metrics" aria-label="今日の営業指標">
         <DashboardMetric label="本日フォロー" value={followToday.length} tone="blue" />
+        <DashboardMetric label="今週フォロー" value={followThisWeek.length} tone="blue" />
         <DashboardMetric label="商談中" value={meetingCount} tone="orange" />
         <DashboardMetric label="見積提出" value={estimateCount} tone="purple" />
         <DashboardMetric label="成約" value={wonCount} tone="gold" />
@@ -99,7 +123,7 @@ export default function Home({
                 onClick={() => setActivePage('Pipeline')}
               >
                 <span>{customer.companyName}</span>
-                <small>{customer.nextFollowDate}</small>
+                <small>{followDate(customer)}</small>
               </button>
             ))}
           </div>
@@ -107,6 +131,34 @@ export default function Home({
           <div className="empty-state">
             <h3>本日のフォローはありません</h3>
             <p>案件管理で次回フォロー日を登録すると、ここに表示されます。</p>
+          </div>
+        )}
+      </section>
+
+      <section className="section-block follow-section">
+        <div className="section-heading">
+          <h2>今週フォローすべき顧客</h2>
+          <button className="text-button" onClick={() => setActivePage('Customers')}>
+            得意先へ
+          </button>
+        </div>
+        {followThisWeek.length > 0 ? (
+          <div className="dashboard-card-list">
+            {followThisWeek.slice(0, 5).map((customer) => (
+              <button
+                className="dashboard-row"
+                key={customer.id}
+                onClick={() => setActivePage('Customers')}
+              >
+                <span>{customer.companyName}</span>
+                <small>{followDate(customer)}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">
+            <h3>今週の追加フォローはありません</h3>
+            <p>得意先詳細で次回フォロー日を登録すると、ここに表示されます。</p>
           </div>
         )}
       </section>
@@ -127,7 +179,7 @@ export default function Home({
                 onClick={() => setActivePage('Pipeline')}
               >
                 <span>{customer.companyName}</span>
-                <small>{customer.nextFollowDate}</small>
+                <small>{followDate(customer)}</small>
               </button>
             ))}
           </div>

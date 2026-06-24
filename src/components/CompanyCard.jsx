@@ -36,11 +36,14 @@ export default function CompanyCard({
   const canDiscoverContact = Boolean(company.website) && !contactLoading;
 
   return (
-    <article className={`company-card ${compact ? 'compact' : ''}`}>
+    <article className={`company-card ${compact ? 'compact' : ''} ${company.isDoNotContact ? 'ng-card' : ''}`}>
       <div className="card-topline">
         <span className={`status-pill ${tone}`}>{company.status}</span>
         <span className="area-chip">{company.area}</span>
       </div>
+      {company.isDoNotContact && (
+        <p className="ng-banner">配信停止・NG {company.doNotContactReason ? `/ ${company.doNotContactReason}` : ''}</p>
+      )}
 
       <div className="company-heading">
         <h3>{company.companyName}</h3>
@@ -105,7 +108,19 @@ export default function CompanyCard({
           <dt>取得元</dt>
           <dd>{company.source || 'Manual'}</dd>
         </div>
+        <div>
+          <dt>次回</dt>
+          <dd>{company.nextFollowUpDate || company.nextFollowDate || '未設定'}</dd>
+        </div>
       </dl>
+
+      {(company.tags ?? []).length > 0 && (
+        <div className="lead-badges">
+          {company.tags.map((tag) => (
+            <span className="info-badge ready" key={tag}>{tag}</span>
+          ))}
+        </div>
+      )}
 
       <div className="score-reasons">
         <p>スコア理由</p>

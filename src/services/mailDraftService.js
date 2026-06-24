@@ -14,13 +14,14 @@ export async function createMailDrafts({
   productName,
   purpose,
   senderName = '',
+  products = [],
   preferOpenAI = true,
 }) {
   if (!customer) {
     throw new Error('Customer is required to create mail drafts.');
   }
 
-  const context = buildContext({ customer, productName, purpose, senderName });
+  const context = buildContext({ customer, productName, purpose, senderName, products });
 
   if (preferOpenAI && hasOpenAIConfig()) {
     try {
@@ -50,9 +51,23 @@ export async function createMailDrafts({
   };
 }
 
-function buildContext({ customer, productName, purpose, senderName }) {
+function buildContext({ customer, productName, purpose, senderName, products }) {
+  const proposedProducts = (customer.proposedProducts ?? [])
+    .map((productId) => products.find((product) => product.id === productId))
+    .filter(Boolean);
   const product = productName.trim() || '貴社の営業活動を支援するサービス';
   const sender = senderName.trim() || '営業担当';
+  const latestHistory = [...(customer.dealHistories ?? [])]
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  const tagNote = (customer.tags ?? []).length > 0
+    ? `営業手帳では「${customer.tags.join('、')}」のタグで管理しています。`
+    : '';
+  const historyNote = latestHistory?.summary
+    ? `直近の接点では「${latestHistory.summary}」という記録があり、次の一手として「${latestHistory.nextAction || '追加提案'}」が適していると考えています。`
+    : '';
+  const productNote = proposedProducts.length > 0
+    ? `提案候補として、${proposedProducts.map((item) => `「${item.name}」`).join('、')}を想定しています。`
+    : '';
   const companyNote = customer.memo
     ? `営業手帳のメモに「${customer.memo}」とあり、今回のご案内が検討材料になるのではないかと考えております。`
     : `${customer.area || '貴社エリア'}で${customer.industry || '事業'}を展開されている貴社に合わせて、具体的な活用イメージをご提案できると考えております。`;
@@ -67,10 +82,13 @@ function buildContext({ customer, productName, purpose, senderName }) {
     email: customer.email || '',
     inquiryUrl: customer.inquiryUrl || '',
     memo: customer.memo || customer.pipelineMemo || '',
+    tags: customer.tags ?? [],
+    dealHistories: customer.dealHistories ?? [],
+    proposedProducts,
     product,
     purpose,
     sender,
-    companyNote,
+    companyNote: [companyNote, tagNote, historyNote, productNote].filter(Boolean).join('\n'),
     nextAction,
   };
 }
@@ -82,7 +100,16 @@ function toOpenAIInput(context) {
     area: context.area,
     email: context.email,
     inquiryUrl: context.inquiryUrl,
-    memo: context.memo,
+    memo: [
+      context.memo,
+      context.tags.length > 0 ? `タグ: ${context.tags.join('、')}` : '',
+      context.dealHistories.length > 0
+        ? `商談履歴: ${context.dealHistories.map((history) => `${history.date || '日付未設定'} ${history.type} ${history.summary} 次:${history.nextAction}`).join(' / ')}`
+        : '',
+      context.proposedProducts.length > 0
+        ? `提案商品: ${context.proposedProducts.map((product) => `${product.name} ${product.description || ''}`).join(' / ')}`
+        : '',
+    ].filter(Boolean).join('\n'),
     productName: context.product,
     purpose: context.purpose,
     senderName: context.sender,
