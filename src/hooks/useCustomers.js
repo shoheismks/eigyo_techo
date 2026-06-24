@@ -11,9 +11,31 @@ import {
 } from '../services/customerSyncService.js';
 
 const STORAGE_KEY = 'eigyo-techo-customers';
-const VALID_STATUSES = ['未接触', '送信済', '返信あり', '商談中', '見積提出', '成約', '失注'];
+
+const STATUS_UNCONTACTED = '\u672a\u63a5\u89e6';
+const STATUS_SENT = '\u9001\u4fe1\u6e08';
+const STATUS_REPLIED = '\u8fd4\u4fe1\u3042\u308a';
+const STATUS_MEETING = '\u5546\u8ac7\u4e2d';
+const STATUS_ESTIMATE = '\u898b\u7a4d\u63d0\u51fa';
+const STATUS_WON = '\u6210\u7d04';
+const STATUS_LOST = '\u5931\u6ce8';
+const CONTACT_NONE = '\u672a\u53d6\u5f97';
+const CONTACT_DONE = '\u53d6\u5f97\u6e08';
+const REPLY_TYPE = '\u8fd4\u4fe1';
+const MAIL_TYPE = '\u30e1\u30fc\u30eb';
+
+const VALID_STATUSES = [
+  STATUS_UNCONTACTED,
+  STATUS_SENT,
+  STATUS_REPLIED,
+  STATUS_MEETING,
+  STATUS_ESTIMATE,
+  STATUS_WON,
+  STATUS_LOST,
+];
 
 const defaultCustomer = {
+  userId: '',
   placeId: '',
   corporateNumber: '',
   companyName: '',
@@ -25,7 +47,7 @@ const defaultCustomer = {
   email: '',
   emailType: '',
   inquiryUrl: '',
-  status: '未接触',
+  status: STATUS_UNCONTACTED,
   tags: [],
   memo: '',
   companyNote: '',
@@ -35,7 +57,7 @@ const defaultCustomer = {
   dealHistories: [],
   proposedProducts: [],
   source: 'Manual',
-  contactStatus: '未取得',
+  contactStatus: CONTACT_NONE,
   lastContactDate: '',
   nextFollowDate: '',
   pipelineMemo: '',
@@ -47,53 +69,61 @@ const defaultCustomer = {
 };
 
 const legacyStatusMap = {
-  未対応: '未接触',
-  対応中: '商談中',
-  提案済み: '見積提出',
+  '\u672a\u5bfe\u5fdc': STATUS_UNCONTACTED,
+  '\u5bfe\u5fdc\u4e2d': STATUS_MEETING,
+  '\u63d0\u6848\u6e08\u307f': STATUS_ESTIMATE,
 };
 
 function normalizeStatus(status) {
   const normalized = legacyStatusMap[status] ?? status;
-  return VALID_STATUSES.includes(normalized) ? normalized : '未接触';
+  return VALID_STATUSES.includes(normalized) ? normalized : STATUS_UNCONTACTED;
 }
 
 function normalizeContactStatus(status, customer) {
-  if (['未取得', '取得済', '取得失敗'].includes(status)) {
+  if ([CONTACT_NONE, CONTACT_DONE, '\u53d6\u5f97\u5931\u6557'].includes(status)) {
     return status;
   }
 
-  return customer.email || customer.inquiryUrl ? '取得済' : '未取得';
+  return customer.email || customer.inquiryUrl ? CONTACT_DONE : CONTACT_NONE;
 }
 
-function normalizeReply(reply = {}) {
+function normalizeReply(reply = {}, userId = '') {
   return {
     id: reply.id ?? crypto.randomUUID(),
-    type: reply.type ?? '返信',
+    type: reply.type ?? REPLY_TYPE,
     summary: reply.summary ?? '',
     createdAt: reply.createdAt ?? new Date().toISOString(),
     createdBy: reply.createdBy ?? '',
-    replies: Array.isArray(reply.replies) ? reply.replies.map(normalizeReply) : [],
+    userId: reply.userId ?? userId,
+    replies: Array.isArray(reply.replies)
+      ? reply.replies.map((item) => normalizeReply(item, userId))
+      : [],
   };
 }
 
-function normalizeDealHistory(history = {}) {
+function normalizeDealHistory(history = {}, userId = '') {
   return {
     id: history.id ?? crypto.randomUUID(),
     date: history.date ?? '',
-    type: history.type ?? 'メール',
+    type: history.type ?? MAIL_TYPE,
     summary: history.summary ?? '',
     nextAction: history.nextAction ?? '',
     createdAt: history.createdAt ?? new Date().toISOString(),
     createdBy: history.createdBy ?? '',
-    replies: Array.isArray(history.replies) ? history.replies.map(normalizeReply) : [],
+    userId: history.userId ?? userId,
+    replies: Array.isArray(history.replies)
+      ? history.replies.map((reply) => normalizeReply(reply, userId))
+      : [],
   };
 }
 
-function normalizeCustomer(customer = {}) {
+function normalizeCustomer(customer = {}, userId = '') {
+  const nextUserId = customer.userId ?? userId;
   const baseCustomer = {
     ...defaultCustomer,
     ...customer,
     id: customer.id ?? crypto.randomUUID(),
+    userId: nextUserId,
     status: normalizeStatus(customer.status),
     createdAt: customer.createdAt ?? new Date().toISOString(),
     updatedAt: customer.updatedAt ?? new Date().toISOString(),
@@ -105,7 +135,7 @@ function normalizeCustomer(customer = {}) {
     isDoNotContact: Boolean(customer.isDoNotContact),
     doNotContactReason: customer.doNotContactReason ?? '',
     dealHistories: Array.isArray(customer.dealHistories)
-      ? customer.dealHistories.map(normalizeDealHistory)
+      ? customer.dealHistories.map((history) => normalizeDealHistory(history, nextUserId))
       : [],
     proposedProducts: Array.isArray(customer.proposedProducts) ? customer.proposedProducts : [],
     pipelineMemo: customer.pipelineMemo ?? customer.memo ?? '',
@@ -118,10 +148,14 @@ function normalizeCustomer(customer = {}) {
   };
 }
 
-function readLocalCustomers() {
+function readLocalCustomers(userId = '') {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved).map(normalizeCustomer) : [];
+    return saved
+      ? JSON.parse(saved)
+          .map((customer) => normalizeCustomer(customer, userId))
+          .filter((customer) => !userId || customer.userId === userId)
+      : [];
   } catch {
     return [];
   }
@@ -134,27 +168,27 @@ function saveLocalCustomers(customers) {
 function toSyncError(error) {
   const message = error?.message || '';
   if (message.includes('Could not find the table')) {
-    return 'Supabaseのcustomersテーブルが見つかりません。SQLを実行してください。';
+    return 'Supabase customers table was not found. Please run the SQL setup.';
   }
 
-  return 'Supabase接続に失敗しました。LocalStorageで動作しています。';
+  return 'Supabase sync failed. LocalStorage fallback is active.';
 }
 
 function getLocalReason(fallback = '') {
   if (!hasCloudConfig()) {
-    return 'Supabase環境変数が未設定です。LocalStorageで動作しています。';
+    return 'Supabase env vars are not set. LocalStorage fallback is active.';
   }
 
   if (!navigator.onLine) {
-    return 'オフラインのためLocalStorageで動作しています。';
+    return 'Offline. LocalStorage fallback is active.';
   }
 
   return fallback;
 }
 
-export function useCustomers() {
+export function useCustomers(userId = '') {
   const [customers, setCustomers] = useState(() =>
-    canUseSupabase() ? [] : readLocalCustomers(),
+    canUseSupabase() ? [] : readLocalCustomers(userId),
   );
   const [syncState, setSyncState] = useState(canUseSupabase() ? 'syncing' : 'local');
   const [syncError, setSyncError] = useState(getLocalReason);
@@ -164,7 +198,7 @@ export function useCustomers() {
 
     async function syncFromSupabase() {
       if (!canUseSupabase()) {
-        setCustomers(readLocalCustomers());
+        setCustomers(readLocalCustomers(userId));
         setSyncState('local');
         setSyncError(getLocalReason());
         return;
@@ -173,15 +207,21 @@ export function useCustomers() {
       try {
         setSyncState('syncing');
         setSyncError('');
-        const localCustomers = readLocalCustomers();
-        const remoteCustomers = (await fetchRemoteCustomers()).map(normalizeCustomer);
-        const mergedCustomers = mergeCustomers(localCustomers, remoteCustomers).map(normalizeCustomer);
+        const localCustomers = readLocalCustomers(userId);
+        const remoteCustomers = (await fetchRemoteCustomers(userId)).map((customer) =>
+          normalizeCustomer(customer, userId),
+        );
+        const mergedCustomers = mergeCustomers(localCustomers, remoteCustomers).map((customer) =>
+          normalizeCustomer(customer, userId),
+        );
 
         if (localCustomers.length > 0) {
           await upsertRemoteCustomers(mergedCustomers);
         }
 
-        const refreshedCustomers = (await fetchRemoteCustomers()).map(normalizeCustomer);
+        const refreshedCustomers = (await fetchRemoteCustomers(userId)).map((customer) =>
+          normalizeCustomer(customer, userId),
+        );
         const nextCustomers = refreshedCustomers.length > 0 ? refreshedCustomers : mergedCustomers;
 
         if (ignore) {
@@ -192,7 +232,7 @@ export function useCustomers() {
         saveLocalCustomers(nextCustomers);
         setSyncState('supabase');
       } catch (error) {
-        setCustomers(readLocalCustomers());
+        setCustomers(readLocalCustomers(userId));
         setSyncError(toSyncError(error));
         setSyncState('local');
       }
@@ -203,7 +243,7 @@ export function useCustomers() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     saveLocalCustomers(customers);
@@ -239,7 +279,7 @@ export function useCustomers() {
 
   async function reloadFromCloud() {
     if (!canUseSupabase()) {
-      setCustomers(readLocalCustomers());
+      setCustomers(readLocalCustomers(userId));
       setSyncState('local');
       setSyncError(getLocalReason());
       return;
@@ -248,12 +288,14 @@ export function useCustomers() {
     try {
       setSyncState('syncing');
       setSyncError('');
-      const remoteCustomers = (await fetchRemoteCustomers()).map(normalizeCustomer);
+      const remoteCustomers = (await fetchRemoteCustomers(userId)).map((customer) =>
+        normalizeCustomer(customer, userId),
+      );
       setCustomers(remoteCustomers);
       saveLocalCustomers(remoteCustomers);
       setSyncState('supabase');
     } catch (error) {
-      setCustomers(readLocalCustomers());
+      setCustomers(readLocalCustomers(userId));
       setSyncError(toSyncError(error));
       setSyncState('local');
     }
@@ -266,7 +308,7 @@ export function useCustomers() {
       setSyncState('local');
       setSyncError(
         hasCloudConfig()
-          ? getLocalReason('Supabaseに接続できません。LocalStorageに保存しました。')
+          ? getLocalReason('Supabase unavailable. Saved to LocalStorage.')
           : getLocalReason(),
       );
       return;
@@ -289,8 +331,9 @@ export function useCustomers() {
   function addCustomer(customer) {
     const normalized = normalizeCustomer({
       ...customer,
+      userId,
       updatedAt: new Date().toISOString(),
-    });
+    }, userId);
 
     setCustomers((current) => {
       const exists = current.some((item) => {
@@ -316,7 +359,7 @@ export function useCustomers() {
     if (!normalizedCompanyName) {
       return {
         ok: false,
-        reason: '会社名が空です',
+        reason: 'Company name is empty.',
       };
     }
 
@@ -328,18 +371,19 @@ export function useCustomers() {
     if (exists) {
       return {
         ok: false,
-        reason: 'すでに営業手帳に追加されています',
+        reason: 'Already added to Eigyo Techo.',
       };
     }
 
     const importedCustomer = normalizeCustomer({
       id: crypto.randomUUID(),
+      userId,
       companyName: normalizedCompanyName,
-      status: '未接触',
+      status: STATUS_UNCONTACTED,
       source: 'chrome-extension',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
+    }, userId);
 
     setCustomers((current) => {
       const nextCustomers = [importedCustomer, ...current];
@@ -349,7 +393,7 @@ export function useCustomers() {
 
     return {
       ok: true,
-      reason: '営業手帳に追加しました',
+      reason: 'Added to Eigyo Techo.',
       customerId: importedCustomer.id,
     };
   }
@@ -358,7 +402,7 @@ export function useCustomers() {
     setCustomers((current) => {
       const nextCustomers = current.map((customer) =>
         customer.id === id
-          ? normalizeCustomer({ ...customer, ...updates, updatedAt: new Date().toISOString() })
+          ? normalizeCustomer({ ...customer, ...updates, userId, updatedAt: new Date().toISOString() }, userId)
           : customer,
       );
       const updatedCustomer = nextCustomers.find((customer) => customer.id === id);

@@ -66,6 +66,81 @@ button:disabled {
   background: rgba(5, 7, 13, 0.9);
 }
 
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(14, 28, 52, 0.84), var(--bg) 28rem);
+}
+
+.login-card {
+  width: min(100%, 440px);
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 26, 43, 0.96), rgba(10, 15, 26, 0.96));
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.auth-tabs button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.auth-tabs .selected {
+  border-color: rgba(102, 163, 255, 0.8);
+  background: rgba(40, 120, 255, 0.2);
+  color: var(--white);
+}
+
+.auth-bar {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 11, 19, 0.94);
+  padding: 8px 12px;
+  backdrop-filter: blur(14px);
+}
+
+.auth-bar span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-bar .text-button {
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
 .extension-toast {
   position: fixed;
   top: 14px;

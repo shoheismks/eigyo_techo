@@ -1,5 +1,6 @@
 create table if not exists public.customers (
   id text primary key,
+  user_id uuid,
   place_id text,
   corporate_number text,
   company_name text,
@@ -33,6 +34,7 @@ create table if not exists public.customers (
 );
 
 alter table public.customers add column if not exists corporate_number text;
+alter table public.customers add column if not exists user_id uuid;
 alter table public.customers add column if not exists tags jsonb;
 alter table public.customers add column if not exists company_note text;
 alter table public.customers add column if not exists next_follow_up_date date;
@@ -44,33 +46,37 @@ alter table public.customers add column if not exists proposed_products jsonb;
 alter table public.customers enable row level security;
 
 drop policy if exists "Allow anon read customers" on public.customers;
-create policy "Allow anon read customers"
+drop policy if exists "Allow authenticated read own customers" on public.customers;
+create policy "Allow authenticated read own customers"
 on public.customers
 for select
-to anon
-using (true);
+to authenticated
+using (auth.uid() = user_id);
 
 drop policy if exists "Allow anon insert customers" on public.customers;
-create policy "Allow anon insert customers"
+drop policy if exists "Allow authenticated insert own customers" on public.customers;
+create policy "Allow authenticated insert own customers"
 on public.customers
 for insert
-to anon
-with check (true);
+to authenticated
+with check (auth.uid() = user_id);
 
 drop policy if exists "Allow anon update customers" on public.customers;
-create policy "Allow anon update customers"
+drop policy if exists "Allow authenticated update own customers" on public.customers;
+create policy "Allow authenticated update own customers"
 on public.customers
 for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
 drop policy if exists "Allow anon delete customers" on public.customers;
-create policy "Allow anon delete customers"
+drop policy if exists "Allow authenticated delete own customers" on public.customers;
+create policy "Allow authenticated delete own customers"
 on public.customers
 for delete
-to anon
-using (true);
+to authenticated
+using (auth.uid() = user_id);
 
 create table if not exists public.mail_drafts (
   id text primary key,

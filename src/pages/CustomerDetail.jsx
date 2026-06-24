@@ -28,13 +28,14 @@ function hasCorrection(history) {
   );
 }
 
-function createReply(reply) {
+function createReply(reply, userId = '') {
   return {
     id: crypto.randomUUID(),
     type: reply.type,
     summary: reply.summary,
     createdAt: new Date().toISOString(),
     createdBy: reply.createdBy,
+    userId,
     replies: [],
   };
 }
@@ -147,6 +148,7 @@ export default function CustomerDetail({
       {
         ...historyForm,
         id: crypto.randomUUID(),
+        userId: customer.userId,
         date: historyForm.date || today,
         createdAt: new Date().toISOString(),
         replies: [],
@@ -170,7 +172,7 @@ export default function CustomerDetail({
 
     updateField(
       'dealHistories',
-      addReplyToTree(customer.dealHistories ?? [], replyTarget, createReply(replyForm)),
+      addReplyToTree(customer.dealHistories ?? [], replyTarget, createReply(replyForm, customer.userId)),
     );
     setReplyTarget(null);
     setReplyForm(emptyReply);

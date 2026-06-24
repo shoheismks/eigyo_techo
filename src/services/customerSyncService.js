@@ -10,17 +10,34 @@ export function hasCloudConfig() {
   return hasSupabaseConfig && Boolean(supabase);
 }
 
-export async function fetchRemoteCustomers() {
+export async function fetchRemoteCustomers(userId = '') {
   if (!canUseSupabase()) {
     return [];
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from(TABLE_NAME)
     .select('*')
     .order('created_at', { ascending: false });
 
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { data, error } = await query;
+
   if (error) {
+    if (userId && isMissingColumnError(error, 'user_id')) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from(TABLE_NAME)
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!fallbackError) {
+        return (fallbackData ?? []).map(fromSupabaseRow);
+      }
+    }
+
     throw error;
   }
 
@@ -38,8 +55,8 @@ export async function upsertRemoteCustomers(customers) {
     .upsert(rows, { onConflict: 'id' });
 
   if (error) {
-    if (isMissingColumnError(error, 'company_note')) {
-      const fallbackRows = rows.map(({ company_note: _companyNote, ...row }) => row);
+    if (isMissingColumnError(error, 'company_note') || isMissingColumnError(error, 'user_id')) {
+      const fallbackRows = rows.map(({ company_note: _companyNote, user_id: _userId, ...row }) => row);
       const { error: fallbackError } = await supabase
         .from(TABLE_NAME)
         .upsert(fallbackRows, { onConflict: 'id' });
@@ -94,6 +111,7 @@ function isNewer(a, b) {
 function toSupabaseRow(customer) {
   return {
     id: customer.id,
+    user_id: customer.userId,
     place_id: customer.placeId,
     corporate_number: customer.corporateNumber,
     company_name: customer.companyName,
@@ -130,6 +148,7 @@ function toSupabaseRow(customer) {
 function fromSupabaseRow(row) {
   return {
     id: row.id,
+    userId: row.user_id ?? row.userId ?? '',
     placeId: row.place_id ?? row.placeId ?? '',
     corporateNumber: row.corporate_number ?? row.corporateNumber ?? '',
     companyName: row.company_name ?? row.companyName ?? '',

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from './context/AuthContext.jsx';
 import Home from './pages/Home.jsx';
 import LeadSearch from './pages/LeadSearch.jsx';
 import Customers from './pages/Customers.jsx';
@@ -8,6 +9,7 @@ import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
 import Products from './pages/Products.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
+import Login from './pages/Login.jsx';
 import { useCustomers } from './hooks/useCustomers.js';
 import { useProducts } from './hooks/useProducts.js';
 
@@ -31,6 +33,28 @@ function getImportCompanyName() {
 }
 
 export default function App() {
+  const { loading, user } = useAuth();
+
+  if (loading) {
+    return (
+      <main className="login-page">
+        <section className="login-card">
+          <h1>営業手帳</h1>
+          <p className="hero-copy">ログイン状態を確認しています。</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return <AuthenticatedApp />;
+}
+
+function AuthenticatedApp() {
+  const { signOut, user, userId } = useAuth();
   const [activePage, setActivePage] = useState(() => (isImportPath() ? 'Import' : 'Home'));
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -47,8 +71,8 @@ export default function App() {
     reloadFromCloud,
     syncError,
     syncState,
-  } = useCustomers();
-  const { products, addProduct, updateProduct, removeProduct } = useProducts();
+  } = useCustomers(userId);
+  const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
@@ -139,6 +163,10 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
+        <header className="auth-bar">
+          <span>{user.email}</span>
+          <button className="text-button" onClick={signOut}>ログアウト</button>
+        </header>
         {extensionNotice && <div className="extension-toast">{extensionNotice}</div>}
         {activePage === 'Import' && (
           <ImportPage

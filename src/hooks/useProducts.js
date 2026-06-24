@@ -22,6 +22,7 @@ export const TEMPERATURE_ZONES = ['冷凍', '冷蔵', '常温'];
 export const PRODUCT_UNITS = ['kg', 'g', 'パック', '箱', 'ケース', '枚', '本', '袋', '個'];
 
 export const emptyProduct = {
+  userId: '',
   name: '',
   category: '',
   manufacturerName: '',
@@ -70,7 +71,7 @@ export function calculateGrossMarginRate(costPrice, desiredSellingPrice) {
   return `${(((price - cost) / price) * 100).toFixed(1).replace(/\.0$/, '')}%`;
 }
 
-export function normalizeProduct(product = {}) {
+export function normalizeProduct(product = {}, userId = '') {
   const costPrice = parsePrice(product.costPrice ?? product.cost ?? '');
   const desiredSellingPrice = parsePrice(
     product.desiredSellingPrice ?? product.sellingPrice ?? '',
@@ -80,6 +81,7 @@ export function normalizeProduct(product = {}) {
     ...emptyProduct,
     ...product,
     id: product.id ?? crypto.randomUUID(),
+    userId: product.userId ?? userId,
     category: product.category ?? '',
     manufacturerName: product.manufacturerName ?? '',
     origin: product.origin ?? '',
@@ -102,10 +104,14 @@ export function normalizeProduct(product = {}) {
   };
 }
 
-function readLocalProducts() {
+function readLocalProducts(userId = '') {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved).map(normalizeProduct) : [];
+    return saved
+      ? JSON.parse(saved)
+          .map((product) => normalizeProduct(product, userId))
+          .filter((product) => !userId || product.userId === userId)
+      : [];
   } catch {
     return [];
   }
@@ -115,8 +121,8 @@ function saveLocalProducts(products) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
 }
 
-export function useProducts() {
-  const [products, setProducts] = useState(readLocalProducts);
+export function useProducts(userId = '') {
+  const [products, setProducts] = useState(() => readLocalProducts(userId));
 
   const sortedProducts = useMemo(
     () =>
@@ -130,10 +136,11 @@ export function useProducts() {
     const now = new Date().toISOString();
     const normalizedProduct = normalizeProduct({
       ...product,
+      userId,
       id: product.id ?? crypto.randomUUID(),
       createdAt: now,
       updatedAt: now,
-    });
+    }, userId);
 
     setProducts((current) => {
       const nextProducts = [normalizedProduct, ...current];
@@ -148,7 +155,7 @@ export function useProducts() {
     setProducts((current) => {
       const nextProducts = current.map((product) =>
         product.id === id
-          ? normalizeProduct({ ...product, ...updates, updatedAt: new Date().toISOString() })
+          ? normalizeProduct({ ...product, ...updates, userId, updatedAt: new Date().toISOString() }, userId)
           : product,
       );
       saveLocalProducts(nextProducts);
