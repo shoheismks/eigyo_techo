@@ -223,7 +223,7 @@ function AuthenticatedApp() {
             setActivePage={setActivePage}
           />
         )}
-        {activePage === 'MailAI' && <MailAI customers={customers} products={products} />}
+        {activePage === 'MailAI' && <MailAI customers={customers} products={products} userId={userId} />}
 
         <nav className="bottom-nav" aria-label="メインナビゲーション">
           {Object.entries(pages).map(([key, page]) => (

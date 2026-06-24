@@ -80,6 +80,7 @@ using (auth.uid() = user_id);
 
 create table if not exists public.mail_drafts (
   id text primary key,
+  user_id uuid,
   customer_id text,
   customer_name text,
   title text,
@@ -92,33 +93,39 @@ create table if not exists public.mail_drafts (
   updated_at timestamptz
 );
 
+alter table public.mail_drafts add column if not exists user_id uuid;
+
 alter table public.mail_drafts enable row level security;
 
 drop policy if exists "Allow anon read mail_drafts" on public.mail_drafts;
-create policy "Allow anon read mail_drafts"
+drop policy if exists "Allow authenticated read own mail_drafts" on public.mail_drafts;
+create policy "Allow authenticated read own mail_drafts"
 on public.mail_drafts
 for select
-to anon
-using (true);
+to authenticated
+using (auth.uid() = user_id);
 
 drop policy if exists "Allow anon insert mail_drafts" on public.mail_drafts;
-create policy "Allow anon insert mail_drafts"
+drop policy if exists "Allow authenticated insert own mail_drafts" on public.mail_drafts;
+create policy "Allow authenticated insert own mail_drafts"
 on public.mail_drafts
 for insert
-to anon
-with check (true);
+to authenticated
+with check (auth.uid() = user_id);
 
 drop policy if exists "Allow anon update mail_drafts" on public.mail_drafts;
-create policy "Allow anon update mail_drafts"
+drop policy if exists "Allow authenticated update own mail_drafts" on public.mail_drafts;
+create policy "Allow authenticated update own mail_drafts"
 on public.mail_drafts
 for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
 drop policy if exists "Allow anon delete mail_drafts" on public.mail_drafts;
-create policy "Allow anon delete mail_drafts"
+drop policy if exists "Allow authenticated delete own mail_drafts" on public.mail_drafts;
+create policy "Allow authenticated delete own mail_drafts"
 on public.mail_drafts
 for delete
-to anon
-using (true);
+to authenticated
+using (auth.uid() = user_id);

@@ -9,7 +9,7 @@ import {
   upsertMailDrafts,
 } from '../services/mailDraftSyncService.js';
 
-export default function MailAI({ customers, products = [] }) {
+export default function MailAI({ customers, products = [], userId = '' }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [productId, setProductId] = useState('');
   const [productName, setProductName] = useState('');
@@ -57,14 +57,14 @@ export default function MailAI({ customers, products = [] }) {
       }
 
       try {
-        const savedDrafts = await fetchMailDrafts(selectedCustomer.id);
+        const savedDrafts = await fetchMailDrafts(selectedCustomer.id, userId);
         if (!ignore) {
           setDrafts(savedDrafts);
           setDraftSyncNotice(savedDrafts.length > 0 ? '保存済みメール案を読み込みました' : '');
         }
       } catch {
         if (!ignore) {
-          const localDrafts = readLocalMailDrafts(selectedCustomer.id);
+          const localDrafts = readLocalMailDrafts(selectedCustomer.id, userId);
           setDrafts(localDrafts);
           setDraftSyncNotice('メール案はLocalStorageから読み込みます');
         }
@@ -76,7 +76,7 @@ export default function MailAI({ customers, products = [] }) {
     return () => {
       ignore = true;
     };
-  }, [selectedCustomer?.id]);
+  }, [selectedCustomer?.id, userId]);
 
   async function handleCreateDrafts() {
     setIsGenerating(true);
@@ -99,6 +99,7 @@ export default function MailAI({ customers, products = [] }) {
         productName,
         purpose,
         source: result.source,
+        userId,
       });
       setDrafts(generatedDrafts);
       setGenerationSource(result.source);
@@ -106,7 +107,7 @@ export default function MailAI({ customers, products = [] }) {
       setDraftSyncNotice('');
 
       try {
-        const savedDrafts = await upsertMailDrafts(generatedDrafts);
+        const savedDrafts = await upsertMailDrafts(generatedDrafts, userId);
         setDrafts(savedDrafts);
         setDraftSyncNotice('メール案を保存しました');
       } catch {
