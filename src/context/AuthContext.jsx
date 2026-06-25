@@ -16,6 +16,14 @@ function getAuthErrorMessage(error) {
     return 'メール確認が完了していません。Supabaseから届いた確認メールを開いてください。';
   }
 
+  if (error.message.includes('User already registered')) {
+    return 'このメールアドレスはすでに登録されています。ログインしてください。';
+  }
+
+  if (error.message.includes('Password should be')) {
+    return 'パスワードが短すぎます。6文字以上で設定してください。';
+  }
+
   return error.message;
 }
 
@@ -35,9 +43,8 @@ export function AuthProvider({ children }) {
       }
 
       const { data, error } = await supabase.auth.getSession();
-      if (ignore) {
-        return;
-      }
+
+      if (ignore) return;
 
       if (error) {
         setAuthError(getAuthErrorMessage(error));
@@ -70,13 +77,18 @@ export function AuthProvider({ children }) {
 
   async function signIn(email, password) {
     setAuthError('');
+
     if (!supabase) {
       const message = 'Supabase設定が見つかりません。環境変数を確認してください。';
       setAuthError(message);
       return { ok: false, error: message };
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
     if (error) {
       const message = getAuthErrorMessage(error);
       setAuthError(message);
@@ -88,13 +100,23 @@ export function AuthProvider({ children }) {
 
   async function signUp(email, password) {
     setAuthError('');
+
     if (!supabase) {
       const message = 'Supabase設定が見つかりません。環境変数を確認してください。';
       setAuthError(message);
       return { ok: false, error: message };
     }
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const redirectTo = window.location.origin;
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectTo,
+      },
+    });
+
     if (error) {
       const message = getAuthErrorMessage(error);
       setAuthError(message);
@@ -106,19 +128,28 @@ export function AuthProvider({ children }) {
       setUser(data.user ?? null);
     }
 
-    return { ok: true, requiresEmailConfirmation: !data.session };
+    return {
+      ok: true,
+      requiresEmailConfirmation: !data.session,
+    };
   }
 
   async function signOut() {
     setAuthError('');
-    if (!supabase) {
-      return;
-    }
+
+    if (!supabase) return;
 
     const { error } = await supabase.auth.signOut();
+
     if (error) {
       setAuthError(getAuthErrorMessage(error));
+      return { ok: false, error: getAuthErrorMessage(error) };
     }
+
+    setSession(null);
+    setUser(null);
+
+    return { ok: true };
   }
 
   const value = useMemo(
@@ -141,6 +172,7 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider.');
   }
