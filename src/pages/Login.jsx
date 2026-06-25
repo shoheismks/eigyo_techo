@@ -9,6 +9,11 @@ export default function Login() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setMessage('');
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage('');
@@ -18,7 +23,11 @@ export default function Login() {
     const result = await action(email.trim(), password);
 
     if (result.ok && mode === 'signup') {
-      setMessage('登録しました。確認メールが届く設定の場合はメールを確認してください。');
+      setMessage(
+        result.requiresEmailConfirmation
+          ? '登録しました。確認メールが届いた場合は、メール内のリンクを開いてからログインしてください。'
+          : '登録してログインしました。',
+      );
     }
 
     setIsSubmitting(false);
@@ -37,14 +46,14 @@ export default function Login() {
           <button
             className={mode === 'login' ? 'selected' : ''}
             type="button"
-            onClick={() => setMode('login')}
+            onClick={() => switchMode('login')}
           >
             ログイン
           </button>
           <button
             className={mode === 'signup' ? 'selected' : ''}
             type="button"
-            onClick={() => setMode('signup')}
+            onClick={() => switchMode('signup')}
           >
             新規登録
           </button>
@@ -79,7 +88,9 @@ export default function Login() {
         </form>
 
         {!hasSupabaseConfig && (
-          <p className="error-text">Supabase環境変数が未設定です。.env を確認してください。</p>
+          <p className="error-text">
+            Supabase環境変数が未設定です。.env または Vercel の環境変数を確認してください。
+          </p>
         )}
         {message && <p className="notice-text">{message}</p>}
         {authError && <p className="error-text">{authError}</p>}

@@ -3,6 +3,22 @@ import { hasSupabaseConfig, supabase } from '../lib/supabaseClient.js';
 
 const AuthContext = createContext(null);
 
+function getAuthErrorMessage(error) {
+  if (!error?.message) {
+    return '認証に失敗しました。メールアドレスとパスワードを確認してください。';
+  }
+
+  if (error.message.includes('Invalid login credentials')) {
+    return 'メールアドレスまたはパスワードが違います。';
+  }
+
+  if (error.message.includes('Email not confirmed')) {
+    return 'メール確認が完了していません。Supabaseから届いた確認メールを開いてください。';
+  }
+
+  return error.message;
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -24,7 +40,7 @@ export function AuthProvider({ children }) {
       }
 
       if (error) {
-        setAuthError(error.message);
+        setAuthError(getAuthErrorMessage(error));
       }
 
       setSession(data.session ?? null);
@@ -55,15 +71,16 @@ export function AuthProvider({ children }) {
   async function signIn(email, password) {
     setAuthError('');
     if (!supabase) {
-      const message = 'Supabase環境変数が未設定です。';
+      const message = 'Supabase設定が見つかりません。環境変数を確認してください。';
       setAuthError(message);
       return { ok: false, error: message };
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setAuthError(error.message);
-      return { ok: false, error: error.message };
+      const message = getAuthErrorMessage(error);
+      setAuthError(message);
+      return { ok: false, error: message };
     }
 
     return { ok: true };
@@ -72,18 +89,24 @@ export function AuthProvider({ children }) {
   async function signUp(email, password) {
     setAuthError('');
     if (!supabase) {
-      const message = 'Supabase環境変数が未設定です。';
+      const message = 'Supabase設定が見つかりません。環境変数を確認してください。';
       setAuthError(message);
       return { ok: false, error: message };
     }
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) {
-      setAuthError(error.message);
-      return { ok: false, error: error.message };
+      const message = getAuthErrorMessage(error);
+      setAuthError(message);
+      return { ok: false, error: message };
     }
 
-    return { ok: true };
+    if (data.session) {
+      setSession(data.session);
+      setUser(data.user ?? null);
+    }
+
+    return { ok: true, requiresEmailConfirmation: !data.session };
   }
 
   async function signOut() {
@@ -94,7 +117,7 @@ export function AuthProvider({ children }) {
 
     const { error } = await supabase.auth.signOut();
     if (error) {
-      setAuthError(error.message);
+      setAuthError(getAuthErrorMessage(error));
     }
   }
 
