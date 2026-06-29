@@ -9,24 +9,10 @@ import {
   normalizeProduct,
   parsePrice,
 } from '../hooks/useProducts.js';
+import { uploadAttachment } from '../services/storageService.js';
 
 function fileLabel(file) {
   return file?.name ? `${file.name} (${Math.ceil((file.size ?? 0) / 1024)}KB)` : '未添付';
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () =>
-      resolve({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        dataUrl: reader.result,
-      });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 export default function ProductDetail({
@@ -34,13 +20,18 @@ export default function ProductDetail({
   addProduct,
   updateProduct,
   setActivePage,
+  userId = '',
 }) {
-  const [form, setForm] = useState(() => normalizeProduct(product ?? emptyProduct));
+  const [form, setForm] = useState(() =>
+    normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId),
+  );
+  const [uploadingField, setUploadingField] = useState('');
+  const [uploadError, setUploadError] = useState('');
   const isNew = !product;
 
   useEffect(() => {
-    setForm(normalizeProduct(product ?? emptyProduct));
-  }, [product]);
+    setForm(normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId));
+  }, [product, userId]);
 
   const grossMarginRate = useMemo(
     () => calculateGrossMarginRate(form.costPrice, form.desiredSellingPrice),
@@ -60,17 +51,55 @@ export default function ProductDetail({
     });
   }
 
+  function updateTags(value) {
+    updateField(
+      'tags',
+      value
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    );
+  }
+
   async function handleFile(field, file) {
     if (!file) {
       return;
     }
 
-    const fileRecord = await readFileAsDataUrl(file);
-    updateField(field, fileRecord);
+    setUploadingField(field);
+    setUploadError('');
+
+    try {
+      const ownerId = form.id || crypto.randomUUID();
+      const fileRecord = await uploadAttachment({
+        file,
+        userId,
+        ownerType: 'product',
+        ownerId,
+        field,
+      });
+      setForm((current) => ({
+        ...current,
+        id: ownerId,
+        [field]: fileRecord,
+        attachments: [
+          ...(current.attachments ?? []).filter((item) => item.field !== field),
+          fileRecord,
+        ],
+      }));
+    } catch (error) {
+      setUploadError(error.message || '添付ファイルのアップロードに失敗しました。');
+    } finally {
+      setUploadingField('');
+    }
   }
 
   function removeFile(field) {
-    updateField(field, null);
+    setForm((current) => ({
+      ...current,
+      [field]: null,
+      attachments: (current.attachments ?? []).filter((item) => item.field !== field),
+    }));
   }
 
   function handleSubmit(event) {
@@ -82,10 +111,11 @@ export default function ProductDetail({
 
     const payload = normalizeProduct({
       ...form,
+      userId,
       costPrice: parsePrice(form.costPrice),
       desiredSellingPrice: parsePrice(form.desiredSellingPrice),
       grossMarginRate,
-    });
+    }, userId);
 
     if (isNew) {
       addProduct(payload);
@@ -101,7 +131,7 @@ export default function ProductDetail({
       <section className="page-header">
         <p className="eyebrow">Product detail</p>
         <h1>{isNew ? '商品追加' : '商品詳細'}</h1>
-        <p>商品情報、価格、添付資料を営業で使いやすい形に整えます。</p>
+        <p>商品情報、価格、添付ファイルをSupabaseに同期して管理します。</p>
       </section>
 
       <form onSubmit={handleSubmit}>
@@ -148,6 +178,15 @@ export default function ProductDetail({
               </select>
             </label>
           </div>
+
+          <label className="field-label">
+            タグ
+            <input
+              value={(form.tags ?? []).join(', ')}
+              placeholder="例: 高級, 冷凍, 差別化"
+              onChange={(event) => updateTags(event.target.value)}
+            />
+          </label>
 
           <label className="field-label">
             メーカー名
@@ -309,8 +348,11 @@ export default function ProductDetail({
             </label>
           </div>
 
-          {form.imageFile?.dataUrl && (
-            <img className="product-preview-image" src={form.imageFile.dataUrl} alt="商品画像プレビュー" />
+          {uploadingField && <p className="notice-text">アップロード中...</p>}
+          {uploadError && <p className="error-text">{uploadError}</p>}
+
+          {form.imageFile?.url && (
+            <img className="product-preview-image" src={form.imageFile.url} alt="商品画像プレビュー" />
           )}
         </section>
 

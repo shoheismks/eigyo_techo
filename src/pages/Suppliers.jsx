@@ -1,0 +1,188 @@
+import { useMemo, useState } from 'react';
+import { uploadAttachment } from '../services/storageService.js';
+
+const emptySupplier = {
+  name: '',
+  area: '',
+  address: '',
+  phone: '',
+  email: '',
+  website: '',
+  tags: '',
+  memo: '',
+};
+
+const emptyHistory = {
+  date: '',
+  summary: '',
+  createdByName: '',
+  quoteFile: null,
+};
+
+function includesText(value, keyword) {
+  return String(value ?? '').toLowerCase().includes(keyword);
+}
+
+export default function Suppliers({ suppliers, addSupplier, updateSupplier, removeSupplier, userId }) {
+  const [keyword, setKeyword] = useState('');
+  const [form, setForm] = useState(emptySupplier);
+  const [historySupplierId, setHistorySupplierId] = useState('');
+  const [historyForm, setHistoryForm] = useState(emptyHistory);
+  const [uploadError, setUploadError] = useState('');
+
+  const filteredSuppliers = useMemo(() => {
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    return suppliers.filter((supplier) => {
+      if (!normalizedKeyword) {
+        return true;
+      }
+
+      return [
+        supplier.name,
+        supplier.area,
+        supplier.address,
+        supplier.email,
+        supplier.memo,
+        ...(supplier.tags ?? []),
+      ].some((value) => includesText(value, normalizedKeyword));
+    });
+  }, [keyword, suppliers]);
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    if (!form.name.trim()) {
+      return;
+    }
+
+    addSupplier({
+      ...form,
+      tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+    });
+    setForm(emptySupplier);
+  }
+
+  async function addSupplierHistory(event) {
+    event.preventDefault();
+    const supplier = suppliers.find((item) => item.id === historySupplierId);
+    if (!supplier || !historyForm.summary.trim()) {
+      return;
+    }
+
+    setUploadError('');
+    let quoteFile = null;
+    try {
+      if (historyForm.quoteFile) {
+        quoteFile = await uploadAttachment({
+          file: historyForm.quoteFile,
+          userId,
+          ownerType: 'supplier-deal',
+          ownerId: supplier.id,
+          field: 'quoteFile',
+        });
+      }
+    } catch (error) {
+      setUploadError(error.message || '見積ファイルのアップロードに失敗しました。');
+      return;
+    }
+
+    updateSupplier(supplier.id, {
+      dealHistories: [
+        {
+          id: crypto.randomUUID(),
+          date: historyForm.date || new Date().toISOString().slice(0, 10),
+          summary: historyForm.summary,
+          createdAt: new Date().toISOString(),
+          createdBy: userId,
+          createdByName: historyForm.createdByName,
+          quoteFile,
+        },
+        ...(supplier.dealHistories ?? []),
+      ],
+    });
+    setHistoryForm(emptyHistory);
+  }
+
+  return (
+    <main className="page">
+      <section className="page-header">
+        <p className="eyebrow">Suppliers</p>
+        <h1>仕入先</h1>
+        <p>仕入先情報、商談メモ、相手からの見積ファイルをSupabaseで管理します。</p>
+      </section>
+
+      <section className="search-panel">
+        <label className="field-label">
+          検索
+          <input value={keyword} placeholder="仕入先名、エリア、タグ、メモで検索" onChange={(event) => setKeyword(event.target.value)} />
+        </label>
+      </section>
+
+      <section className="detail-section">
+        <h2>仕入先を追加</h2>
+        <form className="history-add-form" onSubmit={handleSubmit}>
+          <label className="field-label">仕入先名<input value={form.name} onChange={(event) => updateField('name', event.target.value)} required /></label>
+          <div className="date-grid">
+            <label className="field-label">エリア<input value={form.area} onChange={(event) => updateField('area', event.target.value)} /></label>
+            <label className="field-label">電話<input value={form.phone} onChange={(event) => updateField('phone', event.target.value)} /></label>
+          </div>
+          <label className="field-label">住所<input value={form.address} onChange={(event) => updateField('address', event.target.value)} /></label>
+          <div className="date-grid">
+            <label className="field-label">メール<input value={form.email} onChange={(event) => updateField('email', event.target.value)} /></label>
+            <label className="field-label">Web<input value={form.website} onChange={(event) => updateField('website', event.target.value)} /></label>
+          </div>
+          <label className="field-label">タグ<input value={form.tags} placeholder="例: 輸入, チーズ, 冷凍" onChange={(event) => updateField('tags', event.target.value)} /></label>
+          <label className="field-label">メモ<textarea value={form.memo} onChange={(event) => updateField('memo', event.target.value)} /></label>
+          <button className="primary-button" type="submit">追加</button>
+        </form>
+      </section>
+
+      <section className="detail-section">
+        <h2>仕入先商談メモ</h2>
+        <form className="history-add-form" onSubmit={addSupplierHistory}>
+          <label className="field-label">
+            仕入先
+            <select value={historySupplierId} onChange={(event) => setHistorySupplierId(event.target.value)}>
+              <option value="">選択してください</option>
+              {suppliers.map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name}</option>)}
+            </select>
+          </label>
+          <label className="field-label">日付<input type="date" value={historyForm.date} onChange={(event) => setHistoryForm({ ...historyForm, date: event.target.value })} /></label>
+          <label className="field-label">メモ<textarea value={historyForm.summary} onChange={(event) => setHistoryForm({ ...historyForm, summary: event.target.value })} /></label>
+          <label className="field-label">記載者<input value={historyForm.createdByName} onChange={(event) => setHistoryForm({ ...historyForm, createdByName: event.target.value })} /></label>
+          <label className="field-label file-field">見積ファイル<input type="file" onChange={(event) => setHistoryForm({ ...historyForm, quoteFile: event.target.files?.[0] ?? null })} /></label>
+          {uploadError && <p className="error-text">{uploadError}</p>}
+          <button className="primary-button" type="submit">商談メモを追加</button>
+        </form>
+      </section>
+
+      <section className="result-stack">
+        <div className="section-heading">
+          <h2>仕入先一覧</h2>
+          <span>{filteredSuppliers.length}件</span>
+        </div>
+        <div className="card-grid two-column-grid">
+          {filteredSuppliers.map((supplier) => (
+            <article className="company-card" key={supplier.id}>
+              <div className="company-heading">
+                <h3>{supplier.name}</h3>
+                <p>{supplier.area || 'エリア未設定'}</p>
+              </div>
+              <p className="inline-helper">{supplier.memo || 'メモなし'}</p>
+              <div className="lead-badges">
+                {(supplier.tags ?? []).map((tag) => <span className="info-badge ready" key={tag}>{tag}</span>)}
+                <span className="info-badge">{(supplier.dealHistories ?? []).length} 商談</span>
+              </div>
+              <div className="card-actions">
+                <button className="ghost-button danger" onClick={() => removeSupplier(supplier.id)}>削除</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}

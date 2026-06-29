@@ -59,7 +59,7 @@ button:disabled {
 }
 
 .app-frame {
-  width: min(100%, 520px);
+  width: min(100%, 1180px);
   min-height: 100vh;
   position: relative;
   overflow: hidden;
@@ -1490,8 +1490,8 @@ textarea:focus {
   z-index: 10;
   width: min(calc(100% - 24px), 496px);
   transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  display: flex;
+  overflow-x: auto;
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1502,7 +1502,7 @@ textarea:focus {
 }
 
 .bottom-nav button {
-  min-width: 0;
+  min-width: 64px;
   min-height: 54px;
   display: grid;
   place-items: center;
@@ -1513,6 +1513,68 @@ textarea:focus {
   color: var(--muted);
   font-size: 0.62rem;
   font-weight: 900;
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.card-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.responsive-table {
+  display: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  padding: 10px 12px;
+}
+
+.table-head {
+  background: rgba(40, 120, 255, 0.16);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.table-row {
+  border-top: 1px solid var(--line);
+  color: #dfe9f7;
+}
+
+.table-row strong,
+.table-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.table-actions .ghost-button {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.card-list-mobile {
+  display: grid;
+  gap: 12px;
 }
 
 @media (max-width: 380px) {
@@ -1552,6 +1614,18 @@ textarea:focus {
 
   .page {
     padding-inline: 22px;
+  }
+
+  .two-column-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-list-mobile {
+    display: none;
+  }
+
+  .responsive-table {
+    display: block;
   }
 
   .pipeline-summary {

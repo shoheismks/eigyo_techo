@@ -9,17 +9,29 @@ import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
 import Products from './pages/Products.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
+import Contacts from './pages/Contacts.jsx';
+import Suppliers from './pages/Suppliers.jsx';
+import BusinessCards from './pages/BusinessCards.jsx';
+import Complaints from './pages/Complaints.jsx';
 import Login from './pages/Login.jsx';
 import { useCustomers } from './hooks/useCustomers.js';
 import { useProducts } from './hooks/useProducts.js';
+import { useContacts } from './hooks/useContacts.js';
+import { useSuppliers } from './hooks/useSuppliers.js';
+import { useBusinessCards } from './hooks/useBusinessCards.js';
+import { useComplaints } from './hooks/useComplaints.js';
 
 const pages = {
   Home: { label: 'ホーム', icon: 'H' },
   LeadSearch: { label: '検索', icon: 'S' },
   CompanyEnrich: { label: '補完', icon: 'E' },
-  Customers: { label: '得意先', icon: 'C' },
+  Customers: { label: '取引先', icon: 'C' },
   Pipeline: { label: '案件', icon: 'P' },
   Products: { label: '商品', icon: 'B' },
+  Contacts: { label: '担当者', icon: 'N' },
+  Suppliers: { label: '仕入', icon: 'V' },
+  BusinessCards: { label: '名刺', icon: 'O' },
+  Complaints: { label: '苦情', icon: '!' },
   MailAI: { label: 'メール', icon: 'M' },
 };
 
@@ -61,6 +73,7 @@ function AuthenticatedApp() {
   const [extensionNotice, setExtensionNotice] = useState('');
   const [importError, setImportError] = useState('');
   const [importHandled, setImportHandled] = useState(false);
+
   const {
     customers,
     addCustomer,
@@ -73,6 +86,28 @@ function AuthenticatedApp() {
     syncState,
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
+  const {
+    records: contacts,
+    addRecord: addContact,
+    updateRecord: updateContact,
+    removeRecord: removeContact,
+  } = useContacts(userId);
+  const {
+    records: suppliers,
+    addRecord: addSupplier,
+    updateRecord: updateSupplier,
+    removeRecord: removeSupplier,
+  } = useSuppliers(userId);
+  const {
+    records: businessCards,
+    addRecord: addBusinessCard,
+  } = useBusinessCards(userId);
+  const {
+    records: complaints,
+    addRecord: addComplaint,
+    updateRecord: updateComplaint,
+    removeRecord: removeComplaint,
+  } = useComplaints(userId);
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
@@ -167,12 +202,11 @@ function AuthenticatedApp() {
           <span>{user.email}</span>
           <button className="text-button" onClick={signOut}>ログアウト</button>
         </header>
+
         {extensionNotice && <div className="extension-toast">{extensionNotice}</div>}
+
         {activePage === 'Import' && (
-          <ImportPage
-            error={importError}
-            onGoCustomers={() => setActivePage('Customers')}
-          />
+          <ImportPage error={importError} onGoCustomers={() => setActivePage('Customers')} />
         )}
         {activePage === 'Home' && (
           <Home
@@ -183,12 +217,8 @@ function AuthenticatedApp() {
             reloadFromCloud={reloadFromCloud}
           />
         )}
-        {activePage === 'LeadSearch' && (
-          <LeadSearch addCustomer={addCustomer} isSaved={isSaved} />
-        )}
-        {activePage === 'CompanyEnrich' && (
-          <CompanyEnrich addCustomer={addCustomer} isSaved={isSaved} />
-        )}
+        {activePage === 'LeadSearch' && <LeadSearch addCustomer={addCustomer} isSaved={isSaved} />}
+        {activePage === 'CompanyEnrich' && <CompanyEnrich addCustomer={addCustomer} isSaved={isSaved} />}
         {activePage === 'Customers' && (
           <Customers
             customers={customers}
@@ -201,19 +231,15 @@ function AuthenticatedApp() {
           <CustomerDetail
             customer={selectedCustomer}
             products={products}
+            contacts={contacts}
             updateCustomer={updateCustomer}
             setActivePage={setActivePage}
+            user={user}
           />
         )}
-        {activePage === 'Pipeline' && (
-          <Pipeline customers={customers} updateCustomer={updateCustomer} />
-        )}
+        {activePage === 'Pipeline' && <Pipeline customers={customers} updateCustomer={updateCustomer} />}
         {activePage === 'Products' && (
-          <Products
-            products={products}
-            removeProduct={removeProduct}
-            onOpenProductDetail={openProductDetail}
-          />
+          <Products products={products} removeProduct={removeProduct} onOpenProductDetail={openProductDetail} />
         )}
         {activePage === 'ProductDetail' && (
           <ProductDetail
@@ -221,6 +247,44 @@ function AuthenticatedApp() {
             addProduct={addProduct}
             updateProduct={updateProduct}
             setActivePage={setActivePage}
+            userId={userId}
+          />
+        )}
+        {activePage === 'Contacts' && (
+          <Contacts
+            contacts={contacts}
+            customers={customers}
+            addContact={addContact}
+            updateContact={updateContact}
+            removeContact={removeContact}
+          />
+        )}
+        {activePage === 'Suppliers' && (
+          <Suppliers
+            suppliers={suppliers}
+            addSupplier={addSupplier}
+            updateSupplier={updateSupplier}
+            removeSupplier={removeSupplier}
+            userId={userId}
+          />
+        )}
+        {activePage === 'BusinessCards' && (
+          <BusinessCards
+            businessCards={businessCards}
+            addBusinessCard={addBusinessCard}
+            contacts={contacts}
+            addContact={addContact}
+            userId={userId}
+          />
+        )}
+        {activePage === 'Complaints' && (
+          <Complaints
+            complaints={complaints}
+            customers={customers}
+            addComplaint={addComplaint}
+            updateComplaint={updateComplaint}
+            removeComplaint={removeComplaint}
+            userId={userId}
           />
         )}
         {activePage === 'MailAI' && <MailAI customers={customers} products={products} userId={userId} />}
@@ -256,7 +320,7 @@ function ImportPage({ error, onGoCustomers }) {
           <h3>追加できませんでした</h3>
           <p>{error}</p>
           <button className="primary-button" onClick={onGoCustomers}>
-            得意先一覧へ
+            取引先一覧へ
           </button>
         </section>
       ) : (

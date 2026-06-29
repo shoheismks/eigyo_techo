@@ -1,6 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  canUseCloud,
+  deleteRecord,
+  fetchRecords,
+  getLocalSyncReason,
+  mergeByUpdatedAt,
+  upsertRecords,
+} from '../services/recordSyncService.js';
 
 const STORAGE_KEY = 'eigyo-techo-products';
+const TABLE_NAME = 'products';
 
 export const PRODUCT_CATEGORIES = [
   '牛肉',
@@ -29,6 +38,7 @@ export const emptyProduct = {
   origin: '',
   temperatureZone: '冷凍',
   packageStyle: '',
+  tags: [],
   costPrice: '',
   costUnit: 'kg',
   desiredSellingPrice: '',
@@ -39,6 +49,7 @@ export const emptyProduct = {
   imageFile: null,
   productMaterialFile: null,
   specSheetFile: null,
+  attachments: [],
 };
 
 export function parsePrice(value) {
@@ -87,6 +98,7 @@ export function normalizeProduct(product = {}, userId = '') {
     origin: product.origin ?? '',
     temperatureZone: product.temperatureZone || '冷凍',
     packageStyle: product.packageStyle ?? '',
+    tags: Array.isArray(product.tags) ? product.tags : [],
     costPrice,
     costUnit: product.costUnit || 'kg',
     desiredSellingPrice,
@@ -96,11 +108,31 @@ export function normalizeProduct(product = {}, userId = '') {
       calculateGrossMarginRate(costPrice, desiredSellingPrice),
     description: product.description ?? '',
     memo: product.memo ?? '',
-    imageFile: product.imageFile ?? null,
-    productMaterialFile: product.productMaterialFile ?? null,
-    specSheetFile: product.specSheetFile ?? null,
+    imageFile: normalizeAttachment(product.imageFile),
+    productMaterialFile: normalizeAttachment(product.productMaterialFile),
+    specSheetFile: normalizeAttachment(product.specSheetFile),
+    attachments: Array.isArray(product.attachments)
+      ? product.attachments.map(normalizeAttachment).filter(Boolean)
+      : [],
     createdAt: product.createdAt ?? new Date().toISOString(),
     updatedAt: product.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeAttachment(file) {
+  if (!file || file.dataUrl) {
+    return null;
+  }
+
+  return {
+    id: file.id ?? crypto.randomUUID(),
+    name: file.name ?? '',
+    type: file.type ?? '',
+    size: file.size ?? 0,
+    path: file.path ?? '',
+    url: file.url ?? '',
+    field: file.field ?? '',
+    uploadedAt: file.uploadedAt ?? '',
   };
 }
 
@@ -118,11 +150,114 @@ function readLocalProducts(userId = '') {
 }
 
 function saveLocalProducts(products) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(products.map((product) => normalizeProduct(product))));
+}
+
+function toSupabaseRow(product) {
+  return {
+    id: product.id,
+    user_id: product.userId,
+    name: product.name,
+    category: product.category,
+    manufacturer_name: product.manufacturerName,
+    origin: product.origin,
+    temperature_zone: product.temperatureZone,
+    package_style: product.packageStyle,
+    tags: product.tags,
+    cost_price: product.costPrice === '' ? null : product.costPrice,
+    cost_unit: product.costUnit,
+    desired_selling_price: product.desiredSellingPrice === '' ? null : product.desiredSellingPrice,
+    selling_price_unit: product.sellingPriceUnit,
+    gross_margin_rate: product.grossMarginRate,
+    description: product.description,
+    memo: product.memo,
+    image_file: product.imageFile,
+    product_material_file: product.productMaterialFile,
+    spec_sheet_file: product.specSheetFile,
+    attachments: product.attachments,
+    created_at: product.createdAt,
+    updated_at: product.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function fromSupabaseRow(row) {
+  return normalizeProduct({
+    id: row.id,
+    userId: row.user_id ?? '',
+    name: row.name ?? '',
+    category: row.category ?? '',
+    manufacturerName: row.manufacturer_name ?? '',
+    origin: row.origin ?? '',
+    temperatureZone: row.temperature_zone ?? '冷凍',
+    packageStyle: row.package_style ?? '',
+    tags: row.tags ?? [],
+    costPrice: row.cost_price ?? '',
+    costUnit: row.cost_unit ?? 'kg',
+    desiredSellingPrice: row.desired_selling_price ?? '',
+    sellingPriceUnit: row.selling_price_unit ?? 'kg',
+    grossMarginRate: row.gross_margin_rate ?? '',
+    description: row.description ?? '',
+    memo: row.memo ?? '',
+    imageFile: row.image_file ?? null,
+    productMaterialFile: row.product_material_file ?? null,
+    specSheetFile: row.spec_sheet_file ?? null,
+    attachments: row.attachments ?? [],
+    createdAt: row.created_at ?? '',
+    updatedAt: row.updated_at ?? '',
+  });
 }
 
 export function useProducts(userId = '') {
-  const [products, setProducts] = useState(() => readLocalProducts(userId));
+  const [products, setProducts] = useState(() => (canUseCloud() ? [] : readLocalProducts(userId)));
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
+  const [syncError, setSyncError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function syncProducts() {
+      if (!canUseCloud()) {
+        setProducts(readLocalProducts(userId));
+        setSyncState('local');
+        setSyncError(getLocalSyncReason());
+        return;
+      }
+
+      try {
+        setSyncState('syncing');
+        setSyncError('');
+        const localProducts = readLocalProducts(userId);
+        const remoteProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
+        const mergedProducts = mergeByUpdatedAt(localProducts, remoteProducts)
+          .map((product) => normalizeProduct(product, userId));
+
+        if (localProducts.length > 0) {
+          await upsertRecords(TABLE_NAME, mergedProducts, toSupabaseRow);
+        }
+
+        const refreshedProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
+        const nextProducts = refreshedProducts.length > 0 ? refreshedProducts : mergedProducts;
+
+        if (ignore) {
+          return;
+        }
+
+        setProducts(nextProducts);
+        saveLocalProducts(nextProducts);
+        setSyncState('supabase');
+      } catch (error) {
+        setProducts(readLocalProducts(userId));
+        setSyncState('local');
+        setSyncError(getLocalSyncReason(error.message));
+      }
+    }
+
+    syncProducts();
+
+    return () => {
+      ignore = true;
+    };
+  }, [userId]);
 
   const sortedProducts = useMemo(
     () =>
@@ -131,6 +266,50 @@ export function useProducts(userId = '') {
       ),
     [products],
   );
+
+  async function reloadProducts() {
+    if (!canUseCloud()) {
+      setProducts(readLocalProducts(userId));
+      setSyncState('local');
+      setSyncError(getLocalSyncReason());
+      return;
+    }
+
+    try {
+      setSyncState('syncing');
+      const remoteProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
+      setProducts(remoteProducts);
+      saveLocalProducts(remoteProducts);
+      setSyncState('supabase');
+      setSyncError('');
+    } catch (error) {
+      setSyncState('local');
+      setSyncError(getLocalSyncReason(error.message));
+    }
+  }
+
+  function syncProducts(nextProducts, changedProduct = null) {
+    saveLocalProducts(nextProducts);
+
+    if (!canUseCloud()) {
+      setSyncState('local');
+      setSyncError(getLocalSyncReason());
+      return;
+    }
+
+    setSyncState('syncing');
+    setSyncError('');
+    const writePromise = changedProduct
+      ? upsertRecords(TABLE_NAME, [changedProduct], toSupabaseRow)
+      : upsertRecords(TABLE_NAME, nextProducts, toSupabaseRow);
+
+    writePromise
+      .then(reloadProducts)
+      .catch((error) => {
+        setSyncState('local');
+        setSyncError(getLocalSyncReason(error.message));
+      });
+  }
 
   function addProduct(product) {
     const now = new Date().toISOString();
@@ -144,7 +323,7 @@ export function useProducts(userId = '') {
 
     setProducts((current) => {
       const nextProducts = [normalizedProduct, ...current];
-      saveLocalProducts(nextProducts);
+      syncProducts(nextProducts, normalizedProduct);
       return nextProducts;
     });
 
@@ -158,7 +337,8 @@ export function useProducts(userId = '') {
           ? normalizeProduct({ ...product, ...updates, userId, updatedAt: new Date().toISOString() }, userId)
           : product,
       );
-      saveLocalProducts(nextProducts);
+      const changedProduct = nextProducts.find((product) => product.id === id);
+      syncProducts(nextProducts, changedProduct);
       return nextProducts;
     });
   }
@@ -167,6 +347,16 @@ export function useProducts(userId = '') {
     setProducts((current) => {
       const nextProducts = current.filter((product) => product.id !== id);
       saveLocalProducts(nextProducts);
+
+      if (canUseCloud()) {
+        deleteRecord(TABLE_NAME, id, userId)
+          .then(reloadProducts)
+          .catch((error) => {
+            setSyncState('local');
+            setSyncError(getLocalSyncReason(error.message));
+          });
+      }
+
       return nextProducts;
     });
   }
@@ -176,5 +366,8 @@ export function useProducts(userId = '') {
     addProduct,
     updateProduct,
     removeProduct,
+    reloadProducts,
+    productSyncState: syncState,
+    productSyncError: syncError,
   };
 }

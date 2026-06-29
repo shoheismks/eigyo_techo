@@ -110,6 +110,11 @@ function normalizeDealHistory(history = {}, userId = '') {
     nextAction: history.nextAction ?? '',
     createdAt: history.createdAt ?? new Date().toISOString(),
     createdBy: history.createdBy ?? '',
+    createdByName: history.createdByName ?? '',
+    contactIds: Array.isArray(history.contactIds) ? history.contactIds : [],
+    contactNames: Array.isArray(history.contactNames) ? history.contactNames : [],
+    companionUsers: Array.isArray(history.companionUsers) ? history.companionUsers : [],
+    companionNames: Array.isArray(history.companionNames) ? history.companionNames : [],
     userId: history.userId ?? userId,
     replies: Array.isArray(history.replies)
       ? history.replies.map((reply) => normalizeReply(reply, userId))
