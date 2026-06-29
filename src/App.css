@@ -1731,6 +1731,62 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.business-card-form {
+  border-color: rgba(102, 163, 255, 0.38);
+  background: rgba(40, 120, 255, 0.1);
+}
+
+.business-card-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.image-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0;
+}
+
+.image-button .karte-thumb {
+  max-height: 120px;
+}
+
+.image-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.84);
+  padding: 18px;
+}
+
+.image-modal img {
+  width: min(100%, 920px);
+  max-height: 86vh;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #05070d;
+}
+
+.image-modal-close {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(7, 11, 19, 0.92);
+  color: var(--white);
+  padding: 0 14px;
+  font-weight: 900;
+}
+
 .ai-analysis-grid,
 .karte-list {
   display: grid;

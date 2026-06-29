@@ -250,6 +250,7 @@ function AuthenticatedApp() {
             attachments={attachments}
             updateCustomer={updateCustomer}
             addContact={addContact}
+            addBusinessCard={addBusinessCard}
             addComplaint={addComplaint}
             addAttachment={addAttachment}
             setActivePage={setActivePage}
