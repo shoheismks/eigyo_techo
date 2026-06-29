@@ -1,3 +1,6 @@
+-- Eigyo Techo Supabase setup
+-- Safe to run repeatedly. Tables are created/extended first, then RLS policies are reset.
+
 create table if not exists public.customers (
   id text primary key,
   user_id uuid,
@@ -33,50 +36,37 @@ create table if not exists public.customers (
   updated_at timestamptz
 );
 
-alter table public.customers add column if not exists corporate_number text;
 alter table public.customers add column if not exists user_id uuid;
+alter table public.customers add column if not exists place_id text;
+alter table public.customers add column if not exists corporate_number text;
+alter table public.customers add column if not exists company_name text;
+alter table public.customers add column if not exists industry text;
+alter table public.customers add column if not exists area text;
+alter table public.customers add column if not exists address text;
+alter table public.customers add column if not exists phone text;
+alter table public.customers add column if not exists website text;
+alter table public.customers add column if not exists email text;
+alter table public.customers add column if not exists email_type text;
+alter table public.customers add column if not exists inquiry_url text;
+alter table public.customers add column if not exists status text;
 alter table public.customers add column if not exists tags jsonb;
+alter table public.customers add column if not exists memo text;
 alter table public.customers add column if not exists company_note text;
 alter table public.customers add column if not exists next_follow_up_date date;
 alter table public.customers add column if not exists is_do_not_contact boolean default false;
 alter table public.customers add column if not exists do_not_contact_reason text;
 alter table public.customers add column if not exists deal_histories jsonb;
 alter table public.customers add column if not exists proposed_products jsonb;
-
-alter table public.customers enable row level security;
-
-drop policy if exists "Allow anon read customers" on public.customers;
-drop policy if exists "Allow authenticated read own customers" on public.customers;
-create policy "Allow authenticated read own customers"
-on public.customers
-for select
-to authenticated
-using (auth.uid() = user_id);
-
-drop policy if exists "Allow anon insert customers" on public.customers;
-drop policy if exists "Allow authenticated insert own customers" on public.customers;
-create policy "Allow authenticated insert own customers"
-on public.customers
-for insert
-to authenticated
-with check (auth.uid() = user_id);
-
-drop policy if exists "Allow anon update customers" on public.customers;
-drop policy if exists "Allow authenticated update own customers" on public.customers;
-create policy "Allow authenticated update own customers"
-on public.customers
-for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
-drop policy if exists "Allow anon delete customers" on public.customers;
-drop policy if exists "Allow authenticated delete own customers" on public.customers;
-create policy "Allow authenticated delete own customers"
-on public.customers
-for delete
-to authenticated
-using (auth.uid() = user_id);
+alter table public.customers add column if not exists source text;
+alter table public.customers add column if not exists contact_status text;
+alter table public.customers add column if not exists last_contact_date date;
+alter table public.customers add column if not exists next_follow_date date;
+alter table public.customers add column if not exists pipeline_memo text;
+alter table public.customers add column if not exists score integer;
+alter table public.customers add column if not exists rank text;
+alter table public.customers add column if not exists score_reasons jsonb;
+alter table public.customers add column if not exists created_at timestamptz;
+alter table public.customers add column if not exists updated_at timestamptz;
 
 create table if not exists public.mail_drafts (
   id text primary key,
@@ -94,41 +84,16 @@ create table if not exists public.mail_drafts (
 );
 
 alter table public.mail_drafts add column if not exists user_id uuid;
-
-alter table public.mail_drafts enable row level security;
-
-drop policy if exists "Allow anon read mail_drafts" on public.mail_drafts;
-drop policy if exists "Allow authenticated read own mail_drafts" on public.mail_drafts;
-create policy "Allow authenticated read own mail_drafts"
-on public.mail_drafts
-for select
-to authenticated
-using (auth.uid() = user_id);
-
-drop policy if exists "Allow anon insert mail_drafts" on public.mail_drafts;
-drop policy if exists "Allow authenticated insert own mail_drafts" on public.mail_drafts;
-create policy "Allow authenticated insert own mail_drafts"
-on public.mail_drafts
-for insert
-to authenticated
-with check (auth.uid() = user_id);
-
-drop policy if exists "Allow anon update mail_drafts" on public.mail_drafts;
-drop policy if exists "Allow authenticated update own mail_drafts" on public.mail_drafts;
-create policy "Allow authenticated update own mail_drafts"
-on public.mail_drafts
-for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
-drop policy if exists "Allow anon delete mail_drafts" on public.mail_drafts;
-drop policy if exists "Allow authenticated delete own mail_drafts" on public.mail_drafts;
-create policy "Allow authenticated delete own mail_drafts"
-on public.mail_drafts
-for delete
-to authenticated
-using (auth.uid() = user_id);
+alter table public.mail_drafts add column if not exists customer_id text;
+alter table public.mail_drafts add column if not exists customer_name text;
+alter table public.mail_drafts add column if not exists title text;
+alter table public.mail_drafts add column if not exists subject text;
+alter table public.mail_drafts add column if not exists body text;
+alter table public.mail_drafts add column if not exists product_name text;
+alter table public.mail_drafts add column if not exists purpose text;
+alter table public.mail_drafts add column if not exists source text;
+alter table public.mail_drafts add column if not exists created_at timestamptz;
+alter table public.mail_drafts add column if not exists updated_at timestamptz;
 
 create table if not exists public.products (
   id text primary key,
@@ -156,22 +121,26 @@ create table if not exists public.products (
 );
 
 alter table public.products add column if not exists user_id uuid;
+alter table public.products add column if not exists name text;
+alter table public.products add column if not exists category text;
+alter table public.products add column if not exists manufacturer_name text;
+alter table public.products add column if not exists origin text;
+alter table public.products add column if not exists temperature_zone text;
+alter table public.products add column if not exists package_style text;
 alter table public.products add column if not exists tags jsonb;
+alter table public.products add column if not exists cost_price numeric;
+alter table public.products add column if not exists cost_unit text;
+alter table public.products add column if not exists desired_selling_price numeric;
+alter table public.products add column if not exists selling_price_unit text;
+alter table public.products add column if not exists gross_margin_rate text;
+alter table public.products add column if not exists description text;
+alter table public.products add column if not exists memo text;
+alter table public.products add column if not exists image_file jsonb;
+alter table public.products add column if not exists product_material_file jsonb;
+alter table public.products add column if not exists spec_sheet_file jsonb;
 alter table public.products add column if not exists attachments jsonb;
-alter table public.products enable row level security;
-
-drop policy if exists "Allow authenticated read own products" on public.products;
-create policy "Allow authenticated read own products" on public.products
-for select to authenticated using (auth.uid() = user_id);
-drop policy if exists "Allow authenticated insert own products" on public.products;
-create policy "Allow authenticated insert own products" on public.products
-for insert to authenticated with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated update own products" on public.products;
-create policy "Allow authenticated update own products" on public.products
-for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated delete own products" on public.products;
-create policy "Allow authenticated delete own products" on public.products
-for delete to authenticated using (auth.uid() = user_id);
+alter table public.products add column if not exists created_at timestamptz;
+alter table public.products add column if not exists updated_at timestamptz;
 
 create table if not exists public.contacts (
   id text primary key,
@@ -193,19 +162,22 @@ create table if not exists public.contacts (
   updated_at timestamptz
 );
 
-alter table public.contacts enable row level security;
-drop policy if exists "Allow authenticated read own contacts" on public.contacts;
-create policy "Allow authenticated read own contacts" on public.contacts
-for select to authenticated using (auth.uid() = user_id);
-drop policy if exists "Allow authenticated insert own contacts" on public.contacts;
-create policy "Allow authenticated insert own contacts" on public.contacts
-for insert to authenticated with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated update own contacts" on public.contacts;
-create policy "Allow authenticated update own contacts" on public.contacts
-for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated delete own contacts" on public.contacts;
-create policy "Allow authenticated delete own contacts" on public.contacts
-for delete to authenticated using (auth.uid() = user_id);
+alter table public.contacts add column if not exists user_id uuid;
+alter table public.contacts add column if not exists customer_id text;
+alter table public.contacts add column if not exists company_name text;
+alter table public.contacts add column if not exists name text;
+alter table public.contacts add column if not exists department text;
+alter table public.contacts add column if not exists role text;
+alter table public.contacts add column if not exists company_size text;
+alter table public.contacts add column if not exists email text;
+alter table public.contacts add column if not exists phone text;
+alter table public.contacts add column if not exists memo text;
+alter table public.contacts add column if not exists tags jsonb;
+alter table public.contacts add column if not exists importance_score integer;
+alter table public.contacts add column if not exists importance_rank text;
+alter table public.contacts add column if not exists importance_reasons jsonb;
+alter table public.contacts add column if not exists created_at timestamptz;
+alter table public.contacts add column if not exists updated_at timestamptz;
 
 create table if not exists public.suppliers (
   id text primary key,
@@ -223,19 +195,18 @@ create table if not exists public.suppliers (
   updated_at timestamptz
 );
 
-alter table public.suppliers enable row level security;
-drop policy if exists "Allow authenticated read own suppliers" on public.suppliers;
-create policy "Allow authenticated read own suppliers" on public.suppliers
-for select to authenticated using (auth.uid() = user_id);
-drop policy if exists "Allow authenticated insert own suppliers" on public.suppliers;
-create policy "Allow authenticated insert own suppliers" on public.suppliers
-for insert to authenticated with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated update own suppliers" on public.suppliers;
-create policy "Allow authenticated update own suppliers" on public.suppliers
-for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated delete own suppliers" on public.suppliers;
-create policy "Allow authenticated delete own suppliers" on public.suppliers
-for delete to authenticated using (auth.uid() = user_id);
+alter table public.suppliers add column if not exists user_id uuid;
+alter table public.suppliers add column if not exists name text;
+alter table public.suppliers add column if not exists area text;
+alter table public.suppliers add column if not exists address text;
+alter table public.suppliers add column if not exists phone text;
+alter table public.suppliers add column if not exists email text;
+alter table public.suppliers add column if not exists website text;
+alter table public.suppliers add column if not exists tags jsonb;
+alter table public.suppliers add column if not exists memo text;
+alter table public.suppliers add column if not exists deal_histories jsonb;
+alter table public.suppliers add column if not exists created_at timestamptz;
+alter table public.suppliers add column if not exists updated_at timestamptz;
 
 create table if not exists public.business_cards (
   id text primary key,
@@ -249,19 +220,14 @@ create table if not exists public.business_cards (
   updated_at timestamptz
 );
 
-alter table public.business_cards enable row level security;
-drop policy if exists "Allow authenticated read own business_cards" on public.business_cards;
-create policy "Allow authenticated read own business_cards" on public.business_cards
-for select to authenticated using (auth.uid() = user_id);
-drop policy if exists "Allow authenticated insert own business_cards" on public.business_cards;
-create policy "Allow authenticated insert own business_cards" on public.business_cards
-for insert to authenticated with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated update own business_cards" on public.business_cards;
-create policy "Allow authenticated update own business_cards" on public.business_cards
-for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated delete own business_cards" on public.business_cards;
-create policy "Allow authenticated delete own business_cards" on public.business_cards
-for delete to authenticated using (auth.uid() = user_id);
+alter table public.business_cards add column if not exists user_id uuid;
+alter table public.business_cards add column if not exists contact_id text;
+alter table public.business_cards add column if not exists customer_id text;
+alter table public.business_cards add column if not exists raw_text text;
+alter table public.business_cards add column if not exists image_file jsonb;
+alter table public.business_cards add column if not exists extracted jsonb;
+alter table public.business_cards add column if not exists created_at timestamptz;
+alter table public.business_cards add column if not exists updated_at timestamptz;
 
 create table if not exists public.complaints (
   id text primary key,
@@ -279,19 +245,18 @@ create table if not exists public.complaints (
   updated_at timestamptz
 );
 
-alter table public.complaints enable row level security;
-drop policy if exists "Allow authenticated read own complaints" on public.complaints;
-create policy "Allow authenticated read own complaints" on public.complaints
-for select to authenticated using (auth.uid() = user_id);
-drop policy if exists "Allow authenticated insert own complaints" on public.complaints;
-create policy "Allow authenticated insert own complaints" on public.complaints
-for insert to authenticated with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated update own complaints" on public.complaints;
-create policy "Allow authenticated update own complaints" on public.complaints
-for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated delete own complaints" on public.complaints;
-create policy "Allow authenticated delete own complaints" on public.complaints
-for delete to authenticated using (auth.uid() = user_id);
+alter table public.complaints add column if not exists user_id uuid;
+alter table public.complaints add column if not exists customer_id text;
+alter table public.complaints add column if not exists customer_name text;
+alter table public.complaints add column if not exists title text;
+alter table public.complaints add column if not exists status text;
+alter table public.complaints add column if not exists severity text;
+alter table public.complaints add column if not exists memo text;
+alter table public.complaints add column if not exists created_by uuid;
+alter table public.complaints add column if not exists created_by_name text;
+alter table public.complaints add column if not exists attachments jsonb;
+alter table public.complaints add column if not exists created_at timestamptz;
+alter table public.complaints add column if not exists updated_at timestamptz;
 
 create table if not exists public.attachments (
   id text primary key,
@@ -310,41 +275,173 @@ create table if not exists public.attachments (
   updated_at timestamptz
 );
 
+alter table public.attachments add column if not exists user_id uuid;
+alter table public.attachments add column if not exists owner_type text;
+alter table public.attachments add column if not exists owner_id text;
+alter table public.attachments add column if not exists field text;
+alter table public.attachments add column if not exists name text;
+alter table public.attachments add column if not exists content_type text;
+alter table public.attachments add column if not exists size_bytes integer;
+alter table public.attachments add column if not exists storage_bucket text;
+alter table public.attachments add column if not exists storage_path text;
+alter table public.attachments add column if not exists public_url text;
+alter table public.attachments add column if not exists metadata jsonb;
+alter table public.attachments add column if not exists created_at timestamptz;
+alter table public.attachments add column if not exists updated_at timestamptz;
+
+alter table public.customers enable row level security;
+alter table public.mail_drafts enable row level security;
+alter table public.products enable row level security;
+alter table public.contacts enable row level security;
+alter table public.suppliers enable row level security;
+alter table public.business_cards enable row level security;
+alter table public.complaints enable row level security;
 alter table public.attachments enable row level security;
-drop policy if exists "Allow authenticated read own attachments" on public.attachments;
-create policy "Allow authenticated read own attachments" on public.attachments
-for select to authenticated using (auth.uid() = user_id);
-drop policy if exists "Allow authenticated insert own attachments" on public.attachments;
-create policy "Allow authenticated insert own attachments" on public.attachments
-for insert to authenticated with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated update own attachments" on public.attachments;
-create policy "Allow authenticated update own attachments" on public.attachments
-for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-drop policy if exists "Allow authenticated delete own attachments" on public.attachments;
-create policy "Allow authenticated delete own attachments" on public.attachments
-for delete to authenticated using (auth.uid() = user_id);
 
-insert into storage.buckets (id, name, public)
-values ('app-attachments', 'app-attachments', true)
-on conflict (id) do nothing;
+create or replace function pg_temp.eigyo_drop_policy(
+  relation_name text,
+  policy_name text
+) returns void
+language plpgsql
+as $$
+begin
+  if to_regclass(relation_name) is null then
+    raise notice 'skip drop policy %, relation % does not exist', policy_name, relation_name;
+    return;
+  end if;
 
-drop policy if exists "Allow authenticated upload own app attachments" on storage.objects;
-create policy "Allow authenticated upload own app attachments"
-on storage.objects for insert to authenticated
-with check (bucket_id = 'app-attachments' and auth.uid()::text = (storage.foldername(name))[1]);
+  execute format('drop policy if exists %I on %s', policy_name, relation_name);
+end;
+$$;
 
-drop policy if exists "Allow authenticated read own app attachments" on storage.objects;
-create policy "Allow authenticated read own app attachments"
-on storage.objects for select to authenticated
-using (bucket_id = 'app-attachments' and auth.uid()::text = (storage.foldername(name))[1]);
+create or replace function pg_temp.eigyo_reset_policy(
+  relation_name text,
+  policy_name text,
+  create_policy_sql text
+) returns void
+language plpgsql
+as $$
+begin
+  if to_regclass(relation_name) is null then
+    raise notice 'skip create policy %, relation % does not exist', policy_name, relation_name;
+    return;
+  end if;
 
-drop policy if exists "Allow authenticated update own app attachments" on storage.objects;
-create policy "Allow authenticated update own app attachments"
-on storage.objects for update to authenticated
-using (bucket_id = 'app-attachments' and auth.uid()::text = (storage.foldername(name))[1])
-with check (bucket_id = 'app-attachments' and auth.uid()::text = (storage.foldername(name))[1]);
+  perform pg_temp.eigyo_drop_policy(relation_name, policy_name);
+  execute create_policy_sql;
+end;
+$$;
 
-drop policy if exists "Allow authenticated delete own app attachments" on storage.objects;
-create policy "Allow authenticated delete own app attachments"
-on storage.objects for delete to authenticated
-using (bucket_id = 'app-attachments' and auth.uid()::text = (storage.foldername(name))[1]);
+select pg_temp.eigyo_drop_policy('public.customers', 'Allow anon read customers');
+select pg_temp.eigyo_drop_policy('public.customers', 'Allow anon insert customers');
+select pg_temp.eigyo_drop_policy('public.customers', 'Allow anon update customers');
+select pg_temp.eigyo_drop_policy('public.customers', 'Allow anon delete customers');
+select pg_temp.eigyo_drop_policy('public.mail_drafts', 'Allow anon read mail_drafts');
+select pg_temp.eigyo_drop_policy('public.mail_drafts', 'Allow anon insert mail_drafts');
+select pg_temp.eigyo_drop_policy('public.mail_drafts', 'Allow anon update mail_drafts');
+select pg_temp.eigyo_drop_policy('public.mail_drafts', 'Allow anon delete mail_drafts');
+
+select pg_temp.eigyo_reset_policy(
+  'public.customers',
+  'Allow authenticated read own customers',
+  'create policy "Allow authenticated read own customers" on public.customers for select to authenticated using (auth.uid() = user_id)'
+);
+select pg_temp.eigyo_reset_policy(
+  'public.customers',
+  'Allow authenticated insert own customers',
+  'create policy "Allow authenticated insert own customers" on public.customers for insert to authenticated with check (auth.uid() = user_id)'
+);
+select pg_temp.eigyo_reset_policy(
+  'public.customers',
+  'Allow authenticated update own customers',
+  'create policy "Allow authenticated update own customers" on public.customers for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)'
+);
+select pg_temp.eigyo_reset_policy(
+  'public.customers',
+  'Allow authenticated delete own customers',
+  'create policy "Allow authenticated delete own customers" on public.customers for delete to authenticated using (auth.uid() = user_id)'
+);
+
+select pg_temp.eigyo_reset_policy(
+  'public.mail_drafts',
+  'Allow authenticated read own mail_drafts',
+  'create policy "Allow authenticated read own mail_drafts" on public.mail_drafts for select to authenticated using (auth.uid() = user_id)'
+);
+select pg_temp.eigyo_reset_policy(
+  'public.mail_drafts',
+  'Allow authenticated insert own mail_drafts',
+  'create policy "Allow authenticated insert own mail_drafts" on public.mail_drafts for insert to authenticated with check (auth.uid() = user_id)'
+);
+select pg_temp.eigyo_reset_policy(
+  'public.mail_drafts',
+  'Allow authenticated update own mail_drafts',
+  'create policy "Allow authenticated update own mail_drafts" on public.mail_drafts for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)'
+);
+select pg_temp.eigyo_reset_policy(
+  'public.mail_drafts',
+  'Allow authenticated delete own mail_drafts',
+  'create policy "Allow authenticated delete own mail_drafts" on public.mail_drafts for delete to authenticated using (auth.uid() = user_id)'
+);
+
+select pg_temp.eigyo_reset_policy('public.products', 'Allow authenticated read own products', 'create policy "Allow authenticated read own products" on public.products for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.products', 'Allow authenticated insert own products', 'create policy "Allow authenticated insert own products" on public.products for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.products', 'Allow authenticated update own products', 'create policy "Allow authenticated update own products" on public.products for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.products', 'Allow authenticated delete own products', 'create policy "Allow authenticated delete own products" on public.products for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.contacts', 'Allow authenticated read own contacts', 'create policy "Allow authenticated read own contacts" on public.contacts for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.contacts', 'Allow authenticated insert own contacts', 'create policy "Allow authenticated insert own contacts" on public.contacts for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.contacts', 'Allow authenticated update own contacts', 'create policy "Allow authenticated update own contacts" on public.contacts for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.contacts', 'Allow authenticated delete own contacts', 'create policy "Allow authenticated delete own contacts" on public.contacts for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.suppliers', 'Allow authenticated read own suppliers', 'create policy "Allow authenticated read own suppliers" on public.suppliers for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.suppliers', 'Allow authenticated insert own suppliers', 'create policy "Allow authenticated insert own suppliers" on public.suppliers for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.suppliers', 'Allow authenticated update own suppliers', 'create policy "Allow authenticated update own suppliers" on public.suppliers for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.suppliers', 'Allow authenticated delete own suppliers', 'create policy "Allow authenticated delete own suppliers" on public.suppliers for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.business_cards', 'Allow authenticated read own business_cards', 'create policy "Allow authenticated read own business_cards" on public.business_cards for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.business_cards', 'Allow authenticated insert own business_cards', 'create policy "Allow authenticated insert own business_cards" on public.business_cards for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.business_cards', 'Allow authenticated update own business_cards', 'create policy "Allow authenticated update own business_cards" on public.business_cards for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.business_cards', 'Allow authenticated delete own business_cards', 'create policy "Allow authenticated delete own business_cards" on public.business_cards for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated read own complaints', 'create policy "Allow authenticated read own complaints" on public.complaints for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated insert own complaints', 'create policy "Allow authenticated insert own complaints" on public.complaints for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated update own complaints', 'create policy "Allow authenticated update own complaints" on public.complaints for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated delete own complaints', 'create policy "Allow authenticated delete own complaints" on public.complaints for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated read own attachments', 'create policy "Allow authenticated read own attachments" on public.attachments for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated insert own attachments', 'create policy "Allow authenticated insert own attachments" on public.attachments for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated update own attachments', 'create policy "Allow authenticated update own attachments" on public.attachments for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated delete own attachments', 'create policy "Allow authenticated delete own attachments" on public.attachments for delete to authenticated using (auth.uid() = user_id)');
+
+do $$
+begin
+  if to_regclass('storage.buckets') is not null then
+    insert into storage.buckets (id, name, public)
+    values ('app-attachments', 'app-attachments', true)
+    on conflict (id) do nothing;
+  else
+    raise notice 'storage.buckets does not exist; skip storage bucket setup';
+  end if;
+end;
+$$;
+
+select pg_temp.eigyo_reset_policy(
+  'storage.objects',
+  'Allow authenticated upload own app attachments',
+  'create policy "Allow authenticated upload own app attachments" on storage.objects for insert to authenticated with check (bucket_id = ''app-attachments'' and auth.uid()::text = (storage.foldername(name))[1])'
+);
+select pg_temp.eigyo_reset_policy(
+  'storage.objects',
+  'Allow authenticated read own app attachments',
+  'create policy "Allow authenticated read own app attachments" on storage.objects for select to authenticated using (bucket_id = ''app-attachments'' and auth.uid()::text = (storage.foldername(name))[1])'
+);
+select pg_temp.eigyo_reset_policy(
+  'storage.objects',
+  'Allow authenticated update own app attachments',
+  'create policy "Allow authenticated update own app attachments" on storage.objects for update to authenticated using (bucket_id = ''app-attachments'' and auth.uid()::text = (storage.foldername(name))[1]) with check (bucket_id = ''app-attachments'' and auth.uid()::text = (storage.foldername(name))[1])'
+);
+select pg_temp.eigyo_reset_policy(
+  'storage.objects',
+  'Allow authenticated delete own app attachments',
+  'create policy "Allow authenticated delete own app attachments" on storage.objects for delete to authenticated using (bucket_id = ''app-attachments'' and auth.uid()::text = (storage.foldername(name))[1])'
+);
