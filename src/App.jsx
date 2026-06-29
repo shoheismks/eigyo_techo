@@ -7,6 +7,7 @@ import Pipeline from './pages/Pipeline.jsx';
 import MailAI from './pages/MailAI.jsx';
 import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
+import CustomerKarte from './pages/CustomerKarte.jsx';
 import Products from './pages/Products.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import Contacts from './pages/Contacts.jsx';
@@ -20,6 +21,7 @@ import { useContacts } from './hooks/useContacts.js';
 import { useSuppliers } from './hooks/useSuppliers.js';
 import { useBusinessCards } from './hooks/useBusinessCards.js';
 import { useComplaints } from './hooks/useComplaints.js';
+import { useAttachments } from './hooks/useAttachments.js';
 
 const pages = {
   Home: { label: 'ホーム', icon: 'H' },
@@ -108,6 +110,10 @@ function AuthenticatedApp() {
     updateRecord: updateComplaint,
     removeRecord: removeComplaint,
   } = useComplaints(userId);
+  const {
+    records: attachments,
+    addRecord: addAttachment,
+  } = useAttachments(userId);
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
@@ -115,6 +121,11 @@ function AuthenticatedApp() {
   function openCustomerDetail(customerId) {
     setSelectedCustomerId(customerId);
     setActivePage('CustomerDetail');
+  }
+
+  function openCustomerKarte(customerId) {
+    setSelectedCustomerId(customerId);
+    setActivePage('CustomerKarte');
   }
 
   function openProductDetail(productId) {
@@ -225,6 +236,24 @@ function AuthenticatedApp() {
             updateCustomer={updateCustomer}
             removeCustomer={removeCustomer}
             onOpenDetail={openCustomerDetail}
+            onOpenKarte={openCustomerKarte}
+          />
+        )}
+        {activePage === 'CustomerKarte' && (
+          <CustomerKarte
+            customerId={selectedCustomerId}
+            customers={customers}
+            contacts={contacts}
+            businessCards={businessCards}
+            products={products}
+            complaints={complaints}
+            attachments={attachments}
+            updateCustomer={updateCustomer}
+            addContact={addContact}
+            addComplaint={addComplaint}
+            addAttachment={addAttachment}
+            setActivePage={setActivePage}
+            user={user}
           />
         )}
         {activePage === 'CustomerDetail' && (

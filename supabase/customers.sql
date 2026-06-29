@@ -153,6 +153,8 @@ create table if not exists public.contacts (
   company_size text,
   email text,
   phone text,
+  mobile text,
+  decision_power text,
   memo text,
   tags jsonb,
   importance_score integer,
@@ -171,6 +173,8 @@ alter table public.contacts add column if not exists role text;
 alter table public.contacts add column if not exists company_size text;
 alter table public.contacts add column if not exists email text;
 alter table public.contacts add column if not exists phone text;
+alter table public.contacts add column if not exists mobile text;
+alter table public.contacts add column if not exists decision_power text;
 alter table public.contacts add column if not exists memo text;
 alter table public.contacts add column if not exists tags jsonb;
 alter table public.contacts add column if not exists importance_score integer;

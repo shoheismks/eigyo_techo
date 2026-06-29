@@ -6,7 +6,7 @@ import { PIPELINE_STATUSES } from './Pipeline.jsx';
 const ALL = 'すべて';
 const STATUS_FILTERS = [ALL, ...PIPELINE_STATUSES];
 
-export default function Customers({ customers, updateCustomer, removeCustomer, onOpenDetail }) {
+export default function Customers({ customers, updateCustomer, removeCustomer, onOpenDetail, onOpenKarte }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [tagFilter, setTagFilter] = useState(ALL);
@@ -134,6 +134,8 @@ export default function Customers({ customers, updateCustomer, removeCustomer, o
               company={customer}
               actionLabel="詳細"
               onAction={() => onOpenDetail(customer.id)}
+              karteLabel="カルテ"
+              onKarte={() => onOpenKarte(customer.id)}
               onStatusChange={(status) => updateCustomer(customer.id, { status })}
               onMemoChange={(memo) => updateCustomer(customer.id, { memo })}
               onRemove={() => removeCustomer(customer.id)}

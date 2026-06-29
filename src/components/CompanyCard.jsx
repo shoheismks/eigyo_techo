@@ -15,6 +15,8 @@ export default function CompanyCard({
   actionLabel,
   actionDisabled = false,
   onAction,
+  karteLabel = '',
+  onKarte,
   onStatusChange,
   onMemoChange,
   onRemove,
@@ -166,6 +168,11 @@ export default function CompanyCard({
         {onAction && (
           <button className="primary-button" disabled={actionDisabled} onClick={onAction}>
             {actionDisabled ? '追加済み' : actionLabel}
+          </button>
+        )}
+        {onKarte && (
+          <button className="ghost-button" onClick={onKarte}>
+            {karteLabel || 'カルテ'}
           </button>
         )}
         {onRemove && (
