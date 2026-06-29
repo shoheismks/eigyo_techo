@@ -6,7 +6,7 @@ import {
 } from '../hooks/useProducts.js';
 
 const ALL = 'すべて';
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 40;
 
 function includesText(value, keyword) {
   return String(value ?? '').toLowerCase().includes(keyword);
@@ -58,15 +58,24 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
 
+  function resetPaging(handler) {
+    return (event) => {
+      handler(event);
+      setVisibleCount(PAGE_SIZE);
+    };
+  }
+
   return (
-    <main className="page">
+    <main className="page products-page">
       <section className="page-header">
-        <p className="eyebrow">Products</p>
-        <h1>商品マスター</h1>
-        <p>商品情報、価格、資料URL、タグをSupabaseで共有します。一覧では添付ファイル本体を読み込みません。</p>
+        <div>
+          <p className="eyebrow">Products</p>
+          <h1>商品マスター</h1>
+          <p>PCでは価格・粗利・資料有無を比較しやすいテーブルで表示します。</p>
+        </div>
       </section>
 
-      <section className="search-panel">
+      <section className="search-panel desktop-filter-panel">
         <div className="section-heading">
           <h2>商品検索</h2>
           <button
@@ -78,61 +87,38 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
           </button>
         </div>
 
-        <label className="field-label">
+        <label className="field-label filter-search">
           キーワード
           <input
             value={keyword}
             placeholder="商品名、メーカー、産地、タグ、メモで検索"
-            onChange={(event) => {
-              setKeyword(event.target.value);
-              setVisibleCount(PAGE_SIZE);
-            }}
+            onChange={resetPaging((event) => setKeyword(event.target.value))}
           />
         </label>
 
-        <div className="date-grid">
-          <label className="field-label">
-            カテゴリー
-            <select
-              value={categoryFilter}
-              onChange={(event) => {
-                setCategoryFilter(event.target.value);
-                setVisibleCount(PAGE_SIZE);
-              }}
-            >
-              <option>{ALL}</option>
-              {PRODUCT_CATEGORIES.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
-          </label>
+        <label className="field-label">
+          カテゴリー
+          <select value={categoryFilter} onChange={resetPaging((event) => setCategoryFilter(event.target.value))}>
+            <option>{ALL}</option>
+            {PRODUCT_CATEGORIES.map((category) => (
+              <option key={category}>{category}</option>
+            ))}
+          </select>
+        </label>
 
-          <label className="field-label">
-            温度帯
-            <select
-              value={temperatureFilter}
-              onChange={(event) => {
-                setTemperatureFilter(event.target.value);
-                setVisibleCount(PAGE_SIZE);
-              }}
-            >
-              <option>{ALL}</option>
-              {TEMPERATURE_ZONES.map((zone) => (
-                <option key={zone}>{zone}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="field-label">
+          温度帯
+          <select value={temperatureFilter} onChange={resetPaging((event) => setTemperatureFilter(event.target.value))}>
+            <option>{ALL}</option>
+            {TEMPERATURE_ZONES.map((zone) => (
+              <option key={zone}>{zone}</option>
+            ))}
+          </select>
+        </label>
 
         <label className="field-label">
           メーカー名
-          <select
-            value={manufacturerFilter}
-            onChange={(event) => {
-              setManufacturerFilter(event.target.value);
-              setVisibleCount(PAGE_SIZE);
-            }}
-          >
+          <select value={manufacturerFilter} onChange={resetPaging((event) => setManufacturerFilter(event.target.value))}>
             <option>{ALL}</option>
             {manufacturers.map((manufacturer) => (
               <option key={manufacturer}>{manufacturer}</option>
@@ -149,22 +135,41 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
 
         {visibleProducts.length > 0 ? (
           <>
-            <div className="responsive-table products-table">
-              <div className="table-head">
-                <span>商品</span>
-                <span>分類</span>
+            <div className="desktop-table products-table">
+              <div className="desktop-table-head">
+                <span>商品名</span>
+                <span>カテゴリー</span>
                 <span>メーカー</span>
-                <span>価格</span>
+                <span>産地</span>
+                <span>温度帯</span>
+                <span>荷姿</span>
+                <span>原価</span>
+                <span>希望販売価格</span>
+                <span>粗利率</span>
+                <span>資料</span>
                 <span>操作</span>
               </div>
               {visibleProducts.map((product) => (
-                <div className="table-row" key={product.id}>
+                <div className="desktop-table-row" key={product.id}>
                   <strong>{product.name}</strong>
-                  <span>{product.category || '-'} / {product.temperatureZone || '-'}</span>
+                  <span>{product.category || '-'}</span>
                   <span>{product.manufacturerName || '-'}</span>
-                  <span>{formatPrice(product.desiredSellingPrice) || '-'}円/{product.sellingPriceUnit}</span>
+                  <span>{product.origin || '-'}</span>
+                  <span>{product.temperatureZone || '-'}</span>
+                  <span>{product.packageStyle || '-'}</span>
+                  <span>{formatPrice(product.costPrice) || '-'}{product.costPrice !== '' ? `円/${product.costUnit}` : ''}</span>
+                  <span>{formatPrice(product.desiredSellingPrice) || '-'}{product.desiredSellingPrice !== '' ? `円/${product.sellingPriceUnit}` : ''}</span>
+                  <span>{product.grossMarginRate || '-'}</span>
+                  <span>
+                    {[
+                      product.imageFile && '画像',
+                      product.productMaterialFile && '資料',
+                      product.specSheetFile && 'スペック',
+                    ].filter(Boolean).join(', ') || 'なし'}
+                  </span>
                   <span className="table-actions">
                     <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>編集</button>
+                    <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>削除</button>
                   </span>
                 </div>
               ))}

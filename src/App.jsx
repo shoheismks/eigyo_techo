@@ -343,10 +343,13 @@ function ActivePage({
     return (
       <Customers
         customers={customers}
+        contacts={contacts}
         updateCustomer={updateCustomer}
         removeCustomer={removeCustomer}
         onOpenDetail={openCustomerDetail}
         onOpenKarte={openCustomerKarte}
+        onOpenPipeline={() => setActivePage('Pipeline')}
+        onCreateMail={() => setActivePage('MailAI')}
       />
     );
   }
@@ -477,6 +480,10 @@ function ActivePage({
     );
   }
 
+  if (activePage === 'Calendar') {
+    return <CalendarPage customers={customers} setActivePage={setActivePage} />;
+  }
+
   if (activePage === 'Settings') {
     return (
       <SettingsPage
@@ -523,6 +530,70 @@ function ImportPage({ error, onGoCustomers }) {
           <p>会社名を確認しています。</p>
         </div>
       )}
+    </section>
+  );
+}
+
+function CalendarPage({ customers, setActivePage }) {
+  const followItems = useMemo(
+    () =>
+      customers
+        .filter((customer) => customer.nextFollowUpDate || customer.nextFollowDate)
+        .sort((a, b) =>
+          (a.nextFollowUpDate || a.nextFollowDate).localeCompare(
+            b.nextFollowUpDate || b.nextFollowDate,
+          ),
+        )
+        .slice(0, 60),
+    [customers],
+  );
+
+  return (
+    <section className="page">
+      <div className="page-header">
+        <p className="eyebrow">Calendar</p>
+        <h1>フォロー予定</h1>
+        <p>次回フォロー日が入っている取引先を日付順に確認できます。</p>
+      </div>
+
+      <section className="desktop-panel">
+        <div className="section-heading">
+          <h2>予定一覧</h2>
+          <button type="button" className="text-button" onClick={() => setActivePage('Pipeline')}>
+            案件へ
+          </button>
+        </div>
+
+        <div className="desktop-table calendar-table">
+          <div className="desktop-table-head">
+            <span>日付</span>
+            <span>会社名</span>
+            <span>ステータス</span>
+            <span>メモ</span>
+            <span>操作</span>
+          </div>
+          {followItems.map((customer) => (
+            <div className="desktop-table-row" key={customer.id}>
+              <span>{customer.nextFollowUpDate || customer.nextFollowDate}</span>
+              <strong>{customer.companyName}</strong>
+              <span>{customer.status || '-'}</span>
+              <span>{customer.pipelineMemo || customer.memo || '-'}</span>
+              <span className="table-actions">
+                <button type="button" className="ghost-button" onClick={() => setActivePage('Pipeline')}>
+                  案件
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {followItems.length === 0 && (
+          <div className="empty-state">
+            <h3>フォロー予定はありません</h3>
+            <p>取引先または案件画面で次回フォロー日を登録してください。</p>
+          </div>
+        )}
+      </section>
     </section>
   );
 }
