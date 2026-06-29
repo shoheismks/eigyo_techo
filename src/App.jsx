@@ -1,41 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import AppLayout from './components/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import Home from './pages/Home.jsx';
-import LeadSearch from './pages/LeadSearch.jsx';
-import Customers from './pages/Customers.jsx';
-import Pipeline from './pages/Pipeline.jsx';
-import MailAI from './pages/MailAI.jsx';
-import CompanyEnrich from './pages/CompanyEnrich.jsx';
-import CustomerDetail from './pages/CustomerDetail.jsx';
-import CustomerKarte from './pages/CustomerKarte.jsx';
-import Products from './pages/Products.jsx';
-import ProductDetail from './pages/ProductDetail.jsx';
-import Contacts from './pages/Contacts.jsx';
-import Suppliers from './pages/Suppliers.jsx';
-import BusinessCards from './pages/BusinessCards.jsx';
-import Complaints from './pages/Complaints.jsx';
-import Login from './pages/Login.jsx';
-import { useCustomers } from './hooks/useCustomers.js';
-import { useProducts } from './hooks/useProducts.js';
-import { useContacts } from './hooks/useContacts.js';
-import { useSuppliers } from './hooks/useSuppliers.js';
+import { useAttachments } from './hooks/useAttachments.js';
 import { useBusinessCards } from './hooks/useBusinessCards.js';
 import { useComplaints } from './hooks/useComplaints.js';
-import { useAttachments } from './hooks/useAttachments.js';
-
-const pages = {
-  Home: { label: 'ホーム', icon: 'H' },
-  LeadSearch: { label: '検索', icon: 'S' },
-  CompanyEnrich: { label: '補完', icon: 'E' },
-  Customers: { label: '取引先', icon: 'C' },
-  Pipeline: { label: '案件', icon: 'P' },
-  Products: { label: '商品', icon: 'B' },
-  Contacts: { label: '担当者', icon: 'N' },
-  Suppliers: { label: '仕入', icon: 'V' },
-  BusinessCards: { label: '名刺', icon: 'O' },
-  Complaints: { label: '苦情', icon: '!' },
-  MailAI: { label: 'メール', icon: 'M' },
-};
+import { useContacts } from './hooks/useContacts.js';
+import { useCustomers } from './hooks/useCustomers.js';
+import { useProducts } from './hooks/useProducts.js';
+import { useSuppliers } from './hooks/useSuppliers.js';
+import BusinessCards from './pages/BusinessCards.jsx';
+import CompanyEnrich from './pages/CompanyEnrich.jsx';
+import Complaints from './pages/Complaints.jsx';
+import Contacts from './pages/Contacts.jsx';
+import CustomerDetail from './pages/CustomerDetail.jsx';
+import CustomerKarte from './pages/CustomerKarte.jsx';
+import Customers from './pages/Customers.jsx';
+import Home from './pages/Home.jsx';
+import LeadSearch from './pages/LeadSearch.jsx';
+import Login from './pages/Login.jsx';
+import MailAI from './pages/MailAI.jsx';
+import Pipeline from './pages/Pipeline.jsx';
+import ProductDetail from './pages/ProductDetail.jsx';
+import Products from './pages/Products.jsx';
+import Suppliers from './pages/Suppliers.jsx';
+import { PIPELINE_STATUSES } from './pages/Pipeline.jsx';
 
 function isImportPath() {
   return window.location.pathname === '/import';
@@ -75,6 +63,7 @@ function AuthenticatedApp() {
   const [extensionNotice, setExtensionNotice] = useState('');
   const [importError, setImportError] = useState('');
   const [importHandled, setImportHandled] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   const {
     customers,
@@ -118,6 +107,10 @@ function AuthenticatedApp() {
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
 
+  function navigate(page) {
+    setActivePage(page);
+  }
+
   function openCustomerDetail(customerId) {
     setSelectedCustomerId(customerId);
     setActivePage('CustomerDetail');
@@ -131,6 +124,23 @@ function AuthenticatedApp() {
   function openProductDetail(productId) {
     setSelectedProductId(productId === 'new' ? '' : productId);
     setActivePage('ProductDetail');
+  }
+
+  function handleAddAction(actionKey) {
+    const nextPageByAction = {
+      company: 'LeadSearch',
+      'business-card': 'BusinessCards',
+      deal: 'Pipeline',
+      complaint: 'Complaints',
+      supplier: 'Suppliers',
+    };
+
+    if (actionKey === 'product') {
+      openProductDetail('new');
+      return;
+    }
+
+    setActivePage(nextPageByAction[actionKey] || 'Home');
   }
 
   function handleExtensionImport(companyName) {
@@ -207,158 +217,404 @@ function AuthenticatedApp() {
   }, [importHandled]);
 
   return (
-    <div className="app-shell">
-      <div className="app-frame">
-        <header className="auth-bar">
-          <span>{user.email}</span>
-          <button className="text-button" onClick={signOut}>ログアウト</button>
-        </header>
+    <AppLayout
+      activePage={activePage}
+      user={user}
+      onNavigate={navigate}
+      onAddAction={handleAddAction}
+      onSignOut={signOut}
+      addMenuOpen={addMenuOpen}
+      setAddMenuOpen={setAddMenuOpen}
+      notice={extensionNotice}
+    >
+      <ActivePage
+        activePage={activePage}
+        importError={importError}
+        setActivePage={setActivePage}
+        addCustomer={addCustomer}
+        isSaved={isSaved}
+        customers={customers}
+        updateCustomer={updateCustomer}
+        removeCustomer={removeCustomer}
+        openCustomerDetail={openCustomerDetail}
+        openCustomerKarte={openCustomerKarte}
+        selectedCustomer={selectedCustomer}
+        selectedCustomerId={selectedCustomerId}
+        products={products}
+        addProduct={addProduct}
+        updateProduct={updateProduct}
+        removeProduct={removeProduct}
+        openProductDetail={openProductDetail}
+        selectedProduct={selectedProduct}
+        contacts={contacts}
+        addContact={addContact}
+        updateContact={updateContact}
+        removeContact={removeContact}
+        suppliers={suppliers}
+        addSupplier={addSupplier}
+        updateSupplier={updateSupplier}
+        removeSupplier={removeSupplier}
+        businessCards={businessCards}
+        addBusinessCard={addBusinessCard}
+        complaints={complaints}
+        addComplaint={addComplaint}
+        updateComplaint={updateComplaint}
+        removeComplaint={removeComplaint}
+        attachments={attachments}
+        addAttachment={addAttachment}
+        syncState={syncState}
+        syncError={syncError}
+        reloadFromCloud={reloadFromCloud}
+        user={user}
+        userId={userId}
+        signOut={signOut}
+      />
+    </AppLayout>
+  );
+}
 
-        {extensionNotice && <div className="extension-toast">{extensionNotice}</div>}
+function ActivePage({
+  activePage,
+  importError,
+  setActivePage,
+  addCustomer,
+  isSaved,
+  customers,
+  updateCustomer,
+  removeCustomer,
+  openCustomerDetail,
+  openCustomerKarte,
+  selectedCustomer,
+  selectedCustomerId,
+  products,
+  addProduct,
+  updateProduct,
+  removeProduct,
+  openProductDetail,
+  selectedProduct,
+  contacts,
+  addContact,
+  updateContact,
+  removeContact,
+  suppliers,
+  addSupplier,
+  updateSupplier,
+  removeSupplier,
+  businessCards,
+  addBusinessCard,
+  complaints,
+  addComplaint,
+  updateComplaint,
+  removeComplaint,
+  attachments,
+  addAttachment,
+  syncState,
+  syncError,
+  reloadFromCloud,
+  user,
+  userId,
+  signOut,
+}) {
+  if (activePage === 'Import') {
+    return <ImportPage error={importError} onGoCustomers={() => setActivePage('Customers')} />;
+  }
 
-        {activePage === 'Import' && (
-          <ImportPage error={importError} onGoCustomers={() => setActivePage('Customers')} />
-        )}
-        {activePage === 'Home' && (
-          <Home
-            customers={customers}
-            setActivePage={setActivePage}
-            syncState={syncState}
-            syncError={syncError}
-            reloadFromCloud={reloadFromCloud}
-          />
-        )}
-        {activePage === 'LeadSearch' && <LeadSearch addCustomer={addCustomer} isSaved={isSaved} />}
-        {activePage === 'CompanyEnrich' && <CompanyEnrich addCustomer={addCustomer} isSaved={isSaved} />}
-        {activePage === 'Customers' && (
-          <Customers
-            customers={customers}
-            updateCustomer={updateCustomer}
-            removeCustomer={removeCustomer}
-            onOpenDetail={openCustomerDetail}
-            onOpenKarte={openCustomerKarte}
-          />
-        )}
-        {activePage === 'CustomerKarte' && (
-          <CustomerKarte
-            customerId={selectedCustomerId}
-            customers={customers}
-            contacts={contacts}
-            businessCards={businessCards}
-            products={products}
-            complaints={complaints}
-            attachments={attachments}
-            updateCustomer={updateCustomer}
-            addContact={addContact}
-            addBusinessCard={addBusinessCard}
-            addComplaint={addComplaint}
-            addAttachment={addAttachment}
-            setActivePage={setActivePage}
-            user={user}
-          />
-        )}
-        {activePage === 'CustomerDetail' && (
-          <CustomerDetail
-            customer={selectedCustomer}
-            products={products}
-            contacts={contacts}
-            updateCustomer={updateCustomer}
-            setActivePage={setActivePage}
-            user={user}
-          />
-        )}
-        {activePage === 'Pipeline' && <Pipeline customers={customers} updateCustomer={updateCustomer} />}
-        {activePage === 'Products' && (
-          <Products products={products} removeProduct={removeProduct} onOpenProductDetail={openProductDetail} />
-        )}
-        {activePage === 'ProductDetail' && (
-          <ProductDetail
-            product={selectedProduct}
-            addProduct={addProduct}
-            updateProduct={updateProduct}
-            setActivePage={setActivePage}
-            userId={userId}
-          />
-        )}
-        {activePage === 'Contacts' && (
-          <Contacts
-            contacts={contacts}
-            customers={customers}
-            addContact={addContact}
-            updateContact={updateContact}
-            removeContact={removeContact}
-          />
-        )}
-        {activePage === 'Suppliers' && (
-          <Suppliers
-            suppliers={suppliers}
-            addSupplier={addSupplier}
-            updateSupplier={updateSupplier}
-            removeSupplier={removeSupplier}
-            userId={userId}
-          />
-        )}
-        {activePage === 'BusinessCards' && (
-          <BusinessCards
-            businessCards={businessCards}
-            addBusinessCard={addBusinessCard}
-            contacts={contacts}
-            addContact={addContact}
-            userId={userId}
-          />
-        )}
-        {activePage === 'Complaints' && (
-          <Complaints
-            complaints={complaints}
-            customers={customers}
-            addComplaint={addComplaint}
-            updateComplaint={updateComplaint}
-            removeComplaint={removeComplaint}
-            userId={userId}
-          />
-        )}
-        {activePage === 'MailAI' && <MailAI customers={customers} products={products} userId={userId} />}
+  if (activePage === 'Home') {
+    return (
+      <Home
+        customers={customers}
+        setActivePage={setActivePage}
+        syncState={syncState}
+        syncError={syncError}
+        reloadFromCloud={reloadFromCloud}
+      />
+    );
+  }
 
-        <nav className="bottom-nav" aria-label="メインナビゲーション">
-          {Object.entries(pages).map(([key, page]) => (
-            <button
-              key={key}
-              className={activePage === key ? 'active' : ''}
-              onClick={() => setActivePage(key)}
-            >
-              <span aria-hidden="true">{page.icon}</span>
-              {page.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-    </div>
+  if (activePage === 'LeadSearch') {
+    return <LeadSearch addCustomer={addCustomer} isSaved={isSaved} />;
+  }
+
+  if (activePage === 'CompanyEnrich') {
+    return <CompanyEnrich addCustomer={addCustomer} isSaved={isSaved} />;
+  }
+
+  if (activePage === 'Customers') {
+    return (
+      <Customers
+        customers={customers}
+        updateCustomer={updateCustomer}
+        removeCustomer={removeCustomer}
+        onOpenDetail={openCustomerDetail}
+        onOpenKarte={openCustomerKarte}
+      />
+    );
+  }
+
+  if (activePage === 'CustomerKarte') {
+    return (
+      <CustomerKarte
+        customerId={selectedCustomerId}
+        customers={customers}
+        contacts={contacts}
+        businessCards={businessCards}
+        products={products}
+        complaints={complaints}
+        attachments={attachments}
+        updateCustomer={updateCustomer}
+        addContact={addContact}
+        addBusinessCard={addBusinessCard}
+        addComplaint={addComplaint}
+        addAttachment={addAttachment}
+        setActivePage={setActivePage}
+        user={user}
+      />
+    );
+  }
+
+  if (activePage === 'CustomerDetail') {
+    return (
+      <CustomerDetail
+        customer={selectedCustomer}
+        products={products}
+        contacts={contacts}
+        updateCustomer={updateCustomer}
+        setActivePage={setActivePage}
+        user={user}
+      />
+    );
+  }
+
+  if (activePage === 'Pipeline') {
+    return <Pipeline customers={customers} updateCustomer={updateCustomer} />;
+  }
+
+  if (activePage === 'Products') {
+    return (
+      <Products
+        products={products}
+        removeProduct={removeProduct}
+        onOpenProductDetail={openProductDetail}
+      />
+    );
+  }
+
+  if (activePage === 'ProductDetail') {
+    return (
+      <ProductDetail
+        product={selectedProduct}
+        addProduct={addProduct}
+        updateProduct={updateProduct}
+        setActivePage={setActivePage}
+        userId={userId}
+      />
+    );
+  }
+
+  if (activePage === 'Contacts') {
+    return (
+      <Contacts
+        contacts={contacts}
+        customers={customers}
+        addContact={addContact}
+        updateContact={updateContact}
+        removeContact={removeContact}
+      />
+    );
+  }
+
+  if (activePage === 'Suppliers') {
+    return (
+      <Suppliers
+        suppliers={suppliers}
+        addSupplier={addSupplier}
+        updateSupplier={updateSupplier}
+        removeSupplier={removeSupplier}
+        userId={userId}
+      />
+    );
+  }
+
+  if (activePage === 'BusinessCards') {
+    return (
+      <BusinessCards
+        businessCards={businessCards}
+        addBusinessCard={addBusinessCard}
+        contacts={contacts}
+        addContact={addContact}
+        userId={userId}
+      />
+    );
+  }
+
+  if (activePage === 'Complaints') {
+    return (
+      <Complaints
+        complaints={complaints}
+        customers={customers}
+        addComplaint={addComplaint}
+        updateComplaint={updateComplaint}
+        removeComplaint={removeComplaint}
+        userId={userId}
+      />
+    );
+  }
+
+  if (activePage === 'MailAI') {
+    return <MailAI customers={customers} products={products} userId={userId} />;
+  }
+
+  if (activePage === 'Analytics') {
+    return (
+      <AnalyticsPage
+        customers={customers}
+        products={products}
+        contacts={contacts}
+        suppliers={suppliers}
+        complaints={complaints}
+        setActivePage={setActivePage}
+      />
+    );
+  }
+
+  if (activePage === 'Settings') {
+    return (
+      <SettingsPage
+        user={user}
+        syncState={syncState}
+        syncError={syncError}
+        reloadFromCloud={reloadFromCloud}
+        signOut={signOut}
+      />
+    );
+  }
+
+  return (
+    <Home
+      customers={customers}
+      setActivePage={setActivePage}
+      syncState={syncState}
+      syncError={syncError}
+      reloadFromCloud={reloadFromCloud}
+    />
   );
 }
 
 function ImportPage({ error, onGoCustomers }) {
   return (
-    <main className="page">
-      <section className="page-header">
+    <section className="page">
+      <div className="page-header">
         <p className="eyebrow">Import</p>
         <h1>会社名を追加</h1>
         <p>Chrome拡張から受け取った会社名を営業手帳へ追加します。</p>
-      </section>
+      </div>
 
       {error ? (
-        <section className="empty-state">
+        <div className="empty-state">
           <h3>追加できませんでした</h3>
           <p>{error}</p>
-          <button className="primary-button" onClick={onGoCustomers}>
+          <button type="button" className="primary-button" onClick={onGoCustomers}>
             取引先一覧へ
           </button>
-        </section>
+        </div>
       ) : (
-        <section className="empty-state">
+        <div className="empty-state">
           <h3>取り込み中...</h3>
           <p>会社名を確認しています。</p>
-        </section>
+        </div>
       )}
-    </main>
+    </section>
+  );
+}
+
+function AnalyticsPage({ customers, products, contacts, suppliers, complaints, setActivePage }) {
+  const summary = useMemo(() => {
+    const statusCounts = PIPELINE_STATUSES.map((status) => ({
+      status,
+      count: customers.filter((customer) => customer.status === status).length,
+    }));
+    const highRankCount = customers.filter((customer) => ['S', 'A'].includes(customer.customerRank)).length;
+    const complaintOpenCount = complaints.filter((complaint) => complaint.status !== '解決').length;
+
+    return {
+      statusCounts,
+      highRankCount,
+      complaintOpenCount,
+    };
+  }, [complaints, customers]);
+
+  return (
+    <section className="page">
+      <div className="page-header">
+        <p className="eyebrow">Analytics</p>
+        <h1>営業分析</h1>
+        <p>PCサイドバーから確認する、営業状況の集約ビューです。</p>
+      </div>
+
+      <div className="dashboard-metrics">
+        <DashboardMetric label="取引先" value={customers.length} tone="blue" />
+        <DashboardMetric label="重要顧客" value={summary.highRankCount} tone="gold" />
+        <DashboardMetric label="商品" value={products.length} tone="purple" />
+        <DashboardMetric label="担当者" value={contacts.length} tone="blue" />
+        <DashboardMetric label="仕入先" value={suppliers.length} tone="orange" />
+        <DashboardMetric label="未解決クレーム" value={summary.complaintOpenCount} tone="red" />
+      </div>
+
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>ステータス別件数</h2>
+          <button type="button" className="text-button" onClick={() => setActivePage('Pipeline')}>
+            案件へ
+          </button>
+        </div>
+        <div className="status-count-grid">
+          {summary.statusCounts.map((item) => (
+            <div className="status-count-card" key={item.status}>
+              <span>{item.count}</span>
+              <p>{item.status}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function SettingsPage({ user, syncState, syncError, reloadFromCloud, signOut }) {
+  return (
+    <section className="page">
+      <div className="page-header">
+        <p className="eyebrow">Settings</p>
+        <h1>設定</h1>
+        <p>ログイン情報と保存先の状態を確認できます。</p>
+      </div>
+
+      <section className={`sync-status-card ${syncState === 'supabase' ? 'cloud' : 'local'}`}>
+        <div>
+          <span>ログイン中</span>
+          <strong>{user?.email}</strong>
+        </div>
+        <div>
+          <span>保存先</span>
+          <strong>{syncState === 'supabase' ? 'Supabase' : syncState === 'syncing' ? '同期中...' : 'LocalStorage'}</strong>
+        </div>
+        <button type="button" className="ghost-button" onClick={reloadFromCloud} disabled={syncState === 'syncing'}>
+          クラウドから再読み込み
+        </button>
+        {syncError && <p>{syncError}</p>}
+        <button type="button" className="text-button danger" onClick={signOut}>
+          ログアウト
+        </button>
+      </section>
+    </section>
+  );
+}
+
+function DashboardMetric({ label, value, tone }) {
+  return (
+    <div className={`dashboard-metric ${tone}`}>
+      <span>{value}</span>
+      <p>{label}</p>
+    </div>
   );
 }
