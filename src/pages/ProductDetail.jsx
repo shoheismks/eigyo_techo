@@ -17,12 +17,14 @@ function fileLabel(file) {
 
 export default function ProductDetail({
   product,
+  adoptions = [],
   samples = [],
   quotes = [],
   customers = [],
   suppliers = [],
   addProduct,
   updateProduct,
+  updateAdoption,
   updateSample,
   updateQuote,
   setActivePage,
@@ -64,6 +66,17 @@ export default function ProductDetail({
           ),
         ),
     [form.id, quotes],
+  );
+  const relatedAdoptions = useMemo(
+    () =>
+      adoptions
+        .filter((adoption) => adoption.productId === form.id)
+        .sort((a, b) =>
+          String(b.adoptedDate || b.createdAt || '').localeCompare(
+            String(a.adoptedDate || a.createdAt || ''),
+          ),
+        ),
+    [adoptions, form.id],
   );
 
   function updateField(field, value) {
@@ -394,6 +407,47 @@ export default function ProductDetail({
               onChange={(event) => updateField('memo', event.target.value)}
             />
           </label>
+        </section>
+
+        <section className="detail-section">
+          <div className="section-heading">
+            <h2>採用顧客</h2>
+            <span className="info-badge">{relatedAdoptions.length}件</span>
+          </div>
+          {relatedAdoptions.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {relatedAdoptions.map((adoption) => {
+                const customer = customers.find((item) => item.id === adoption.customerId);
+                return (
+                  <article className="karte-mini-card adoption-card" key={adoption.id}>
+                    <div className="history-meta">
+                      <span>{customer?.companyName || '-'}</span>
+                      <small>{adoption.status || '-'}</small>
+                    </div>
+                    <label className="field-label">
+                      ステータス
+                      <select
+                        value={adoption.status || '採用中'}
+                        onChange={(event) => updateAdoption?.(adoption.id, { status: event.target.value })}
+                      >
+                        {['採用中', '休止中', '終了'].map((status) => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
+                    <dl className="company-details">
+                      <div><dt>採用日</dt><dd>{adoption.adoptedDate || '-'}</dd></div>
+                      <div><dt>月間数量</dt><dd>{adoption.monthlyVolume || '-'}</dd></div>
+                      <div><dt>販売価格</dt><dd>{adoption.sellingPrice || '-'}</dd></div>
+                      <div><dt>単位</dt><dd>{adoption.unit || '-'}</dd></div>
+                      <div><dt>粗利率</dt><dd>{adoption.grossMarginRate || '-'}</dd></div>
+                    </dl>
+                    {adoption.memo && <p className="inline-helper">{adoption.memo}</p>}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="inline-helper">この商品を採用中の顧客はまだ登録されていません。</p>
+          )}
         </section>
 
         <section className="detail-section">

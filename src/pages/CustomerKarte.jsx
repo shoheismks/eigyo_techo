@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../hooks/useAdoptions.js';
 import { normalizeAttachmentRecord } from '../hooks/useAttachments.js';
 import { formatPrice } from '../hooks/useProducts.js';
 import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../hooks/useQuotes.js';
@@ -43,6 +44,14 @@ function createQuoteForm(customerId = '', user) {
     customerId,
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
+  }, user?.id ?? '');
+}
+
+function createAdoptionForm(customerId = '', user) {
+  return normalizeAdoption({
+    ...emptyAdoption,
+    customerId,
+    userId: user?.id ?? '',
   }, user?.id ?? '');
 }
 
@@ -95,6 +104,7 @@ export default function CustomerKarte({
   contacts,
   businessCards,
   products,
+  adoptions = [],
   suppliers = [],
   complaints,
   attachments,
@@ -106,6 +116,8 @@ export default function CustomerKarte({
   updateSample,
   addQuote,
   updateQuote,
+  addAdoption,
+  updateAdoption,
   setActivePage,
   user,
 }) {
@@ -118,10 +130,11 @@ export default function CustomerKarte({
   const [quoteFile, setQuoteFile] = useState(null);
   const [quoteUploading, setQuoteUploading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
+  const [adoptionForm, setAdoptionForm] = useState(() => createAdoptionForm(customerId, user));
 
   const karte = useMemo(
-    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments, samples, quotes }),
-    [attachments, businessCards, complaints, contacts, customerId, customers, products, samples, quotes],
+    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments, samples, quotes, adoptions }),
+    [attachments, businessCards, complaints, contacts, customerId, customers, products, samples, quotes, adoptions],
   );
   const sortedActivityTimeline = useMemo(() => {
     if (!karte) return [];
@@ -132,6 +145,7 @@ export default function CustomerKarte({
   useEffect(() => {
     setSampleForm(createSampleForm(customerId, user));
     setQuoteForm(createQuoteForm(customerId, user));
+    setAdoptionForm(createAdoptionForm(customerId, user));
     setQuoteFile(null);
     setQuoteError('');
   }, [customerId, user?.email, user?.id]);
@@ -186,6 +200,10 @@ export default function CustomerKarte({
 
   function updateQuoteField(field, value) {
     setQuoteForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateAdoptionField(field, value) {
+    setAdoptionForm((current) => ({ ...current, [field]: value }));
   }
 
   function toggleQuoteArrayField(field, id) {
@@ -254,6 +272,20 @@ export default function CustomerKarte({
     } finally {
       setQuoteUploading(false);
     }
+  }
+
+  function handleAddAdoption(event) {
+    event.preventDefault();
+    if (!addAdoption || !adoptionForm.productId) {
+      return;
+    }
+
+    addAdoption(normalizeAdoption({
+      ...adoptionForm,
+      customerId: customer.id,
+      userId: user?.id ?? customer.userId,
+    }, user?.id ?? customer.userId));
+    setAdoptionForm(createAdoptionForm(customer.id, user));
   }
 
   async function handleAttachment(file, field = 'customer-file') {
@@ -469,6 +501,65 @@ export default function CustomerKarte({
               </article>
             )) : <p className="inline-helper">提案商品はまだ登録されていません。</p>}
           </div>
+        </Section>
+
+        <Section title="採用品一覧" count={karte.adoptions.length} defaultOpen={karte.adoptions.length > 0}>
+          <form className="sample-form" onSubmit={handleAddAdoption}>
+            <div className="date-grid">
+              <label className="field-label">
+                商品
+                <select value={adoptionForm.productId} onChange={(event) => updateAdoptionField('productId', event.target.value)}>
+                  <option value="">選択してください</option>
+                  {products.map((product) => (
+                    <option value={product.id} key={product.id}>{product.name || '商品名未設定'}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                ステータス
+                <select value={adoptionForm.status} onChange={(event) => updateAdoptionField('status', event.target.value)}>
+                  {ADOPTION_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                採用日
+                <input type="date" value={adoptionForm.adoptedDate} onChange={(event) => updateAdoptionField('adoptedDate', event.target.value)} />
+              </label>
+              <label className="field-label">
+                月間数量
+                <input value={adoptionForm.monthlyVolume} onChange={(event) => updateAdoptionField('monthlyVolume', event.target.value)} />
+              </label>
+              <label className="field-label">
+                単位
+                <input value={adoptionForm.unit} placeholder="kg / ケース など" onChange={(event) => updateAdoptionField('unit', event.target.value)} />
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                販売価格
+                <input inputMode="decimal" value={adoptionForm.sellingPrice} onChange={(event) => updateAdoptionField('sellingPrice', event.target.value)} />
+              </label>
+              <label className="field-label">
+                粗利率
+                <input value={adoptionForm.grossMarginRate} placeholder="例: 20%" onChange={(event) => updateAdoptionField('grossMarginRate', event.target.value)} />
+              </label>
+            </div>
+            <label className="field-label">
+              メモ
+              <textarea value={adoptionForm.memo} onChange={(event) => updateAdoptionField('memo', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit" disabled={!adoptionForm.productId}>
+              採用履歴を登録
+            </button>
+          </form>
+          <AdoptionList
+            adoptions={karte.adoptions}
+            products={products}
+            updateAdoption={updateAdoption}
+          />
+          {karte.adoptions.length === 0 && <p className="inline-helper">採用品はまだ登録されていません。</p>}
         </Section>
 
         <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0}>
@@ -820,6 +911,54 @@ function SampleList({ samples, products, contacts, updateSample }) {
             <p className="inline-helper">{sample.summary || sample.memo || sample.name || '-'}</p>
           )}
           {sample.memo && sample.customerId && <p className="inline-helper">{sample.memo}</p>}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function AdoptionList({ adoptions, products, updateAdoption }) {
+  if (!adoptions.length) {
+    return null;
+  }
+
+  function productName(adoption) {
+    return products.find((product) => product.id === adoption.productId)?.name || adoption.productName || '-';
+  }
+
+  return (
+    <div className="karte-card-list sample-card-list">
+      {adoptions.map((adoption) => (
+        <article className="karte-mini-card adoption-card" key={adoption.id}>
+          <div className="history-meta">
+            <span>{productName(adoption)}</span>
+            <small>{adoption.status || '-'}</small>
+          </div>
+          <div className="sample-status-row">
+            <label className="field-label">
+              ステータス
+              <select
+                value={adoption.status || '採用中'}
+                onChange={(event) => updateAdoption?.(adoption.id, { status: event.target.value })}
+              >
+                {ADOPTION_STATUSES.map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+          </div>
+          <dl className="company-details">
+            <div><dt>採用日</dt><dd>{formatDate(adoption.adoptedDate)}</dd></div>
+            <div><dt>月間数量</dt><dd>{adoption.monthlyVolume || '-'}</dd></div>
+            <div><dt>販売価格</dt><dd>{adoption.sellingPrice || '-'}</dd></div>
+            <div><dt>単位</dt><dd>{adoption.unit || '-'}</dd></div>
+            <div><dt>粗利率</dt><dd>{adoption.grossMarginRate || '-'}</dd></div>
+          </dl>
+          <label className="field-label">
+            メモ
+            <textarea
+              value={adoption.memo || ''}
+              onChange={(event) => updateAdoption?.(adoption.id, { memo: event.target.value })}
+            />
+          </label>
         </article>
       ))}
     </div>

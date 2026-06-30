@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppLayout from './components/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
+import { useAdoptions } from './hooks/useAdoptions.js';
 import { useAttachments } from './hooks/useAttachments.js';
 import { useBusinessCards } from './hooks/useBusinessCards.js';
 import { useComplaints } from './hooks/useComplaints.js';
@@ -79,6 +80,12 @@ function AuthenticatedApp() {
     syncState,
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
+  const {
+    records: adoptions,
+    addRecord: addAdoption,
+    updateRecord: updateAdoption,
+    removeRecord: removeAdoption,
+  } = useAdoptions(userId);
   const {
     records: samples,
     addRecord: addSample,
@@ -258,6 +265,10 @@ function AuthenticatedApp() {
         addProduct={addProduct}
         updateProduct={updateProduct}
         removeProduct={removeProduct}
+        adoptions={adoptions}
+        addAdoption={addAdoption}
+        updateAdoption={updateAdoption}
+        removeAdoption={removeAdoption}
         samples={samples}
         addSample={addSample}
         updateSample={updateSample}
@@ -312,6 +323,10 @@ function ActivePage({
   addProduct,
   updateProduct,
   removeProduct,
+  adoptions,
+  addAdoption,
+  updateAdoption,
+  removeAdoption,
   samples,
   addSample,
   updateSample,
@@ -392,6 +407,7 @@ function ActivePage({
         contacts={contacts}
         businessCards={businessCards}
         products={products}
+        adoptions={adoptions}
         samples={samples}
         quotes={quotes}
         suppliers={suppliers}
@@ -406,6 +422,8 @@ function ActivePage({
         updateSample={updateSample}
         addQuote={addQuote}
         updateQuote={updateQuote}
+        addAdoption={addAdoption}
+        updateAdoption={updateAdoption}
         setActivePage={setActivePage}
         user={user}
       />
@@ -443,12 +461,14 @@ function ActivePage({
     return (
       <ProductDetail
         product={selectedProduct}
+        adoptions={adoptions}
         samples={samples}
         quotes={quotes}
         customers={customers}
         suppliers={suppliers}
         addProduct={addProduct}
         updateProduct={updateProduct}
+        updateAdoption={updateAdoption}
         updateSample={updateSample}
         updateQuote={updateQuote}
         setActivePage={setActivePage}

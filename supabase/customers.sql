@@ -348,6 +348,35 @@ alter table public.quotes add column if not exists created_by_name text;
 alter table public.quotes add column if not exists created_at timestamptz;
 alter table public.quotes add column if not exists updated_at timestamptz;
 
+create table if not exists public.adoptions (
+  id text primary key,
+  user_id uuid,
+  customer_id text,
+  product_id text,
+  adopted_date date,
+  status text,
+  monthly_volume text,
+  selling_price text,
+  unit text,
+  gross_margin_rate text,
+  memo text,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+
+alter table public.adoptions add column if not exists user_id uuid;
+alter table public.adoptions add column if not exists customer_id text;
+alter table public.adoptions add column if not exists product_id text;
+alter table public.adoptions add column if not exists adopted_date date;
+alter table public.adoptions add column if not exists status text;
+alter table public.adoptions add column if not exists monthly_volume text;
+alter table public.adoptions add column if not exists selling_price text;
+alter table public.adoptions add column if not exists unit text;
+alter table public.adoptions add column if not exists gross_margin_rate text;
+alter table public.adoptions add column if not exists memo text;
+alter table public.adoptions add column if not exists created_at timestamptz;
+alter table public.adoptions add column if not exists updated_at timestamptz;
+
 create table if not exists public.attachments (
   id text primary key,
   user_id uuid,
@@ -388,6 +417,7 @@ alter table public.business_cards enable row level security;
 alter table public.complaints enable row level security;
 alter table public.samples enable row level security;
 alter table public.quotes enable row level security;
+alter table public.adoptions enable row level security;
 alter table public.attachments enable row level security;
 
 create or replace function pg_temp.eigyo_drop_policy(
@@ -509,6 +539,11 @@ select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated read own
 select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated insert own quotes', 'create policy "Allow authenticated insert own quotes" on public.quotes for insert to authenticated with check (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated update own quotes', 'create policy "Allow authenticated update own quotes" on public.quotes for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated delete own quotes', 'create policy "Allow authenticated delete own quotes" on public.quotes for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.adoptions', 'Allow authenticated read own adoptions', 'create policy "Allow authenticated read own adoptions" on public.adoptions for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.adoptions', 'Allow authenticated insert own adoptions', 'create policy "Allow authenticated insert own adoptions" on public.adoptions for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.adoptions', 'Allow authenticated update own adoptions', 'create policy "Allow authenticated update own adoptions" on public.adoptions for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.adoptions', 'Allow authenticated delete own adoptions', 'create policy "Allow authenticated delete own adoptions" on public.adoptions for delete to authenticated using (auth.uid() = user_id)');
 
 select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated read own attachments', 'create policy "Allow authenticated read own attachments" on public.attachments for select to authenticated using (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated insert own attachments', 'create policy "Allow authenticated insert own attachments" on public.attachments for insert to authenticated with check (auth.uid() = user_id)');

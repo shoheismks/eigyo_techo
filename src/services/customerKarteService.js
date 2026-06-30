@@ -10,7 +10,7 @@ function sameCustomer(record, customer) {
 }
 
 function eventDate(record = {}) {
-  return record.date || record.sentAt || record.submittedDate || record.followUpDate || record.followDate || record.createdAt || record.updatedAt || '';
+  return record.date || record.sentAt || record.submittedDate || record.adoptedDate || record.followUpDate || record.followDate || record.createdAt || record.updatedAt || '';
 }
 
 function byDateDesc(a, b) {
@@ -78,7 +78,7 @@ function timelineEvent({
   };
 }
 
-function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments, samples = [], quotes = [] }) {
+function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments, samples = [], quotes = [], adoptions = [] }) {
   const events = [];
   const currentStatus = customer.status || '未接触';
 
@@ -186,6 +186,19 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
     );
   });
 
+  adoptions.forEach((adoption) => {
+    events.push(
+      timelineEvent({
+        id: `adoption-${adoption.id}`,
+        date: adoption.adoptedDate || adoption.createdAt,
+        type: '商品採用',
+        content: `${adoption.productName || '商品'} / ${adoption.status || '採用中'}`,
+        createdBy: adoption.createdByName || adoption.createdBy || adoption.userId,
+        source: 'adoption',
+      }),
+    );
+  });
+
   (customer.mailHistories ?? customer.emailHistories ?? []).forEach((mail) => {
     events.push(
       timelineEvent({
@@ -282,6 +295,7 @@ export function getCustomerKarte({
   attachments = [],
   samples: sampleRecords = [],
   quotes: quoteRecords = [],
+  adoptions: adoptionRecords = [],
 }) {
   const customer = customers.find((item) => item.id === customerId) ?? null;
 
@@ -327,6 +341,13 @@ export function getCustomerKarte({
         .filter(Boolean),
     }))
     .sort(byDateDesc);
+  const customerAdoptions = adoptionRecords
+    .filter((adoption) => adoption.customerId === customer.id)
+    .map((adoption) => ({
+      ...adoption,
+      productName: products.find((product) => product.id === adoption.productId)?.name || '',
+    }))
+    .sort(byDateDesc);
   const estimates = [
     ...customerQuotes,
     ...dealHistories.filter((history) => hasWord(history, ['見積', '価格'])),
@@ -346,6 +367,7 @@ export function getCustomerKarte({
     attachments: customerAttachments,
     samples: customerSamples,
     quotes: customerQuotes,
+    adoptions: customerAdoptions,
   });
 
   return {
@@ -354,6 +376,7 @@ export function getCustomerKarte({
     businessCards: customerCards,
     dealHistories,
     products: proposedProducts,
+    adoptions: customerAdoptions,
     complaints: customerComplaints,
     attachments: customerAttachments,
     estimates,

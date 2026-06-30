@@ -1469,6 +1469,10 @@ textarea:focus {
   border-left: 4px solid var(--purple);
 }
 
+.adoption-card {
+  border-left: 4px solid var(--gold);
+}
+
 .sample-status-row {
   max-width: 240px;
 }
