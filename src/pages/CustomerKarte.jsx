@@ -85,11 +85,17 @@ export default function CustomerKarte({
   const [analysis, setAnalysis] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [timelineOrder, setTimelineOrder] = useState('desc');
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments }),
     [attachments, businessCards, complaints, contacts, customerId, customers, products],
   );
+  const sortedActivityTimeline = useMemo(() => {
+    if (!karte) return [];
+    const nextTimeline = [...karte.activityTimeline];
+    return timelineOrder === 'asc' ? nextTimeline.reverse() : nextTimeline;
+  }, [karte, timelineOrder]);
 
   if (!karte) {
     return (
@@ -240,16 +246,47 @@ export default function CustomerKarte({
         </Section>
 
         <Section title="活動タイムライン" count={karte.activityTimeline.length}>
+          <div className="timeline-toolbar">
+            <span>表示順</span>
+            <div className="segmented-control compact-segmented" aria-label="活動タイムラインの表示順">
+              <button
+                type="button"
+                className={timelineOrder === 'desc' ? 'selected' : ''}
+                onClick={() => setTimelineOrder('desc')}
+              >
+                新しい順
+              </button>
+              <button
+                type="button"
+                className={timelineOrder === 'asc' ? 'selected' : ''}
+                onClick={() => setTimelineOrder('asc')}
+              >
+                古い順
+              </button>
+            </div>
+          </div>
           <div className="timeline-list">
-            {karte.activityTimeline.length > 0 ? karte.activityTimeline.map((activity) => (
-              <article className={`history-card timeline-card ${activity.activityType === 'クレーム' ? 'ng-card' : ''}`} key={`${activity.activityType}-${activity.id}`}>
-                <div className="history-meta">
-                  <span>{activity.activityType} / {formatDate(activity.date || activity.createdAt)}</span>
-                  <small>{activity.createdByName || activity.createdBy || activity.name || '-'}</small>
+            {sortedActivityTimeline.length > 0 ? sortedActivityTimeline.map((activity) => (
+              <article className={`history-card timeline-card timeline-event-card ${activity.type === 'クレーム記録' ? 'ng-card' : ''}`} key={activity.id}>
+                <div className="history-meta timeline-event-heading">
+                  <span>{formatDate(activity.date)} / {activity.type}</span>
+                  <small>{activity.createdBy}</small>
                 </div>
-                <p>{activity.summary || activity.title || activity.memo || activity.name || '-'}</p>
-                {activity.nextAction && <p className="inline-helper">次回: {activity.nextAction}</p>}
-                <ReplyTree replies={activity.replies ?? []} />
+                <p>{activity.content}</p>
+                <div className="timeline-event-grid">
+                  <div>
+                    <span>記載者</span>
+                    <strong>{activity.createdBy}</strong>
+                  </div>
+                  <div>
+                    <span>関連担当者</span>
+                    <strong>{displayText(activity.relatedContacts)}</strong>
+                  </div>
+                  <div>
+                    <span>添付ファイル</span>
+                    <strong>{activity.hasAttachment ? 'あり' : 'なし'}</strong>
+                  </div>
+                </div>
               </article>
             )) : <p className="inline-helper">活動履歴はまだありません。</p>}
           </div>

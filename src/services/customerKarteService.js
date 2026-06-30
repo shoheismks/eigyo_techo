@@ -9,10 +9,12 @@ function sameCustomer(record, customer) {
   );
 }
 
+function eventDate(record = {}) {
+  return record.date || record.sentAt || record.followDate || record.createdAt || record.updatedAt || '';
+}
+
 function byDateDesc(a, b) {
-  const dateA = a.date || a.createdAt || a.updatedAt || '';
-  const dateB = b.date || b.createdAt || b.updatedAt || '';
-  return String(dateB).localeCompare(String(dateA));
+  return String(eventDate(b)).localeCompare(String(eventDate(a)));
 }
 
 function hasWord(record, words) {
@@ -28,6 +30,197 @@ function hasWord(record, words) {
     .filter(Boolean)
     .join(' ');
   return words.some((word) => text.includes(word));
+}
+
+function relatedContactNames(record, contacts) {
+  if (Array.isArray(record.contactNames) && record.contactNames.length > 0) {
+    return record.contactNames;
+  }
+
+  const ids = new Set(record.contactIds ?? [record.contactId].filter(Boolean));
+  return contacts.filter((contact) => ids.has(contact.id)).map((contact) => contact.name).filter(Boolean);
+}
+
+function hasAttachment(record, attachments) {
+  if (record.attachment || record.attachmentUrl || record.file || record.fileUrl) return true;
+  if (Array.isArray(record.attachments) && record.attachments.length > 0) return true;
+  return attachments.some(
+    (attachment) =>
+      attachment.ownerId === record.id ||
+      attachment.metadata?.dealHistoryId === record.id ||
+      attachment.metadata?.complaintId === record.id ||
+      attachment.metadata?.sourceRecordId === record.id,
+  );
+}
+
+function timelineEvent({
+  id,
+  date,
+  type,
+  content,
+  createdBy = '',
+  relatedContacts = [],
+  hasAttachment: attached = false,
+  source = '',
+}) {
+  return {
+    id,
+    date: date || '',
+    type,
+    content: content || '-',
+    createdBy: createdBy || '-',
+    relatedContacts,
+    hasAttachment: attached,
+    source,
+  };
+}
+
+function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments }) {
+  const events = [];
+  const currentStatus = customer.status || '未接触';
+
+  events.push(
+    timelineEvent({
+      id: `customer-created-${customer.id}`,
+      date: customer.createdAt,
+      type: '会社登録',
+      content: `${customer.companyName}を営業手帳に登録`,
+      createdBy: customer.createdByName || customer.createdBy || customer.userId,
+      source: 'customer',
+    }),
+  );
+
+  contacts.forEach((contact) => {
+    events.push(
+      timelineEvent({
+        id: `contact-created-${contact.id}`,
+        date: contact.createdAt,
+        type: '担当者追加',
+        content: `${contact.name || '担当者'} ${contact.department || ''} ${contact.role || ''}`.trim(),
+        createdBy: contact.createdByName || contact.createdBy || contact.userId,
+        relatedContacts: [contact.name].filter(Boolean),
+        source: 'contact',
+      }),
+    );
+  });
+
+  businessCards.forEach((card) => {
+    const name = card.extracted?.name || contacts.find((contact) => contact.id === card.contactId)?.name || '名刺';
+    events.push(
+      timelineEvent({
+        id: `business-card-${card.id}`,
+        date: card.createdAt,
+        type: '名刺登録',
+        content: `${name}の名刺を登録`,
+        createdBy: card.createdByName || card.createdBy || card.userId,
+        relatedContacts: [name].filter(Boolean),
+        hasAttachment: Boolean(card.imageFile?.url || card.imageFile),
+        source: 'business-card',
+      }),
+    );
+  });
+
+  dealHistories.forEach((history) => {
+    const typeText = history.type || '商談';
+    const eventType = hasWord(history, ['見積', '価格']) ? '見積提出' : hasWord(history, ['サンプル', '試食', '試供']) ? 'サンプル発送' : typeText.includes('メール') ? 'メール送信履歴' : '商談履歴';
+    events.push(
+      timelineEvent({
+        id: `deal-${history.id}`,
+        date: history.date || history.createdAt,
+        type: eventType,
+        content: history.summary || history.nextAction || typeText,
+        createdBy: history.createdByName || history.createdBy,
+        relatedContacts: relatedContactNames(history, contacts),
+        hasAttachment: hasAttachment(history, attachments),
+        source: 'deal-history',
+      }),
+    );
+  });
+
+  (customer.mailHistories ?? customer.emailHistories ?? []).forEach((mail) => {
+    events.push(
+      timelineEvent({
+        id: `mail-${mail.id ?? mail.sentAt ?? mail.createdAt}`,
+        date: mail.sentAt || mail.createdAt,
+        type: 'メール送信履歴',
+        content: mail.subject || mail.summary || 'メール送信',
+        createdBy: mail.createdByName || mail.createdBy,
+        relatedContacts: relatedContactNames(mail, contacts),
+        hasAttachment: hasAttachment(mail, attachments),
+        source: 'mail',
+      }),
+    );
+  });
+
+  if (customer.nextFollowUpDate || customer.nextFollowDate) {
+    events.push(
+      timelineEvent({
+        id: `follow-${customer.id}-${customer.nextFollowUpDate || customer.nextFollowDate}`,
+        date: customer.nextFollowUpDate || customer.nextFollowDate,
+        type: 'フォロー予定',
+        content: customer.pipelineMemo || customer.memo || '次回フォロー予定',
+        createdBy: customer.updatedByName || customer.updatedBy || customer.userId,
+        source: 'follow',
+      }),
+    );
+  }
+
+  complaints.forEach((complaint) => {
+    events.push(
+      timelineEvent({
+        id: `complaint-${complaint.id}`,
+        date: complaint.occurredAt || complaint.createdAt,
+        type: 'クレーム記録',
+        content: complaint.title || complaint.memo || 'クレーム記録',
+        createdBy: complaint.createdByName || complaint.createdBy,
+        relatedContacts: relatedContactNames(complaint, contacts),
+        hasAttachment: hasAttachment(complaint, attachments),
+        source: 'complaint',
+      }),
+    );
+  });
+
+  attachments.forEach((attachment) => {
+    events.push(
+      timelineEvent({
+        id: `attachment-${attachment.id}`,
+        date: attachment.createdAt,
+        type: '添付ファイル追加',
+        content: attachment.name || attachment.field || 'ファイル追加',
+        createdBy: attachment.createdByName || attachment.createdBy || attachment.userId,
+        hasAttachment: true,
+        source: 'attachment',
+      }),
+    );
+  });
+
+  (customer.statusHistory ?? customer.statusLogs ?? []).forEach((log) => {
+    events.push(
+      timelineEvent({
+        id: `status-${log.id ?? log.createdAt ?? log.date}`,
+        date: log.date || log.createdAt,
+        type: 'ステータス変更',
+        content: `${log.from ? `${log.from} → ` : ''}${log.to || log.status || currentStatus}`,
+        createdBy: log.createdByName || log.createdBy,
+        source: 'status',
+      }),
+    );
+  });
+
+  events.push(
+    timelineEvent({
+      id: `status-current-${customer.id}`,
+      date: customer.updatedAt || customer.createdAt,
+      type: 'ステータス変更',
+      content: `現在のステータス: ${currentStatus}`,
+      createdBy: customer.updatedByName || customer.updatedBy || customer.userId,
+      source: 'status-current',
+    }),
+  );
+
+  return events
+    .filter((event) => event.date || event.type === '会社登録')
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
 
 export function getCustomerKarte({
@@ -71,11 +264,14 @@ export function getCustomerKarte({
     ...dealHistories.filter((history) => hasWord(history, ['サンプル', '試食', '試供'])),
     ...customerAttachments.filter((attachment) => hasWord(attachment, ['サンプル', 'sample'])),
   ].sort(byDateDesc);
-  const activityTimeline = [
-    ...dealHistories.map((history) => ({ ...history, activityType: '商談' })),
-    ...customerComplaints.map((complaint) => ({ ...complaint, activityType: 'クレーム' })),
-    ...customerAttachments.map((attachment) => ({ ...attachment, activityType: '添付' })),
-  ].sort(byDateDesc);
+  const activityTimeline = buildActivityTimeline({
+    customer,
+    contacts: customerContacts,
+    businessCards: customerCards,
+    dealHistories,
+    complaints: customerComplaints,
+    attachments: customerAttachments,
+  });
 
   return {
     customer,
