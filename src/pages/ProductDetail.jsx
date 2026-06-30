@@ -18,10 +18,13 @@ function fileLabel(file) {
 export default function ProductDetail({
   product,
   samples = [],
+  quotes = [],
   customers = [],
+  suppliers = [],
   addProduct,
   updateProduct,
   updateSample,
+  updateQuote,
   setActivePage,
   userId = '',
 }) {
@@ -50,6 +53,17 @@ export default function ProductDetail({
           ),
         ),
     [form.id, samples],
+  );
+  const relatedQuotes = useMemo(
+    () =>
+      quotes
+        .filter((quote) => (quote.productIds ?? []).includes(form.id))
+        .sort((a, b) =>
+          String(b.submittedDate || b.createdAt || '').localeCompare(
+            String(a.submittedDate || a.createdAt || ''),
+          ),
+        ),
+    [form.id, quotes],
   );
 
   function updateField(field, value) {
@@ -380,6 +394,53 @@ export default function ProductDetail({
               onChange={(event) => updateField('memo', event.target.value)}
             />
           </label>
+        </section>
+
+        <section className="detail-section">
+          <div className="section-heading">
+            <h2>見積履歴</h2>
+            <span className="info-badge">{relatedQuotes.length}件</span>
+          </div>
+          {relatedQuotes.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {relatedQuotes.map((quote) => {
+                const customer = customers.find((item) => item.id === quote.customerId);
+                const supplier = suppliers.find((item) => item.id === quote.supplierId);
+                return (
+                  <article className="karte-mini-card quote-card" key={quote.id}>
+                    <div className="history-meta">
+                      <span>{quote.quoteNumber || '見積'}</span>
+                      <small>{customer?.companyName || '-'}</small>
+                    </div>
+                    <label className="field-label">
+                      ステータス
+                      <select
+                        value={quote.status || '提出済'}
+                        onChange={(event) => updateQuote?.(quote.id, { status: event.target.value })}
+                      >
+                        {['作成中', '提出済', '再見積', '採用', '失注', '期限切れ'].map((status) => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
+                    <dl className="company-details">
+                      <div><dt>仕入先</dt><dd>{supplier?.name || supplier?.companyName || '-'}</dd></div>
+                      <div><dt>提出日</dt><dd>{quote.submittedDate || '-'}</dd></div>
+                      <div><dt>有効期限</dt><dd>{quote.validUntil || '-'}</dd></div>
+                      <div><dt>金額</dt><dd>{quote.totalAmount || '-'}</dd></div>
+                      <div><dt>粗利率</dt><dd>{quote.grossMarginRate || '-'}</dd></div>
+                    </dl>
+                    {quote.fileUrl && (
+                      <a className="ghost-button external-button" href={quote.fileUrl} target="_blank" rel="noreferrer">
+                        {quote.fileName || '見積ファイルを開く'}
+                      </a>
+                    )}
+                    {quote.memo && <p className="inline-helper">{quote.memo}</p>}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="inline-helper">この商品に紐づく見積履歴はまだありません。</p>
+          )}
         </section>
 
         <section className="detail-section">

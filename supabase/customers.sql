@@ -303,6 +303,51 @@ alter table public.samples add column if not exists created_by_name text;
 alter table public.samples add column if not exists created_at timestamptz;
 alter table public.samples add column if not exists updated_at timestamptz;
 
+create table if not exists public.quotes (
+  id text primary key,
+  user_id uuid,
+  customer_id text,
+  supplier_id text,
+  product_ids jsonb,
+  contact_ids jsonb,
+  quote_number text,
+  submitted_date date,
+  valid_until date,
+  currency text,
+  total_amount text,
+  gross_margin_rate text,
+  status text,
+  file_url text,
+  file_name text,
+  memo text,
+  lost_reason text,
+  created_by uuid,
+  created_by_name text,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+
+alter table public.quotes add column if not exists user_id uuid;
+alter table public.quotes add column if not exists customer_id text;
+alter table public.quotes add column if not exists supplier_id text;
+alter table public.quotes add column if not exists product_ids jsonb;
+alter table public.quotes add column if not exists contact_ids jsonb;
+alter table public.quotes add column if not exists quote_number text;
+alter table public.quotes add column if not exists submitted_date date;
+alter table public.quotes add column if not exists valid_until date;
+alter table public.quotes add column if not exists currency text;
+alter table public.quotes add column if not exists total_amount text;
+alter table public.quotes add column if not exists gross_margin_rate text;
+alter table public.quotes add column if not exists status text;
+alter table public.quotes add column if not exists file_url text;
+alter table public.quotes add column if not exists file_name text;
+alter table public.quotes add column if not exists memo text;
+alter table public.quotes add column if not exists lost_reason text;
+alter table public.quotes add column if not exists created_by uuid;
+alter table public.quotes add column if not exists created_by_name text;
+alter table public.quotes add column if not exists created_at timestamptz;
+alter table public.quotes add column if not exists updated_at timestamptz;
+
 create table if not exists public.attachments (
   id text primary key,
   user_id uuid,
@@ -342,6 +387,7 @@ alter table public.suppliers enable row level security;
 alter table public.business_cards enable row level security;
 alter table public.complaints enable row level security;
 alter table public.samples enable row level security;
+alter table public.quotes enable row level security;
 alter table public.attachments enable row level security;
 
 create or replace function pg_temp.eigyo_drop_policy(
@@ -458,6 +504,11 @@ select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated read ow
 select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated insert own samples', 'create policy "Allow authenticated insert own samples" on public.samples for insert to authenticated with check (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated update own samples', 'create policy "Allow authenticated update own samples" on public.samples for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated delete own samples', 'create policy "Allow authenticated delete own samples" on public.samples for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated read own quotes', 'create policy "Allow authenticated read own quotes" on public.quotes for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated insert own quotes', 'create policy "Allow authenticated insert own quotes" on public.quotes for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated update own quotes', 'create policy "Allow authenticated update own quotes" on public.quotes for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.quotes', 'Allow authenticated delete own quotes', 'create policy "Allow authenticated delete own quotes" on public.quotes for delete to authenticated using (auth.uid() = user_id)');
 
 select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated read own attachments', 'create policy "Allow authenticated read own attachments" on public.attachments for select to authenticated using (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated insert own attachments', 'create policy "Allow authenticated insert own attachments" on public.attachments for insert to authenticated with check (auth.uid() = user_id)');

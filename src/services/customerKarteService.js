@@ -10,7 +10,7 @@ function sameCustomer(record, customer) {
 }
 
 function eventDate(record = {}) {
-  return record.date || record.sentAt || record.followUpDate || record.followDate || record.createdAt || record.updatedAt || '';
+  return record.date || record.sentAt || record.submittedDate || record.followUpDate || record.followDate || record.createdAt || record.updatedAt || '';
 }
 
 function byDateDesc(a, b) {
@@ -43,6 +43,7 @@ function relatedContactNames(record, contacts) {
 
 function hasAttachment(record, attachments) {
   if (record.attachment || record.attachmentUrl || record.file || record.fileUrl) return true;
+  if (record.fileName || record.fileUrl) return true;
   if (Array.isArray(record.attachments) && record.attachments.length > 0) return true;
   return attachments.some(
     (attachment) =>
@@ -50,6 +51,7 @@ function hasAttachment(record, attachments) {
       attachment.metadata?.dealHistoryId === record.id ||
       attachment.metadata?.complaintId === record.id ||
       attachment.metadata?.sampleId === record.id ||
+      attachment.metadata?.quoteId === record.id ||
       attachment.metadata?.sourceRecordId === record.id,
   );
 }
@@ -76,7 +78,7 @@ function timelineEvent({
   };
 }
 
-function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments, samples = [] }) {
+function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments, samples = [], quotes = [] }) {
   const events = [];
   const currentStatus = customer.status || '未接触';
 
@@ -167,6 +169,21 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         }),
       );
     }
+  });
+
+  quotes.forEach((quote) => {
+    events.push(
+      timelineEvent({
+        id: `quote-${quote.id}`,
+        date: quote.submittedDate || quote.createdAt,
+        type: '見積提出',
+        content: `${quote.quoteNumber || '見積'} / ${quote.status || '提出済'} / ${quote.totalAmount || '-'}`,
+        createdBy: quote.createdByName || quote.createdBy,
+        relatedContacts: relatedContactNames(quote, contacts),
+        hasAttachment: hasAttachment(quote, attachments),
+        source: 'quote',
+      }),
+    );
   });
 
   (customer.mailHistories ?? customer.emailHistories ?? []).forEach((mail) => {
@@ -264,6 +281,7 @@ export function getCustomerKarte({
   complaints = [],
   attachments = [],
   samples: sampleRecords = [],
+  quotes: quoteRecords = [],
 }) {
   const customer = customers.find((item) => item.id === customerId) ?? null;
 
@@ -299,7 +317,18 @@ export function getCustomerKarte({
         .filter(Boolean),
     }))
     .sort(byDateDesc);
+  const customerQuotes = quoteRecords
+    .filter((quote) => quote.customerId === customer.id)
+    .map((quote) => ({
+      ...quote,
+      productNames: products
+        .filter((product) => (quote.productIds ?? []).includes(product.id))
+        .map((product) => product.name)
+        .filter(Boolean),
+    }))
+    .sort(byDateDesc);
   const estimates = [
+    ...customerQuotes,
     ...dealHistories.filter((history) => hasWord(history, ['見積', '価格'])),
     ...customerAttachments.filter((attachment) => hasWord(attachment, ['見積', 'quote', 'estimate'])),
   ].sort(byDateDesc);
@@ -316,6 +345,7 @@ export function getCustomerKarte({
     complaints: customerComplaints,
     attachments: customerAttachments,
     samples: customerSamples,
+    quotes: customerQuotes,
   });
 
   return {

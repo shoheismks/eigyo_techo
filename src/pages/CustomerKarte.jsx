@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { normalizeAttachmentRecord } from '../hooks/useAttachments.js';
 import { formatPrice } from '../hooks/useProducts.js';
+import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../hooks/useQuotes.js';
 import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
 import { uploadAttachment } from '../services/storageService.js';
@@ -30,6 +31,15 @@ function displayText(value, fallback = '-') {
 function createSampleForm(customerId = '', user) {
   return normalizeSample({
     ...emptySample,
+    customerId,
+    createdBy: user?.id ?? '',
+    createdByName: user?.email ?? '',
+  }, user?.id ?? '');
+}
+
+function createQuoteForm(customerId = '', user) {
+  return normalizeQuote({
+    ...emptyQuote,
     customerId,
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
@@ -85,13 +95,17 @@ export default function CustomerKarte({
   contacts,
   businessCards,
   products,
+  suppliers = [],
   complaints,
   attachments,
   samples = [],
+  quotes = [],
   updateCustomer,
   addAttachment,
   addSample,
   updateSample,
+  addQuote,
+  updateQuote,
   setActivePage,
   user,
 }) {
@@ -100,10 +114,14 @@ export default function CustomerKarte({
   const [uploadError, setUploadError] = useState('');
   const [timelineOrder, setTimelineOrder] = useState('desc');
   const [sampleForm, setSampleForm] = useState(() => createSampleForm(customerId, user));
+  const [quoteForm, setQuoteForm] = useState(() => createQuoteForm(customerId, user));
+  const [quoteFile, setQuoteFile] = useState(null);
+  const [quoteUploading, setQuoteUploading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
 
   const karte = useMemo(
-    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments, samples }),
-    [attachments, businessCards, complaints, contacts, customerId, customers, products, samples],
+    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments, samples, quotes }),
+    [attachments, businessCards, complaints, contacts, customerId, customers, products, samples, quotes],
   );
   const sortedActivityTimeline = useMemo(() => {
     if (!karte) return [];
@@ -113,6 +131,9 @@ export default function CustomerKarte({
 
   useEffect(() => {
     setSampleForm(createSampleForm(customerId, user));
+    setQuoteForm(createQuoteForm(customerId, user));
+    setQuoteFile(null);
+    setQuoteError('');
   }, [customerId, user?.email, user?.id]);
 
   if (!karte) {
@@ -163,6 +184,22 @@ export default function CustomerKarte({
     });
   }
 
+  function updateQuoteField(field, value) {
+    setQuoteForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function toggleQuoteArrayField(field, id) {
+    setQuoteForm((current) => {
+      const values = new Set(current[field] ?? []);
+      if (values.has(id)) {
+        values.delete(id);
+      } else {
+        values.add(id);
+      }
+      return { ...current, [field]: [...values] };
+    });
+  }
+
   function handleAddSample(event) {
     event.preventDefault();
     if (!addSample || !sampleForm.sampleName.trim()) {
@@ -176,6 +213,47 @@ export default function CustomerKarte({
       createdByName: user?.email ?? '',
     }, user?.id ?? customer.userId));
     setSampleForm(createSampleForm(customer.id, user));
+  }
+
+  async function handleAddQuote(event) {
+    event.preventDefault();
+    if (!addQuote || !quoteForm.quoteNumber.trim()) {
+      return;
+    }
+
+    setQuoteUploading(Boolean(quoteFile));
+    setQuoteError('');
+
+    try {
+      const quoteId = quoteForm.id || crypto.randomUUID();
+      let uploadedFile = null;
+
+      if (quoteFile) {
+        uploadedFile = await uploadAttachment({
+          file: quoteFile,
+          userId: user?.id ?? customer.userId,
+          ownerType: 'quote',
+          ownerId: quoteId,
+          field: 'quoteFile',
+        });
+      }
+
+      addQuote(normalizeQuote({
+        ...quoteForm,
+        id: quoteId,
+        customerId: customer.id,
+        fileUrl: uploadedFile?.publicUrl || uploadedFile?.url || quoteForm.fileUrl,
+        fileName: uploadedFile?.name || quoteFile?.name || quoteForm.fileName,
+        createdBy: user?.id ?? customer.userId,
+        createdByName: user?.email ?? '',
+      }, user?.id ?? customer.userId));
+      setQuoteForm(createQuoteForm(customer.id, user));
+      setQuoteFile(null);
+    } catch (error) {
+      setQuoteError(error.message || '見積ファイルのアップロードに失敗しました。');
+    } finally {
+      setQuoteUploading(false);
+    }
   }
 
   async function handleAttachment(file, field = 'customer-file') {
@@ -394,7 +472,112 @@ export default function CustomerKarte({
         </Section>
 
         <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0}>
-          <RecordList records={karte.estimates} emptyText="見積履歴はまだありません。" />
+          <form className="sample-form" onSubmit={handleAddQuote}>
+            <div className="date-grid">
+              <label className="field-label">
+                見積番号
+                <input
+                  value={quoteForm.quoteNumber}
+                  placeholder="例: Q-2026-001"
+                  onChange={(event) => updateQuoteField('quoteNumber', event.target.value)}
+                />
+              </label>
+              <label className="field-label">
+                ステータス
+                <select value={quoteForm.status} onChange={(event) => updateQuoteField('status', event.target.value)}>
+                  {QUOTE_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                提出日
+                <input type="date" value={quoteForm.submittedDate} onChange={(event) => updateQuoteField('submittedDate', event.target.value)} />
+              </label>
+              <label className="field-label">
+                有効期限
+                <input type="date" value={quoteForm.validUntil} onChange={(event) => updateQuoteField('validUntil', event.target.value)} />
+              </label>
+              <label className="field-label">
+                通貨
+                <input value={quoteForm.currency} onChange={(event) => updateQuoteField('currency', event.target.value)} />
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                仕入先
+                <select value={quoteForm.supplierId} onChange={(event) => updateQuoteField('supplierId', event.target.value)}>
+                  <option value="">未選択</option>
+                  {suppliers.map((supplier) => (
+                    <option value={supplier.id} key={supplier.id}>
+                      {supplier.name || supplier.companyName || '仕入先名未設定'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                合計金額
+                <input inputMode="decimal" value={quoteForm.totalAmount} onChange={(event) => updateQuoteField('totalAmount', event.target.value)} />
+              </label>
+              <label className="field-label">
+                粗利率
+                <input value={quoteForm.grossMarginRate} placeholder="例: 20%" onChange={(event) => updateQuoteField('grossMarginRate', event.target.value)} />
+              </label>
+            </div>
+            <div className="sample-picker-grid">
+              <div>
+                <span>関連担当者</span>
+                {karte.contacts.length > 0 ? karte.contacts.map((contact) => (
+                  <label className="mini-check" key={contact.id}>
+                    <input
+                      type="checkbox"
+                      checked={quoteForm.contactIds.includes(contact.id)}
+                      onChange={() => toggleQuoteArrayField('contactIds', contact.id)}
+                    />
+                    {contact.name || '名称未設定'}
+                  </label>
+                )) : <p className="inline-helper">担当者は未登録です。</p>}
+              </div>
+              <div>
+                <span>関連商品</span>
+                {products.length > 0 ? products.map((product) => (
+                  <label className="mini-check" key={product.id}>
+                    <input
+                      type="checkbox"
+                      checked={quoteForm.productIds.includes(product.id)}
+                      onChange={() => toggleQuoteArrayField('productIds', product.id)}
+                    />
+                    {product.name || '商品名未設定'}
+                  </label>
+                )) : <p className="inline-helper">商品は未登録です。</p>}
+              </div>
+            </div>
+            <label className="field-label file-field">
+              見積ファイル
+              <input type="file" onChange={(event) => setQuoteFile(event.target.files?.[0] ?? null)} />
+              <span>{quoteFile?.name || quoteForm.fileName || '未添付'}</span>
+            </label>
+            <label className="field-label">
+              メモ
+              <textarea value={quoteForm.memo} onChange={(event) => updateQuoteField('memo', event.target.value)} />
+            </label>
+            <label className="field-label">
+              失注理由
+              <textarea value={quoteForm.lostReason} onChange={(event) => updateQuoteField('lostReason', event.target.value)} />
+            </label>
+            {quoteUploading && <p className="notice-text">見積ファイルをアップロード中...</p>}
+            {quoteError && <p className="error-text">{quoteError}</p>}
+            <button className="primary-button" type="submit" disabled={!quoteForm.quoteNumber.trim() || quoteUploading}>
+              見積を登録
+            </button>
+          </form>
+          <QuoteList
+            quotes={karte.estimates}
+            products={products}
+            contacts={karte.contacts}
+            updateQuote={updateQuote}
+          />
+          {karte.estimates.length === 0 && <p className="inline-helper">見積履歴はまだありません。</p>}
         </Section>
 
         <Section title="サンプル管理" count={karte.samples.length} defaultOpen={karte.samples.length > 0}>
@@ -637,6 +820,89 @@ function SampleList({ samples, products, contacts, updateSample }) {
             <p className="inline-helper">{sample.summary || sample.memo || sample.name || '-'}</p>
           )}
           {sample.memo && sample.customerId && <p className="inline-helper">{sample.memo}</p>}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function QuoteList({ quotes, products, contacts, updateQuote }) {
+  if (!quotes.length) {
+    return null;
+  }
+
+  function productNames(quote) {
+    return products
+      .filter((product) => (quote.productIds ?? []).includes(product.id))
+      .map((product) => product.name)
+      .filter(Boolean)
+      .join(', ') || displayText(quote.productNames);
+  }
+
+  function contactNames(quote) {
+    return contacts
+      .filter((contact) => (quote.contactIds ?? []).includes(contact.id))
+      .map((contact) => contact.name)
+      .filter(Boolean)
+      .join(', ') || '-';
+  }
+
+  return (
+    <div className="karte-card-list sample-card-list">
+      {quotes.map((quote) => (
+        <article className="karte-mini-card quote-card" key={quote.id}>
+          <div className="history-meta">
+            <span>{quote.quoteNumber || quote.title || quote.type || '見積'}</span>
+            <small>{quote.status || '-'}</small>
+          </div>
+          {quote.customerId && (
+            <div className="sample-status-row">
+              <label className="field-label">
+                ステータス
+                <select
+                  value={quote.status || '提出済'}
+                  onChange={(event) => updateQuote?.(quote.id, { status: event.target.value })}
+                >
+                  {QUOTE_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+          <dl className="company-details">
+            <div><dt>商品</dt><dd>{productNames(quote)}</dd></div>
+            <div><dt>担当者</dt><dd>{contactNames(quote)}</dd></div>
+            <div><dt>提出日</dt><dd>{formatDate(quote.submittedDate || quote.date || quote.createdAt)}</dd></div>
+            <div><dt>有効期限</dt><dd>{formatDate(quote.validUntil)}</dd></div>
+            <div><dt>合計金額</dt><dd>{quote.totalAmount || '-'}</dd></div>
+            <div><dt>粗利率</dt><dd>{quote.grossMarginRate || '-'}</dd></div>
+          </dl>
+          {quote.customerId ? (
+            <>
+              <label className="field-label">
+                メモ
+                <textarea
+                  value={quote.memo || ''}
+                  onChange={(event) => updateQuote?.(quote.id, { memo: event.target.value })}
+                />
+              </label>
+              {quote.status === '失注' && (
+                <label className="field-label">
+                  失注理由
+                  <textarea
+                    value={quote.lostReason || ''}
+                    onChange={(event) => updateQuote?.(quote.id, { lostReason: event.target.value })}
+                  />
+                </label>
+              )}
+            </>
+          ) : (
+            <p className="inline-helper">{quote.summary || quote.memo || quote.name || '-'}</p>
+          )}
+          {quote.fileUrl && (
+            <a className="ghost-button external-button" href={quote.fileUrl} target="_blank" rel="noreferrer">
+              {quote.fileName || '見積ファイルを開く'}
+            </a>
+          )}
         </article>
       ))}
     </div>

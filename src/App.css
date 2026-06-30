@@ -1465,6 +1465,10 @@ textarea:focus {
   border-left: 4px solid var(--blue);
 }
 
+.quote-card {
+  border-left: 4px solid var(--purple);
+}
+
 .sample-status-row {
   max-width: 240px;
 }

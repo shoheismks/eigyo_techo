@@ -7,6 +7,7 @@ import { useComplaints } from './hooks/useComplaints.js';
 import { useContacts } from './hooks/useContacts.js';
 import { useCustomers } from './hooks/useCustomers.js';
 import { useProducts } from './hooks/useProducts.js';
+import { useQuotes } from './hooks/useQuotes.js';
 import { useSamples } from './hooks/useSamples.js';
 import { useSuppliers } from './hooks/useSuppliers.js';
 import BusinessCards from './pages/BusinessCards.jsx';
@@ -84,6 +85,12 @@ function AuthenticatedApp() {
     updateRecord: updateSample,
     removeRecord: removeSample,
   } = useSamples(userId);
+  const {
+    records: quotes,
+    addRecord: addQuote,
+    updateRecord: updateQuote,
+    removeRecord: removeQuote,
+  } = useQuotes(userId);
   const {
     records: contacts,
     addRecord: addContact,
@@ -255,6 +262,10 @@ function AuthenticatedApp() {
         addSample={addSample}
         updateSample={updateSample}
         removeSample={removeSample}
+        quotes={quotes}
+        addQuote={addQuote}
+        updateQuote={updateQuote}
+        removeQuote={removeQuote}
         openProductDetail={openProductDetail}
         selectedProduct={selectedProduct}
         contacts={contacts}
@@ -305,6 +316,10 @@ function ActivePage({
   addSample,
   updateSample,
   removeSample,
+  quotes,
+  addQuote,
+  updateQuote,
+  removeQuote,
   openProductDetail,
   selectedProduct,
   contacts,
@@ -378,6 +393,8 @@ function ActivePage({
         businessCards={businessCards}
         products={products}
         samples={samples}
+        quotes={quotes}
+        suppliers={suppliers}
         complaints={complaints}
         attachments={attachments}
         updateCustomer={updateCustomer}
@@ -387,6 +404,8 @@ function ActivePage({
         addAttachment={addAttachment}
         addSample={addSample}
         updateSample={updateSample}
+        addQuote={addQuote}
+        updateQuote={updateQuote}
         setActivePage={setActivePage}
         user={user}
       />
@@ -425,10 +444,13 @@ function ActivePage({
       <ProductDetail
         product={selectedProduct}
         samples={samples}
+        quotes={quotes}
         customers={customers}
+        suppliers={suppliers}
         addProduct={addProduct}
         updateProduct={updateProduct}
         updateSample={updateSample}
+        updateQuote={updateQuote}
         setActivePage={setActivePage}
         userId={userId}
       />
