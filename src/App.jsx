@@ -369,10 +369,13 @@ function ActivePage({
       <Home
         customers={customers}
         samples={samples}
+        quotes={quotes}
+        complaints={complaints}
         setActivePage={setActivePage}
         syncState={syncState}
         syncError={syncError}
         reloadFromCloud={reloadFromCloud}
+        onOpenKarte={openCustomerKarte}
       />
     );
   }
@@ -571,10 +574,13 @@ function ActivePage({
     <Home
       customers={customers}
       samples={samples}
+      quotes={quotes}
+      complaints={complaints}
       setActivePage={setActivePage}
       syncState={syncState}
       syncError={syncError}
       reloadFromCloud={reloadFromCloud}
+      onOpenKarte={openCustomerKarte}
     />
   );
 }

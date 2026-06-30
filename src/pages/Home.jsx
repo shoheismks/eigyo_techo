@@ -1,4 +1,5 @@
 import { calculateCompanyScore } from '../services/scoringService.js';
+import { buildNotifications } from '../services/notificationService.js';
 import { PIPELINE_STATUSES } from './Pipeline.jsx';
 
 const ACTIVE_DONE_STATUSES = ['成約', '失注'];
@@ -34,14 +35,18 @@ function withScore(customer) {
 export default function Home({
   customers,
   samples = [],
+  quotes = [],
+  complaints = [],
   setActivePage,
   syncState = 'local',
   syncError = '',
   reloadFromCloud,
+  onOpenKarte,
 }) {
   const today = todayString();
   const weekEnd = addDaysString(today, 6);
   const scoredCustomers = customers.map(withScore);
+  const notifications = buildNotifications({ customers: scoredCustomers, samples, quotes, complaints });
   const sRankCount = scoredCustomers.filter((customer) => customer.customerRank === 'S').length;
   const followToday = scoredCustomers.filter(
     (customer) =>
@@ -92,6 +97,7 @@ export default function Home({
       </section>
 
       <section className="dashboard-metrics" aria-label="今日の営業指標">
+        <DashboardMetric label="通知" value={notifications.length} tone={notifications.some((item) => item.tone === 'danger') ? 'red' : 'blue'} />
         <DashboardMetric label="Sランク顧客" value={sRankCount} tone="gold" />
         <DashboardMetric label="本日フォロー" value={followToday.length} tone="blue" />
         <DashboardMetric label="今週フォロー" value={followThisWeek.length} tone="blue" />
@@ -99,6 +105,36 @@ export default function Home({
         <DashboardMetric label="見積提出" value={statusCounts['見積提出'] ?? 0} tone="purple" />
         <DashboardMetric label="成約" value={statusCounts['成約'] ?? 0} tone="gold" />
         <DashboardMetric label="失注" value={statusCounts['失注'] ?? 0} tone="red" />
+      </section>
+
+      <section className="section-block notification-section">
+        <div className="section-heading">
+          <h2>通知</h2>
+          <button className="text-button" onClick={() => setActivePage('Calendar')}>
+            カレンダーへ
+          </button>
+        </div>
+        {notifications.length > 0 ? (
+          <div className="notification-list">
+            {notifications.slice(0, 8).map((notification) => (
+              <button
+                className={`notification-card ${notification.tone}`}
+                key={notification.id}
+                onClick={() => notification.customerId ? onOpenKarte?.(notification.customerId) : setActivePage('Customers')}
+              >
+                <span>{notification.type}</span>
+                <strong>{notification.customerName}</strong>
+                <small>{notification.date}</small>
+                <p>{notification.title}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">
+            <h3>通知はありません</h3>
+            <p>今日対応が必要なフォロー、見積、サンプル、クレームがあるとここに表示されます。</p>
+          </div>
+        )}
       </section>
 
       <section className="section-block follow-section">
