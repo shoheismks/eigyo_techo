@@ -262,6 +262,47 @@ alter table public.complaints add column if not exists attachments jsonb;
 alter table public.complaints add column if not exists created_at timestamptz;
 alter table public.complaints add column if not exists updated_at timestamptz;
 
+create table if not exists public.samples (
+  id text primary key,
+  user_id uuid,
+  customer_id text,
+  contact_ids jsonb,
+  product_ids jsonb,
+  sample_name text,
+  shipped_date date,
+  arrival_date date,
+  follow_up_date date,
+  status text,
+  feedback text,
+  next_action text,
+  shipping_method text,
+  tracking_number text,
+  memo text,
+  created_by uuid,
+  created_by_name text,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+
+alter table public.samples add column if not exists user_id uuid;
+alter table public.samples add column if not exists customer_id text;
+alter table public.samples add column if not exists contact_ids jsonb;
+alter table public.samples add column if not exists product_ids jsonb;
+alter table public.samples add column if not exists sample_name text;
+alter table public.samples add column if not exists shipped_date date;
+alter table public.samples add column if not exists arrival_date date;
+alter table public.samples add column if not exists follow_up_date date;
+alter table public.samples add column if not exists status text;
+alter table public.samples add column if not exists feedback text;
+alter table public.samples add column if not exists next_action text;
+alter table public.samples add column if not exists shipping_method text;
+alter table public.samples add column if not exists tracking_number text;
+alter table public.samples add column if not exists memo text;
+alter table public.samples add column if not exists created_by uuid;
+alter table public.samples add column if not exists created_by_name text;
+alter table public.samples add column if not exists created_at timestamptz;
+alter table public.samples add column if not exists updated_at timestamptz;
+
 create table if not exists public.attachments (
   id text primary key,
   user_id uuid,
@@ -300,6 +341,7 @@ alter table public.contacts enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.business_cards enable row level security;
 alter table public.complaints enable row level security;
+alter table public.samples enable row level security;
 alter table public.attachments enable row level security;
 
 create or replace function pg_temp.eigyo_drop_policy(
@@ -411,6 +453,11 @@ select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated read
 select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated insert own complaints', 'create policy "Allow authenticated insert own complaints" on public.complaints for insert to authenticated with check (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated update own complaints', 'create policy "Allow authenticated update own complaints" on public.complaints for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.complaints', 'Allow authenticated delete own complaints', 'create policy "Allow authenticated delete own complaints" on public.complaints for delete to authenticated using (auth.uid() = user_id)');
+
+select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated read own samples', 'create policy "Allow authenticated read own samples" on public.samples for select to authenticated using (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated insert own samples', 'create policy "Allow authenticated insert own samples" on public.samples for insert to authenticated with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated update own samples', 'create policy "Allow authenticated update own samples" on public.samples for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)');
+select pg_temp.eigyo_reset_policy('public.samples', 'Allow authenticated delete own samples', 'create policy "Allow authenticated delete own samples" on public.samples for delete to authenticated using (auth.uid() = user_id)');
 
 select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated read own attachments', 'create policy "Allow authenticated read own attachments" on public.attachments for select to authenticated using (auth.uid() = user_id)');
 select pg_temp.eigyo_reset_policy('public.attachments', 'Allow authenticated insert own attachments', 'create policy "Allow authenticated insert own attachments" on public.attachments for insert to authenticated with check (auth.uid() = user_id)');

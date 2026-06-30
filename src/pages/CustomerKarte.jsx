@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { normalizeAttachmentRecord } from '../hooks/useAttachments.js';
 import { formatPrice } from '../hooks/useProducts.js';
+import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
 import { uploadAttachment } from '../services/storageService.js';
 import { PIPELINE_STATUSES } from './Pipeline.jsx';
@@ -24,6 +25,15 @@ function formatDateTime(value) {
 function displayText(value, fallback = '-') {
   if (Array.isArray(value)) return value.filter(Boolean).join(', ') || fallback;
   return value || fallback;
+}
+
+function createSampleForm(customerId = '', user) {
+  return normalizeSample({
+    ...emptySample,
+    customerId,
+    createdBy: user?.id ?? '',
+    createdByName: user?.email ?? '',
+  }, user?.id ?? '');
 }
 
 function Section({ title, count, defaultOpen = true, children }) {
@@ -77,8 +87,11 @@ export default function CustomerKarte({
   products,
   complaints,
   attachments,
+  samples = [],
   updateCustomer,
   addAttachment,
+  addSample,
+  updateSample,
   setActivePage,
   user,
 }) {
@@ -86,16 +99,21 @@ export default function CustomerKarte({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [timelineOrder, setTimelineOrder] = useState('desc');
+  const [sampleForm, setSampleForm] = useState(() => createSampleForm(customerId, user));
 
   const karte = useMemo(
-    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments }),
-    [attachments, businessCards, complaints, contacts, customerId, customers, products],
+    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments, samples }),
+    [attachments, businessCards, complaints, contacts, customerId, customers, products, samples],
   );
   const sortedActivityTimeline = useMemo(() => {
     if (!karte) return [];
     const nextTimeline = [...karte.activityTimeline];
     return timelineOrder === 'asc' ? nextTimeline.reverse() : nextTimeline;
   }, [karte, timelineOrder]);
+
+  useEffect(() => {
+    setSampleForm(createSampleForm(customerId, user));
+  }, [customerId, user?.email, user?.id]);
 
   if (!karte) {
     return (
@@ -127,6 +145,37 @@ export default function CustomerKarte({
       'tags',
       value.split(',').map((tag) => tag.trim()).filter(Boolean),
     );
+  }
+
+  function updateSampleField(field, value) {
+    setSampleForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function toggleSampleArrayField(field, id) {
+    setSampleForm((current) => {
+      const values = new Set(current[field] ?? []);
+      if (values.has(id)) {
+        values.delete(id);
+      } else {
+        values.add(id);
+      }
+      return { ...current, [field]: [...values] };
+    });
+  }
+
+  function handleAddSample(event) {
+    event.preventDefault();
+    if (!addSample || !sampleForm.sampleName.trim()) {
+      return;
+    }
+
+    addSample(normalizeSample({
+      ...sampleForm,
+      customerId: customer.id,
+      createdBy: user?.id ?? customer.userId,
+      createdByName: user?.email ?? '',
+    }, user?.id ?? customer.userId));
+    setSampleForm(createSampleForm(customer.id, user));
   }
 
   async function handleAttachment(file, field = 'customer-file') {
@@ -348,8 +397,99 @@ export default function CustomerKarte({
           <RecordList records={karte.estimates} emptyText="見積履歴はまだありません。" />
         </Section>
 
-        <Section title="サンプル履歴" count={karte.samples.length} defaultOpen={karte.samples.length > 0}>
-          <RecordList records={karte.samples} emptyText="サンプル履歴はまだありません。" />
+        <Section title="サンプル管理" count={karte.samples.length} defaultOpen={karte.samples.length > 0}>
+          <form className="sample-form" onSubmit={handleAddSample}>
+            <div className="date-grid">
+              <label className="field-label">
+                サンプル名
+                <input
+                  value={sampleForm.sampleName}
+                  placeholder="例: 和牛ベーコン試食"
+                  onChange={(event) => updateSampleField('sampleName', event.target.value)}
+                />
+              </label>
+              <label className="field-label">
+                ステータス
+                <select value={sampleForm.status} onChange={(event) => updateSampleField('status', event.target.value)}>
+                  {SAMPLE_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                発送日
+                <input type="date" value={sampleForm.shippedDate} onChange={(event) => updateSampleField('shippedDate', event.target.value)} />
+              </label>
+              <label className="field-label">
+                到着日
+                <input type="date" value={sampleForm.arrivalDate} onChange={(event) => updateSampleField('arrivalDate', event.target.value)} />
+              </label>
+              <label className="field-label">
+                フォロー日
+                <input type="date" value={sampleForm.followUpDate} onChange={(event) => updateSampleField('followUpDate', event.target.value)} />
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                発送方法
+                <input value={sampleForm.shippingMethod} onChange={(event) => updateSampleField('shippingMethod', event.target.value)} />
+              </label>
+              <label className="field-label">
+                追跡番号
+                <input value={sampleForm.trackingNumber} onChange={(event) => updateSampleField('trackingNumber', event.target.value)} />
+              </label>
+            </div>
+            <div className="sample-picker-grid">
+              <div>
+                <span>関連担当者</span>
+                {karte.contacts.length > 0 ? karte.contacts.map((contact) => (
+                  <label className="mini-check" key={contact.id}>
+                    <input
+                      type="checkbox"
+                      checked={sampleForm.contactIds.includes(contact.id)}
+                      onChange={() => toggleSampleArrayField('contactIds', contact.id)}
+                    />
+                    {contact.name || '名称未設定'}
+                  </label>
+                )) : <p className="inline-helper">担当者は未登録です。</p>}
+              </div>
+              <div>
+                <span>関連商品</span>
+                {products.length > 0 ? products.map((product) => (
+                  <label className="mini-check" key={product.id}>
+                    <input
+                      type="checkbox"
+                      checked={sampleForm.productIds.includes(product.id)}
+                      onChange={() => toggleSampleArrayField('productIds', product.id)}
+                    />
+                    {product.name || '商品名未設定'}
+                  </label>
+                )) : <p className="inline-helper">商品は未登録です。</p>}
+              </div>
+            </div>
+            <label className="field-label">
+              フィードバック
+              <textarea value={sampleForm.feedback} onChange={(event) => updateSampleField('feedback', event.target.value)} />
+            </label>
+            <label className="field-label">
+              次アクション
+              <textarea value={sampleForm.nextAction} onChange={(event) => updateSampleField('nextAction', event.target.value)} />
+            </label>
+            <label className="field-label">
+              メモ
+              <textarea value={sampleForm.memo} onChange={(event) => updateSampleField('memo', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit" disabled={!sampleForm.sampleName.trim()}>
+              サンプルを登録
+            </button>
+          </form>
+          <SampleList
+            samples={karte.samples}
+            products={products}
+            contacts={karte.contacts}
+            updateSample={updateSample}
+          />
+          {karte.samples.length === 0 && <p className="inline-helper">サンプル履歴はまだありません。</p>}
         </Section>
 
         <Section title="添付ファイル" count={karte.attachments.length}>
@@ -419,6 +559,84 @@ function RecordList({ records, emptyText }) {
           <p>{record.summary || record.memo || record.name || '-'}</p>
           <small>{formatDate(record.date || record.createdAt)}</small>
           {record.publicUrl && <a className="ghost-button external-button" href={record.publicUrl} target="_blank" rel="noreferrer">開く</a>}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SampleList({ samples, products, contacts, updateSample }) {
+  if (!samples.length) {
+    return null;
+  }
+
+  function productNames(sample) {
+    return products
+      .filter((product) => (sample.productIds ?? []).includes(product.id))
+      .map((product) => product.name)
+      .filter(Boolean)
+      .join(', ') || displayText(sample.productNames);
+  }
+
+  function contactNames(sample) {
+    return contacts
+      .filter((contact) => (sample.contactIds ?? []).includes(contact.id))
+      .map((contact) => contact.name)
+      .filter(Boolean)
+      .join(', ') || '-';
+  }
+
+  return (
+    <div className="karte-card-list sample-card-list">
+      {samples.map((sample) => (
+        <article className="karte-mini-card sample-card" key={sample.id}>
+          <div className="history-meta">
+            <span>{sample.sampleName || sample.title || sample.name || sample.type || 'サンプル'}</span>
+            <small>{sample.status || '-'}</small>
+          </div>
+          {sample.customerId && (
+            <div className="sample-status-row">
+              <label className="field-label">
+                ステータス
+                <select
+                  value={sample.status || '発送前'}
+                  onChange={(event) => updateSample?.(sample.id, { status: event.target.value })}
+                >
+                  {SAMPLE_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+          <dl className="company-details">
+            <div><dt>商品</dt><dd>{productNames(sample)}</dd></div>
+            <div><dt>担当者</dt><dd>{contactNames(sample)}</dd></div>
+            <div><dt>発送日</dt><dd>{formatDate(sample.shippedDate)}</dd></div>
+            <div><dt>到着日</dt><dd>{formatDate(sample.arrivalDate)}</dd></div>
+            <div><dt>フォロー日</dt><dd>{formatDate(sample.followUpDate)}</dd></div>
+            <div><dt>発送方法</dt><dd>{sample.shippingMethod || '-'}</dd></div>
+            <div><dt>追跡番号</dt><dd>{sample.trackingNumber || '-'}</dd></div>
+          </dl>
+          {sample.customerId ? (
+            <>
+              <label className="field-label">
+                フィードバック
+                <textarea
+                  value={sample.feedback || ''}
+                  onChange={(event) => updateSample?.(sample.id, { feedback: event.target.value })}
+                />
+              </label>
+              <label className="field-label">
+                次アクション
+                <textarea
+                  value={sample.nextAction || ''}
+                  onChange={(event) => updateSample?.(sample.id, { nextAction: event.target.value })}
+                />
+              </label>
+            </>
+          ) : (
+            <p className="inline-helper">{sample.summary || sample.memo || sample.name || '-'}</p>
+          )}
+          {sample.memo && sample.customerId && <p className="inline-helper">{sample.memo}</p>}
         </article>
       ))}
     </div>

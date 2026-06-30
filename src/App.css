@@ -1417,6 +1417,58 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
+.sample-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sample-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sample-picker-grid > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
+.sample-picker-grid > div > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.mini-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+  color: var(--white);
+  font-size: 0.84rem;
+}
+
+.mini-check input {
+  width: auto;
+}
+
+.sample-card-list {
+  margin-top: 12px;
+}
+
+.sample-card {
+  border-left: 4px solid var(--blue);
+}
+
+.sample-status-row {
+  max-width: 240px;
+}
+
 .history-meta {
   display: flex;
   align-items: center;
@@ -1879,6 +1931,14 @@ textarea:focus {
 
   .timeline-event-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sample-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sample-status-row {
+    max-width: none;
   }
 }
 

@@ -17,8 +17,11 @@ function fileLabel(file) {
 
 export default function ProductDetail({
   product,
+  samples = [],
+  customers = [],
   addProduct,
   updateProduct,
+  updateSample,
   setActivePage,
   userId = '',
 }) {
@@ -36,6 +39,17 @@ export default function ProductDetail({
   const grossMarginRate = useMemo(
     () => calculateGrossMarginRate(form.costPrice, form.desiredSellingPrice),
     [form.costPrice, form.desiredSellingPrice],
+  );
+  const relatedSamples = useMemo(
+    () =>
+      samples
+        .filter((sample) => (sample.productIds ?? []).includes(form.id))
+        .sort((a, b) =>
+          String(b.followUpDate || b.shippedDate || b.createdAt || '').localeCompare(
+            String(a.followUpDate || a.shippedDate || a.createdAt || ''),
+          ),
+        ),
+    [form.id, samples],
   );
 
   function updateField(field, value) {
@@ -366,6 +380,46 @@ export default function ProductDetail({
               onChange={(event) => updateField('memo', event.target.value)}
             />
           </label>
+        </section>
+
+        <section className="detail-section">
+          <div className="section-heading">
+            <h2>サンプル履歴</h2>
+            <span className="info-badge">{relatedSamples.length}件</span>
+          </div>
+          {relatedSamples.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {relatedSamples.map((sample) => {
+                const customer = customers.find((item) => item.id === sample.customerId);
+                return (
+                  <article className="karte-mini-card sample-card" key={sample.id}>
+                    <div className="history-meta">
+                      <span>{sample.sampleName || 'サンプル'}</span>
+                      <small>{customer?.companyName || '-'}</small>
+                    </div>
+                    <label className="field-label">
+                      ステータス
+                      <select
+                        value={sample.status || '発送前'}
+                        onChange={(event) => updateSample?.(sample.id, { status: event.target.value })}
+                      >
+                        {['発送前', '発送済', '到着済', '評価待ち', '採用', '不採用', '保留'].map((status) => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
+                    <dl className="company-details">
+                      <div><dt>発送日</dt><dd>{sample.shippedDate || '-'}</dd></div>
+                      <div><dt>到着日</dt><dd>{sample.arrivalDate || '-'}</dd></div>
+                      <div><dt>フォロー日</dt><dd>{sample.followUpDate || '-'}</dd></div>
+                      <div><dt>次アクション</dt><dd>{sample.nextAction || '-'}</dd></div>
+                    </dl>
+                    {sample.feedback && <p className="inline-helper">{sample.feedback}</p>}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="inline-helper">この商品に紐づくサンプル履歴はまだありません。</p>
+          )}
         </section>
 
         <button className="primary-button sticky-submit" type="submit">

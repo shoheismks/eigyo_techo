@@ -10,7 +10,7 @@ function sameCustomer(record, customer) {
 }
 
 function eventDate(record = {}) {
-  return record.date || record.sentAt || record.followDate || record.createdAt || record.updatedAt || '';
+  return record.date || record.sentAt || record.followUpDate || record.followDate || record.createdAt || record.updatedAt || '';
 }
 
 function byDateDesc(a, b) {
@@ -49,6 +49,7 @@ function hasAttachment(record, attachments) {
       attachment.ownerId === record.id ||
       attachment.metadata?.dealHistoryId === record.id ||
       attachment.metadata?.complaintId === record.id ||
+      attachment.metadata?.sampleId === record.id ||
       attachment.metadata?.sourceRecordId === record.id,
   );
 }
@@ -75,7 +76,7 @@ function timelineEvent({
   };
 }
 
-function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments }) {
+function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments, samples = [] }) {
   const events = [];
   const currentStatus = customer.status || '未接触';
 
@@ -135,6 +136,37 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         source: 'deal-history',
       }),
     );
+  });
+
+  samples.forEach((sample) => {
+    const productText = Array.isArray(sample.productNames) ? sample.productNames.join(', ') : '';
+    events.push(
+      timelineEvent({
+        id: `sample-${sample.id}`,
+        date: sample.shippedDate || sample.createdAt,
+        type: 'サンプル発送',
+        content: `${sample.sampleName || productText || 'サンプル'} / ${sample.status || '発送前'}`,
+        createdBy: sample.createdByName || sample.createdBy,
+        relatedContacts: relatedContactNames(sample, contacts),
+        hasAttachment: hasAttachment(sample, attachments),
+        source: 'sample',
+      }),
+    );
+
+    if (sample.followUpDate) {
+      events.push(
+        timelineEvent({
+          id: `sample-follow-${sample.id}`,
+          date: sample.followUpDate,
+          type: 'フォロー予定',
+          content: sample.nextAction || `${sample.sampleName || 'サンプル'}の反応確認`,
+          createdBy: sample.createdByName || sample.createdBy,
+          relatedContacts: relatedContactNames(sample, contacts),
+          hasAttachment: hasAttachment(sample, attachments),
+          source: 'sample-follow',
+        }),
+      );
+    }
   });
 
   (customer.mailHistories ?? customer.emailHistories ?? []).forEach((mail) => {
@@ -231,6 +263,7 @@ export function getCustomerKarte({
   products = [],
   complaints = [],
   attachments = [],
+  samples: sampleRecords = [],
 }) {
   const customer = customers.find((item) => item.id === customerId) ?? null;
 
@@ -256,11 +289,22 @@ export function getCustomerKarte({
   const customerAttachments = attachments
     .filter((attachment) => sameCustomer(attachment, customer))
     .sort(byDateDesc);
+  const customerSamples = sampleRecords
+    .filter((sample) => sample.customerId === customer.id)
+    .map((sample) => ({
+      ...sample,
+      productNames: products
+        .filter((product) => (sample.productIds ?? []).includes(product.id))
+        .map((product) => product.name)
+        .filter(Boolean),
+    }))
+    .sort(byDateDesc);
   const estimates = [
     ...dealHistories.filter((history) => hasWord(history, ['見積', '価格'])),
     ...customerAttachments.filter((attachment) => hasWord(attachment, ['見積', 'quote', 'estimate'])),
   ].sort(byDateDesc);
   const samples = [
+    ...customerSamples,
     ...dealHistories.filter((history) => hasWord(history, ['サンプル', '試食', '試供'])),
     ...customerAttachments.filter((attachment) => hasWord(attachment, ['サンプル', 'sample'])),
   ].sort(byDateDesc);
@@ -271,6 +315,7 @@ export function getCustomerKarte({
     dealHistories,
     complaints: customerComplaints,
     attachments: customerAttachments,
+    samples: customerSamples,
   });
 
   return {

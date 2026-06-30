@@ -33,6 +33,7 @@ function withScore(customer) {
 
 export default function Home({
   customers,
+  samples = [],
   setActivePage,
   syncState = 'local',
   syncError = '',
@@ -58,6 +59,14 @@ export default function Home({
       !customer.isDoNotContact,
   );
   const overdueFollows = followToday.filter((customer) => followDate(customer) < today);
+  const sampleFollows = samples
+    .filter((sample) => sample.followUpDate && sample.followUpDate <= weekEnd && !['採用', '不採用'].includes(sample.status))
+    .sort((a, b) => a.followUpDate.localeCompare(b.followUpDate))
+    .slice(0, 5)
+    .map((sample) => ({
+      ...sample,
+      customerName: customers.find((customer) => customer.id === sample.customerId)?.companyName ?? '-',
+    }));
   const topScoredCustomers = [...scoredCustomers]
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
@@ -204,6 +213,34 @@ export default function Home({
           <div className="empty-state">
             <h3>まだ営業先がありません</h3>
             <p>検索画面で候補を追加すると、スコア順に表示されます。</p>
+          </div>
+        )}
+      </section>
+
+      <section className="section-block follow-section">
+        <div className="section-heading">
+          <h2>サンプルフォロー予定</h2>
+          <button className="text-button" onClick={() => setActivePage('Customers')}>
+            顧客カルテへ
+          </button>
+        </div>
+        {sampleFollows.length > 0 ? (
+          <div className="dashboard-card-list">
+            {sampleFollows.map((sample) => (
+              <button
+                className={`dashboard-row ${sample.followUpDate <= today ? 'overdue' : ''}`}
+                key={sample.id}
+                onClick={() => setActivePage('Customers')}
+              >
+                <span>{sample.customerName} / {sample.sampleName || 'サンプル'}</span>
+                <small>{sample.followUpDate} / {sample.status}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">
+            <h3>サンプルフォローはありません</h3>
+            <p>顧客カルテでサンプルのフォロー日を登録すると、ここに表示されます。</p>
           </div>
         )}
       </section>

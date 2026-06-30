@@ -7,6 +7,7 @@ import { useComplaints } from './hooks/useComplaints.js';
 import { useContacts } from './hooks/useContacts.js';
 import { useCustomers } from './hooks/useCustomers.js';
 import { useProducts } from './hooks/useProducts.js';
+import { useSamples } from './hooks/useSamples.js';
 import { useSuppliers } from './hooks/useSuppliers.js';
 import BusinessCards from './pages/BusinessCards.jsx';
 import CompanyEnrich from './pages/CompanyEnrich.jsx';
@@ -77,6 +78,12 @@ function AuthenticatedApp() {
     syncState,
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
+  const {
+    records: samples,
+    addRecord: addSample,
+    updateRecord: updateSample,
+    removeRecord: removeSample,
+  } = useSamples(userId);
   const {
     records: contacts,
     addRecord: addContact,
@@ -244,6 +251,10 @@ function AuthenticatedApp() {
         addProduct={addProduct}
         updateProduct={updateProduct}
         removeProduct={removeProduct}
+        samples={samples}
+        addSample={addSample}
+        updateSample={updateSample}
+        removeSample={removeSample}
         openProductDetail={openProductDetail}
         selectedProduct={selectedProduct}
         contacts={contacts}
@@ -290,6 +301,10 @@ function ActivePage({
   addProduct,
   updateProduct,
   removeProduct,
+  samples,
+  addSample,
+  updateSample,
+  removeSample,
   openProductDetail,
   selectedProduct,
   contacts,
@@ -323,6 +338,7 @@ function ActivePage({
     return (
       <Home
         customers={customers}
+        samples={samples}
         setActivePage={setActivePage}
         syncState={syncState}
         syncError={syncError}
@@ -361,6 +377,7 @@ function ActivePage({
         contacts={contacts}
         businessCards={businessCards}
         products={products}
+        samples={samples}
         complaints={complaints}
         attachments={attachments}
         updateCustomer={updateCustomer}
@@ -368,6 +385,8 @@ function ActivePage({
         addBusinessCard={addBusinessCard}
         addComplaint={addComplaint}
         addAttachment={addAttachment}
+        addSample={addSample}
+        updateSample={updateSample}
         setActivePage={setActivePage}
         user={user}
       />
@@ -405,8 +424,11 @@ function ActivePage({
     return (
       <ProductDetail
         product={selectedProduct}
+        samples={samples}
+        customers={customers}
         addProduct={addProduct}
         updateProduct={updateProduct}
+        updateSample={updateSample}
         setActivePage={setActivePage}
         userId={userId}
       />
@@ -498,6 +520,7 @@ function ActivePage({
   return (
     <Home
       customers={customers}
+      samples={samples}
       setActivePage={setActivePage}
       syncState={syncState}
       syncError={syncError}
