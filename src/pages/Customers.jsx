@@ -27,7 +27,6 @@ function includesText(value, keyword) {
 
 export default function Customers({
   customers,
-  contacts = [],
   updateCustomer,
   removeCustomer,
   onOpenDetail,
@@ -60,15 +59,6 @@ export default function Customers({
     [customers],
   );
 
-  const contactsByCustomer = useMemo(() => {
-    return contacts.reduce((summary, contact) => {
-      if (!contact.customerId) return summary;
-      summary[contact.customerId] = summary[contact.customerId] || [];
-      summary[contact.customerId].push(contact);
-      return summary;
-    }, {});
-  }, [contacts]);
-
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const nextCustomers = customers.filter((customer) => {
@@ -85,7 +75,6 @@ export default function Customers({
         followFilter === ALL ||
         (followFilter === '期限切れ' && isOverdue(customer)) ||
         (followFilter === '予定あり' && Boolean(followDate(customer)));
-      const contactNames = (contactsByCustomer[customer.id] ?? []).map((contact) => contact.name).join(' ');
       const searchableText = [
         customer.companyName,
         customer.industry,
@@ -94,7 +83,6 @@ export default function Customers({
         customer.email,
         customer.memo,
         customer.companyNote,
-        contactNames,
         ...(customer.tags ?? []),
       ].join(' ').toLowerCase();
       const matchesSearch = !normalizedQuery || searchableText.includes(normalizedQuery);
@@ -124,7 +112,6 @@ export default function Customers({
   }, [
     areaFilter,
     complaintFilter,
-    contactsByCustomer,
     customers,
     followFilter,
     rankFilter,
@@ -262,7 +249,6 @@ export default function Customers({
               </div>
 
               {visibleCustomers.map((customer) => {
-                const customerContacts = contactsByCustomer[customer.id] ?? [];
                 return (
                   <div className={`desktop-table-row ${customer.isDoNotContact ? 'ng-row' : ''}`} key={customer.id}>
                     <strong>{customer.companyName}</strong>
@@ -273,7 +259,7 @@ export default function Customers({
                       <small>{customer.score ?? 0}</small>
                     </span>
                     <span>{customer.status || '-'}</span>
-                    <span>{customerContacts.map((contact) => contact.name).filter(Boolean).slice(0, 2).join(', ') || '-'}</span>
+                    <span>{customer.contactName || customer.contactPerson || '-'}</span>
                     <span className={isOverdue(customer) ? 'danger' : ''}>{followDate(customer) || '-'}</span>
                     <span>{customer.lastContactDate || '-'}</span>
                     <span>{hasComplaint(customer) ? 'あり' : 'なし'}</span>

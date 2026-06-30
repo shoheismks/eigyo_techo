@@ -343,7 +343,6 @@ function ActivePage({
     return (
       <Customers
         customers={customers}
-        contacts={contacts}
         updateCustomer={updateCustomer}
         removeCustomer={removeCustomer}
         onOpenDetail={openCustomerDetail}
