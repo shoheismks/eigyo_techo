@@ -1908,6 +1908,10 @@ textarea:focus {
   gap: 10px;
 }
 
+.meeting-prep-grid {
+  margin: 14px 0;
+}
+
 .karte-list {
   margin: 0;
   padding-left: 18px;

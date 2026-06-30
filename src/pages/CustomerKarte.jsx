@@ -5,6 +5,7 @@ import { formatPrice } from '../hooks/useProducts.js';
 import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../hooks/useQuotes.js';
 import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
+import { generateMeetingPrep } from '../services/meetingPrepService.js';
 import { uploadAttachment } from '../services/storageService.js';
 import { PIPELINE_STATUSES } from './Pipeline.jsx';
 
@@ -122,6 +123,8 @@ export default function CustomerKarte({
   user,
 }) {
   const [analysis, setAnalysis] = useState(null);
+  const [meetingPrep, setMeetingPrep] = useState(null);
+  const [meetingPrepLoading, setMeetingPrepLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [timelineOrder, setTimelineOrder] = useState('desc');
@@ -286,6 +289,16 @@ export default function CustomerKarte({
       userId: user?.id ?? customer.userId,
     }, user?.id ?? customer.userId));
     setAdoptionForm(createAdoptionForm(customer.id, user));
+  }
+
+  async function handleMeetingPrep() {
+    setMeetingPrepLoading(true);
+    try {
+      const nextPrep = await generateMeetingPrep(karte);
+      setMeetingPrep(nextPrep);
+    } finally {
+      setMeetingPrepLoading(false);
+    }
   }
 
   async function handleAttachment(file, field = 'customer-file') {
@@ -803,6 +816,20 @@ export default function CustomerKarte({
         </Section>
 
         <Section title="AI分析枠" defaultOpen={false}>
+          <button className="primary-button" type="button" onClick={handleMeetingPrep} disabled={meetingPrepLoading}>
+            {meetingPrepLoading ? 'AI商談準備中...' : 'AI商談準備'}
+          </button>
+          {meetingPrep && (
+            <div className="ai-analysis-grid meeting-prep-grid">
+              <AnalysisBlock title="この顧客の特徴" items={meetingPrep.features} />
+              <AnalysisBlock title="前回までの流れ" items={meetingPrep.previousFlow} />
+              <AnalysisBlock title="注意点" items={meetingPrep.cautions} />
+              <AnalysisBlock title="想定ニーズ" items={meetingPrep.needs} />
+              <AnalysisBlock title="提案すべき商品" items={meetingPrep.recommendedProducts} />
+              <AnalysisBlock title="商談で確認すべき質問" items={meetingPrep.questions} />
+              <AnalysisBlock title="次回アクション案" items={meetingPrep.nextActions} />
+            </div>
+          )}
           <button className="primary-button" type="button" onClick={() => setAnalysis(createDummyKarteAnalysis(karte))}>
             AI分析を表示
           </button>
