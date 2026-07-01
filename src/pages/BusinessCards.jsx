@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { uploadAttachment } from '../services/storageService.js';
+import { uploadAttachment } from '../shared/services/storageService.js';
 
 function extractContactFromText(text) {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);

@@ -1,4 +1,4 @@
-import { createRecordHook } from './useSupabaseRecords.js';
+import { createRecordHook } from '../shared/hooks/useSupabaseRecords.js';
 
 export const emptySupplier = {
   userId: '',

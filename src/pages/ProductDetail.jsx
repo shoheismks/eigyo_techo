@@ -9,7 +9,7 @@ import {
   normalizeProduct,
   parsePrice,
 } from '../hooks/useProducts.js';
-import { uploadAttachment } from '../services/storageService.js';
+import { uploadAttachment } from '../shared/services/storageService.js';
 
 function fileLabel(file) {
   return file?.name ? `${file.name} (${Math.ceil((file.size ?? 0) / 1024)}KB)` : '未添付';

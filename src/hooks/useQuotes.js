@@ -1,4 +1,4 @@
-import { createRecordHook } from './useSupabaseRecords.js';
+import { createRecordHook } from '../shared/hooks/useSupabaseRecords.js';
 
 export const QUOTE_STATUSES = ['作成中', '提出済', '再見積', '採用', '失注', '期限切れ'];
 

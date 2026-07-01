@@ -1,4 +1,4 @@
-import { createRecordHook } from './useSupabaseRecords.js';
+import { createRecordHook } from '../shared/hooks/useSupabaseRecords.js';
 
 export const ADOPTION_STATUSES = ['採用中', '休止中', '終了'];
 

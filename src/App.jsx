@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AppLayout from './layouts/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { useAdoptions } from './hooks/useAdoptions.js';
-import { useAttachments } from './hooks/useAttachments.js';
+import { useAttachments } from './shared/hooks/useAttachments.js';
 import { useBusinessCards } from './hooks/useBusinessCards.js';
 import { useComplaints } from './hooks/useComplaints.js';
 import { useContacts } from './hooks/useContacts.js';

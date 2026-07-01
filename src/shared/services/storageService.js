@@ -1,4 +1,4 @@
-import { supabase, hasSupabaseConfig } from '../lib/supabase.js';
+import { supabase, hasSupabaseConfig } from '../../lib/supabase.js';
 
 export const ATTACHMENT_BUCKET = 'app-attachments';
 
