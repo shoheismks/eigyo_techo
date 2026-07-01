@@ -1,0 +1,6 @@
+-- Eigyo Techo Supabase migration: functions
+-- No persistent database functions are required by the current app.
+-- Future candidates:
+-- - updated_at maintenance
+-- - dashboard aggregation helpers
+-- - audit log writers

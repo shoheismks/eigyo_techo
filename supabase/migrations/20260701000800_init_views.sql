@@ -1,0 +1,6 @@
+-- Eigyo Techo Supabase migration: views
+-- No database views are required by the current app.
+-- Future candidates:
+-- - dashboard status summaries
+-- - overdue follow-up summaries
+-- - customer activity timeline views

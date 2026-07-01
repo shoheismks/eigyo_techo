@@ -1,0 +1,3 @@
+-- Eigyo Techo seed data
+-- Current production data is user-owned, so no shared seed rows are inserted.
+-- Add master data here only when it is safe for every environment.

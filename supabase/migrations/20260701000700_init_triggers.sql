@@ -1,0 +1,3 @@
+-- Eigyo Techo Supabase migration: triggers
+-- No triggers are required by the current app.
+-- The React app currently writes created_at / updated_at values directly.
