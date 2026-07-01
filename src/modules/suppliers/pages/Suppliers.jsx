@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { uploadAttachment } from '../shared/services/storageService.js';
+import { uploadAttachment } from '../../../shared/services/storageService.js';
 
 const emptySupplier = {
   name: '',

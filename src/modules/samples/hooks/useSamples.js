@@ -1,4 +1,4 @@
-import { createRecordHook } from '../shared/hooks/useSupabaseRecords.js';
+import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
 
 export const SAMPLE_STATUSES = ['発送前', '発送済', '到着済', '評価待ち', '採用', '不採用', '保留'];
 

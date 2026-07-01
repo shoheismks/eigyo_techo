@@ -1,4 +1,4 @@
-import { createRecordHook } from '../shared/hooks/useSupabaseRecords.js';
+import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
 
 export function normalizeComplaint(complaint = {}, userId = '') {
   return {
