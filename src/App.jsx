@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import AppLayout from './components/AppLayout.jsx';
+import AppLayout from './layouts/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { useAdoptions } from './hooks/useAdoptions.js';
 import { useAttachments } from './hooks/useAttachments.js';
