@@ -7,7 +7,7 @@ import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../hooks/useSampl
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
 import { generateMeetingPrep } from '../services/meetingPrepService.js';
 import { uploadAttachment } from '../services/storageService.js';
-import { PIPELINE_STATUSES } from './Pipeline.jsx';
+import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
 
 function googleSearchUrl(companyName) {
   return `https://www.google.com/search?q=${encodeURIComponent(companyName)}`;

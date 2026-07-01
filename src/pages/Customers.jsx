@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import CompanyCard from '../components/CompanyCard.jsx';
 import { discoverContactInfo } from '../services/contactDiscoveryService.js';
-import { PIPELINE_STATUSES } from './Pipeline.jsx';
+import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
 
 const ALL = 'すべて';
 const PAGE_SIZE = 40;

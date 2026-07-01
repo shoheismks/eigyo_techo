@@ -26,7 +26,7 @@ import Pipeline from './pages/Pipeline.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import Products from './pages/Products.jsx';
 import Suppliers from './pages/Suppliers.jsx';
-import { PIPELINE_STATUSES } from './pages/Pipeline.jsx';
+import { PIPELINE_STATUSES } from './modules/deals/constants.js';
 
 function isImportPath() {
   return window.location.pathname === '/import';

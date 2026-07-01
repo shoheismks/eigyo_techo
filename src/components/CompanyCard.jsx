@@ -1,4 +1,4 @@
-import { PIPELINE_STATUSES } from '../pages/Pipeline.jsx';
+import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
 
 const statusTone = {
   未接触: 'neutral',

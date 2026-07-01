@@ -1,6 +1,6 @@
 import { calculateCompanyScore } from '../services/scoringService.js';
 import { buildNotifications } from '../services/notificationService.js';
-import { PIPELINE_STATUSES } from './Pipeline.jsx';
+import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
 
 const ACTIVE_DONE_STATUSES = ['成約', '失注'];
 
