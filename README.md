@@ -3,6 +3,7 @@
 ## 開発ルール
 
 今後の設計方針と実装ルールは [docs/PROJECT_RULE.md](docs/PROJECT_RULE.md) を参照してください。
+システム全体構成と設計方針は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
 
 営業先を探し、保存し、連絡先取得、AIメール作成、案件管理まで行うスマホファーストの営業支援Webアプリです。
 
