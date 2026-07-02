@@ -1,0 +1,554 @@
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  z-index: 10;
+  width: min(calc(100% - 24px), 496px);
+  transform: translateX(-50%);
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(7, 11, 19, 0.92);
+  padding: 8px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.bottom-nav button {
+  min-width: 64px;
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.card-list-mobile {
+  display: grid;
+  gap: 12px;
+}
+
+.karte-page {
+  padding-top: 0;
+}
+
+.karte-header {
+  position: sticky;
+  top: 45px;
+  z-index: 8;
+  display: grid;
+  gap: 14px;
+  margin: 0 -16px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 11, 19, 0.96);
+  padding: 14px 16px;
+  backdrop-filter: blur(16px);
+}
+
+.karte-header.high-rank {
+  border-color: rgba(255, 204, 77, 0.58);
+  background: linear-gradient(180deg, rgba(41, 33, 12, 0.98), rgba(7, 11, 19, 0.96));
+}
+
+.karte-header.has-complaint {
+  box-shadow: inset 0 -2px 0 rgba(255, 107, 123, 0.58);
+}
+
+.karte-header h1 {
+  margin-bottom: 10px;
+  font-size: 1.55rem;
+}
+
+.karte-header-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.karte-header-actions .primary-button,
+.karte-header-actions .ghost-button {
+  min-height: 42px;
+}
+
+.karte-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.karte-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 26, 43, 0.96), rgba(10, 15, 26, 0.96));
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.karte-section-toggle {
+  width: 100%;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  padding: 0 14px;
+  text-align: left;
+}
+
+.karte-section-toggle span {
+  font-weight: 900;
+}
+
+.karte-section-toggle small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.karte-section-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.karte-field-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.karte-field {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px 12px;
+}
+
+.karte-field span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.karte-field strong {
+  color: var(--white);
+  font-size: 0.94rem;
+  overflow-wrap: anywhere;
+}
+
+.karte-inline-form {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
+.karte-inline-form select[multiple] {
+  min-height: 104px;
+  padding: 10px;
+}
+
+.karte-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.karte-mini-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
+.karte-mini-card p,
+.karte-mini-card small {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.karte-thumb {
+  width: 100%;
+  max-height: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.business-card-form {
+  border-color: rgba(102, 163, 255, 0.38);
+  background: rgba(40, 120, 255, 0.1);
+}
+
+.business-card-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.image-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0;
+}
+
+.image-button .karte-thumb {
+  max-height: 120px;
+}
+
+.image-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.84);
+  padding: 18px;
+}
+
+.image-modal img {
+  width: min(100%, 920px);
+  max-height: 86vh;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #05070d;
+}
+
+.image-modal-close {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(7, 11, 19, 0.92);
+  color: var(--white);
+  padding: 0 14px;
+  font-weight: 900;
+}
+
+.ai-analysis-grid,
+.karte-list {
+  display: grid;
+  gap: 10px;
+}
+
+.meeting-prep-grid {
+  margin: 14px 0;
+}
+
+.karte-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #dfe9f7;
+  line-height: 1.55;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav {
+    gap: 4px;
+    padding: 6px;
+  }
+
+  .bottom-nav button {
+    min-height: 50px;
+    font-size: 0.55rem;
+  }
+
+  .bottom-nav button span {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .calendar-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-week-labels {
+    display: none;
+  }
+
+  .calendar-grid,
+  .calendar-grid.week-view {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day,
+  .calendar-grid.week-view .calendar-day {
+    min-height: auto;
+  }
+
+  .timeline-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .timeline-event-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sample-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sample-status-row {
+    max-width: none;
+  }
+}
+
+.bottom-nav button span {
+  font-size: 1.18rem;
+  line-height: 1;
+}
+
+.bottom-nav .active {
+  background: var(--blue);
+  color: var(--white);
+}
+
+@media (min-width: 760px) {
+  .app-frame {
+    margin: 28px 0;
+    min-height: calc(100vh - 56px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+
+  .page {
+    padding-inline: 22px;
+  }
+
+  .two-column-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-list-mobile {
+    display: none;
+  }
+
+  .responsive-table {
+    display: block;
+  }
+
+  .pipeline-summary {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .date-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .karte-header {
+    top: 45px;
+    grid-template-columns: 1fr 320px;
+    align-items: end;
+    margin-inline: -22px;
+    padding-inline: 22px;
+  }
+
+  .karte-header-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .karte-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .karte-section:first-child,
+  .karte-section:nth-child(3),
+  .karte-section:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .karte-field-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ai-analysis-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-metrics {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .status-count-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+html,
+body,
+#root {
+  width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.app-shell {
+  width: 100vw;
+  justify-content: stretch;
+}
+
+.app-frame {
+  width: 100vw;
+  max-width: none;
+}
+
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-main {
+  min-width: 0;
+  min-height: 100vh;
+}
+
+.main-content {
+  min-width: 0;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 11, 19, 0.94);
+  padding: 10px 12px;
+  backdrop-filter: blur(14px);
+}
+
+.app-topbar-title {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.app-topbar-title strong {
+  color: var(--white);
+  font-size: 1rem;
+}
+
+.app-topbar-title span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-quick-actions,
+.sidebar-nav {
+  display: none;
+}
+
+.logout-button {
+  min-height: 36px;
+}
+
+.add-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  padding: 16px;
+}
+
+.add-action-menu {
+  width: min(100%, 520px);
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 26, 43, 0.98), rgba(7, 11, 19, 0.98));
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.add-action-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.add-action-button {
+  min-height: 66px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 12px;
+  text-align: left;
+}
+
+.add-action-button strong {
+  font-size: 0.95rem;
+}
+
+.add-action-button span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.bottom-nav {
+  width: min(calc(100% - 20px), 520px);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: visible;
+}
+
+.bottom-nav button {
+  min-width: 0;
+}
+
+.bottom-nav .add-tab {
+  background: rgba(40, 120, 255, 0.18);
+  color: var(--white);
+}
+
+.bottom-nav .add-tab span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--blue);
+  box-shadow: 0 10px 24px rgba(40, 120, 255, 0.35);
+}
