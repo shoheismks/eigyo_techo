@@ -6,6 +6,7 @@
 システム全体構成と設計方針は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
 営業業務・食品商社業務のルールは [docs/BUSINESS_RULE.md](docs/BUSINESS_RULE.md) を参照してください。
 外部API・内部API・連携仕様は [docs/API_SPEC.md](docs/API_SPEC.md) を参照してください。
+回帰バグ修正時の共通ルールは [docs/BUGFIX_RULE.md](docs/BUGFIX_RULE.md) を参照してください。
 
 営業先を探し、保存し、連絡先取得、AIメール作成、案件管理まで行うスマホファーストの営業支援Webアプリです。
 
