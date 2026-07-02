@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   canUseCloud,
   deleteRecord,
@@ -211,6 +211,7 @@ export function useProducts(userId = '') {
   const [products, setProducts] = useState(() => (canUseCloud() ? [] : readLocalProducts(userId)));
   const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
   const [syncError, setSyncError] = useState('');
+  const writeSequenceRef = useRef(0);
 
   useEffect(() => {
     let ignore = false;
@@ -267,7 +268,7 @@ export function useProducts(userId = '') {
     [products],
   );
 
-  async function reloadProducts() {
+  async function reloadProducts(writeSequence = null) {
     if (!canUseCloud()) {
       setProducts(readLocalProducts(userId));
       setSyncState('local');
@@ -278,11 +279,20 @@ export function useProducts(userId = '') {
     try {
       setSyncState('syncing');
       const remoteProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
+
+      if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
+        return;
+      }
+
       setProducts(remoteProducts);
       saveLocalProducts(remoteProducts);
       setSyncState('supabase');
       setSyncError('');
     } catch (error) {
+      if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
+        return;
+      }
+
       setSyncState('local');
       setSyncError(getLocalSyncReason(error.message));
     }
@@ -297,6 +307,7 @@ export function useProducts(userId = '') {
       return;
     }
 
+    const writeSequence = ++writeSequenceRef.current;
     setSyncState('syncing');
     setSyncError('');
     const writePromise = changedProduct
@@ -304,8 +315,12 @@ export function useProducts(userId = '') {
       : upsertRecords(TABLE_NAME, nextProducts, toSupabaseRow);
 
     writePromise
-      .then(reloadProducts)
+      .then(() => reloadProducts(writeSequence))
       .catch((error) => {
+        if (writeSequence !== writeSequenceRef.current) {
+          return;
+        }
+
         setSyncState('local');
         setSyncError(getLocalSyncReason(error.message));
       });

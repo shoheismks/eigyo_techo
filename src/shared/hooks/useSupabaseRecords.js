@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   canUseCloud,
   deleteRecord,
@@ -30,8 +30,9 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
     const [records, setRecords] = useState(() => (canUseCloud() ? [] : readLocal(userId)));
     const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
     const [syncError, setSyncError] = useState('');
+    const writeSequenceRef = useRef(0);
 
-    async function reload() {
+    async function reload(writeSequence = null) {
       if (!canUseCloud()) {
         setRecords(readLocal(userId));
         setSyncState('local');
@@ -42,11 +43,20 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
       try {
         setSyncState('syncing');
         const remoteRecords = await fetchRecords(tableName, userId, fromRow);
+
+        if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
+          return;
+        }
+
         setRecords(remoteRecords.map((record) => normalize(record, userId)));
         saveLocal(remoteRecords);
         setSyncState('supabase');
         setSyncError('');
       } catch (error) {
+        if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
+          return;
+        }
+
         setRecords(readLocal(userId));
         setSyncState('local');
         setSyncError(getLocalSyncReason(error.message));
@@ -117,14 +127,19 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
         return;
       }
 
+      const writeSequence = ++writeSequenceRef.current;
       setSyncState('syncing');
       const writePromise = changedRecord
         ? upsertRecords(tableName, [changedRecord], toRow)
         : upsertRecords(tableName, nextRecords, toRow);
 
       writePromise
-        .then(reload)
+        .then(() => reload(writeSequence))
         .catch((error) => {
+          if (writeSequence !== writeSequenceRef.current) {
+            return;
+          }
+
           setSyncState('local');
           setSyncError(getLocalSyncReason(error.message));
         });

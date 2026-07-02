@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { calculateCompanyScore } from '../services/scoringService.js';
 import {
   canUseSupabase,
@@ -197,6 +197,7 @@ export function useCustomers(userId = '') {
   );
   const [syncState, setSyncState] = useState(canUseSupabase() ? 'syncing' : 'local');
   const [syncError, setSyncError] = useState(getLocalReason);
+  const writeSequenceRef = useRef(0);
 
   useEffect(() => {
     let ignore = false;
@@ -282,7 +283,7 @@ export function useCustomers(userId = '') {
     [customers],
   );
 
-  async function reloadFromCloud() {
+  async function reloadFromCloud(writeSequence = null) {
     if (!canUseSupabase()) {
       setCustomers(readLocalCustomers(userId));
       setSyncState('local');
@@ -296,10 +297,19 @@ export function useCustomers(userId = '') {
       const remoteCustomers = (await fetchRemoteCustomers(userId)).map((customer) =>
         normalizeCustomer(customer, userId),
       );
+
+      if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
+        return;
+      }
+
       setCustomers(remoteCustomers);
       saveLocalCustomers(remoteCustomers);
       setSyncState('supabase');
     } catch (error) {
+      if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
+        return;
+      }
+
       setCustomers(readLocalCustomers(userId));
       setSyncError(toSyncError(error));
       setSyncState('local');
@@ -319,6 +329,7 @@ export function useCustomers(userId = '') {
       return;
     }
 
+    const writeSequence = ++writeSequenceRef.current;
     const writePromise = changedCustomer
       ? upsertRemoteCustomer(changedCustomer)
       : upsertRemoteCustomers(nextCustomers);
@@ -326,8 +337,12 @@ export function useCustomers(userId = '') {
     setSyncState('syncing');
     setSyncError('');
     writePromise
-      .then(reloadFromCloud)
+      .then(() => reloadFromCloud(writeSequence))
       .catch((error) => {
+        if (writeSequence !== writeSequenceRef.current) {
+          return;
+        }
+
         setSyncError(toSyncError(error));
         setSyncState('local');
       });
