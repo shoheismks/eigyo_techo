@@ -1,4 +1,4 @@
-import { hasSupabaseConfig, supabase } from '../lib/supabase.js';
+import { hasSupabaseConfig, supabase } from '../../../lib/supabase.js';
 
 const TABLE_NAME = 'customers';
 

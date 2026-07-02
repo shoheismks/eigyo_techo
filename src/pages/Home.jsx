@@ -1,4 +1,4 @@
-import { calculateCompanyScore } from '../services/scoringService.js';
+import { calculateCompanyScore } from '../modules/customers/services/scoringService.js';
 import { buildNotifications } from '../services/notificationService.js';
 import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
 

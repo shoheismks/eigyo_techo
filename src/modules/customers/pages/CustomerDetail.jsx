@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
+import { PIPELINE_STATUSES } from '../../deals/constants.js';
 
 const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
 const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];

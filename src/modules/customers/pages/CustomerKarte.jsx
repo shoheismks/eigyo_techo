@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../modules/products/hooks/useAdoptions.js';
-import { normalizeAttachmentRecord } from '../shared/hooks/useAttachments.js';
-import { formatPrice } from '../modules/products/hooks/useProducts.js';
-import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../modules/quotes/hooks/useQuotes.js';
-import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../modules/samples/hooks/useSamples.js';
+import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../../products/hooks/useAdoptions.js';
+import { normalizeAttachmentRecord } from '../../../shared/hooks/useAttachments.js';
+import { formatPrice } from '../../products/hooks/useProducts.js';
+import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../../quotes/hooks/useQuotes.js';
+import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../../samples/hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
-import { generateMeetingPrep } from '../services/meetingPrepService.js';
-import { uploadAttachment } from '../shared/services/storageService.js';
-import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
+import { generateMeetingPrep } from '../../../services/meetingPrepService.js';
+import { uploadAttachment } from '../../../shared/services/storageService.js';
+import { PIPELINE_STATUSES } from '../../deals/constants.js';
 
 function googleSearchUrl(companyName) {
   return `https://www.google.com/search?q=${encodeURIComponent(companyName)}`;
