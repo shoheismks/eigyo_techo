@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppLayout from './layouts/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { useAdoptions } from './hooks/useAdoptions.js';
+import { useAdoptions } from './modules/products/hooks/useAdoptions.js';
 import { useAttachments } from './shared/hooks/useAttachments.js';
 import { useBusinessCards } from './modules/businessCards/hooks/useBusinessCards.js';
 import { useComplaints } from './modules/claims/hooks/useComplaints.js';
 import { useContacts } from './modules/contacts/hooks/useContacts.js';
 import { useCustomers } from './hooks/useCustomers.js';
-import { useProducts } from './hooks/useProducts.js';
+import { useProducts } from './modules/products/hooks/useProducts.js';
 import { useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
@@ -23,8 +23,8 @@ import LeadSearch from './pages/LeadSearch.jsx';
 import Login from './pages/Login.jsx';
 import MailAI from './pages/MailAI.jsx';
 import Pipeline from './pages/Pipeline.jsx';
-import ProductDetail from './pages/ProductDetail.jsx';
-import Products from './pages/Products.jsx';
+import ProductDetail from './modules/products/pages/ProductDetail.jsx';
+import Products from './modules/products/pages/Products.jsx';
 import Suppliers from './modules/suppliers/pages/Suppliers.jsx';
 import { PIPELINE_STATUSES } from './modules/deals/constants.js';
 

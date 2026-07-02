@@ -6,7 +6,7 @@ import {
   getLocalSyncReason,
   mergeByUpdatedAt,
   upsertRecords,
-} from '../shared/services/recordSyncService.js';
+} from '../../../shared/services/recordSyncService.js';
 
 const STORAGE_KEY = 'eigyo-techo-products';
 const TABLE_NAME = 'products';

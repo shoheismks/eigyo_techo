@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../hooks/useAdoptions.js';
+import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../modules/products/hooks/useAdoptions.js';
 import { normalizeAttachmentRecord } from '../shared/hooks/useAttachments.js';
-import { formatPrice } from '../hooks/useProducts.js';
+import { formatPrice } from '../modules/products/hooks/useProducts.js';
 import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../modules/quotes/hooks/useQuotes.js';
 import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../modules/samples/hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
