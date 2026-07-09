@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { useAdoptions } from './modules/products/hooks/useAdoptions.js';
@@ -7,29 +7,33 @@ import { useBusinessCards } from './modules/businessCards/hooks/useBusinessCards
 import { useComplaints } from './modules/claims/hooks/useComplaints.js';
 import { useContacts } from './modules/contacts/hooks/useContacts.js';
 import { useCustomers } from './modules/customers/hooks/useCustomers.js';
+import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
 import { useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
-import AnalyticsPage from './modules/dashboard/pages/AnalyticsPage.jsx';
-import BusinessCards from './modules/businessCards/pages/BusinessCards.jsx';
-import CalendarPage from './modules/calendar/pages/CalendarPage.jsx';
-import CompanyEnrich from './modules/customers/pages/CompanyEnrich.jsx';
-import Complaints from './modules/claims/pages/Complaints.jsx';
-import Contacts from './modules/contacts/pages/Contacts.jsx';
-import CustomerDetail from './modules/customers/pages/CustomerDetail.jsx';
-import CustomerKarte from './modules/customers/pages/CustomerKarte.jsx';
-import Customers from './modules/customers/pages/Customers.jsx';
-import Home from './pages/Home.jsx';
-import ImportPage from './modules/customers/pages/ImportPage.jsx';
-import LeadSearch from './modules/customers/pages/LeadSearch.jsx';
+import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
 import Login from './pages/Login.jsx';
-import MailAI from './pages/MailAI.jsx';
-import Pipeline from './pages/Pipeline.jsx';
-import ProductDetail from './modules/products/pages/ProductDetail.jsx';
-import Products from './modules/products/pages/Products.jsx';
-import SettingsPage from './modules/settings/pages/SettingsPage.jsx';
-import Suppliers from './modules/suppliers/pages/Suppliers.jsx';
+
+const AnalyticsPage = lazy(() => import('./modules/dashboard/pages/AnalyticsPage.jsx'));
+const BusinessCards = lazy(() => import('./modules/businessCards/pages/BusinessCards.jsx'));
+const CalendarPage = lazy(() => import('./modules/calendar/pages/CalendarPage.jsx'));
+const CompanyEnrich = lazy(() => import('./modules/customers/pages/CompanyEnrich.jsx'));
+const Complaints = lazy(() => import('./modules/claims/pages/Complaints.jsx'));
+const Contacts = lazy(() => import('./modules/contacts/pages/Contacts.jsx'));
+const CustomerDetail = lazy(() => import('./modules/customers/pages/CustomerDetail.jsx'));
+const CustomerKarte = lazy(() => import('./modules/customers/pages/CustomerKarte.jsx'));
+const Customers = lazy(() => import('./modules/customers/pages/Customers.jsx'));
+const Home = lazy(() => import('./pages/Home.jsx'));
+const HelpPage = lazy(() => import('./modules/settings/pages/HelpPage.jsx'));
+const ImportPage = lazy(() => import('./modules/customers/pages/ImportPage.jsx'));
+const LeadSearch = lazy(() => import('./modules/customers/pages/LeadSearch.jsx'));
+const MailAI = lazy(() => import('./pages/MailAI.jsx'));
+const Pipeline = lazy(() => import('./pages/Pipeline.jsx'));
+const ProductDetail = lazy(() => import('./modules/products/pages/ProductDetail.jsx'));
+const Products = lazy(() => import('./modules/products/pages/Products.jsx'));
+const SettingsPage = lazy(() => import('./modules/settings/pages/SettingsPage.jsx'));
+const Suppliers = lazy(() => import('./modules/suppliers/pages/Suppliers.jsx'));
 
 function isImportPath() {
   return window.location.pathname === '/import';
@@ -38,6 +42,10 @@ function isImportPath() {
 function getImportCompanyName() {
   const params = new URLSearchParams(window.location.search);
   return (params.get('companyName') || params.get('importCompany') || '').trim();
+}
+
+function tutorialStorageKey(userId = '') {
+  return `eigyo-techo-tutorial-seen:${userId || 'local'}`;
 }
 
 export default function App() {
@@ -70,6 +78,9 @@ function AuthenticatedApp() {
   const [importError, setImportError] = useState('');
   const [importHandled, setImportHandled] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [globalCustomerSearch, setGlobalCustomerSearch] = useState('');
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
 
   const {
     customers,
@@ -83,6 +94,12 @@ function AuthenticatedApp() {
     syncState,
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
+  const {
+    records: inventories,
+    addRecord: addInventory,
+    updateRecord: updateInventory,
+    removeRecord: removeInventory,
+  } = useInventory(userId);
   const {
     records: adoptions,
     addRecord: addAdoption,
@@ -116,6 +133,7 @@ function AuthenticatedApp() {
   const {
     records: businessCards,
     addRecord: addBusinessCard,
+    updateRecord: updateBusinessCard,
   } = useBusinessCards(userId);
   const {
     records: complaints,
@@ -126,10 +144,18 @@ function AuthenticatedApp() {
   const {
     records: attachments,
     addRecord: addAttachment,
+    updateRecord: updateAttachment,
   } = useAttachments(userId);
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
+
+  useEffect(() => {
+    if (!userId) return;
+    const hasSeenTutorial = localStorage.getItem(tutorialStorageKey(userId)) === 'true';
+    setTutorialOpen(!hasSeenTutorial && !isImportPath());
+    setTutorialStepIndex(0);
+  }, [userId]);
 
   function navigate(page) {
     setActivePage(page);
@@ -165,6 +191,27 @@ function AuthenticatedApp() {
     }
 
     setActivePage(nextPageByAction[actionKey] || 'Home');
+  }
+
+  function handleGlobalSearch(query) {
+    setGlobalCustomerSearch(query);
+    setActivePage('Customers');
+  }
+
+  function closeTutorial() {
+    localStorage.setItem(tutorialStorageKey(userId), 'true');
+    setTutorialOpen(false);
+  }
+
+  function resetTutorial() {
+    localStorage.removeItem(tutorialStorageKey(userId));
+    setTutorialStepIndex(0);
+    setTutorialOpen(true);
+  }
+
+  function navigateTutorialStep(page) {
+    setActivePage(page);
+    closeTutorial();
   }
 
   function handleExtensionImport(companyName) {
@@ -241,71 +288,94 @@ function AuthenticatedApp() {
   }, [importHandled]);
 
   return (
-    <AppLayout
-      activePage={activePage}
-      user={user}
-      onNavigate={navigate}
-      onAddAction={handleAddAction}
-      onSignOut={signOut}
-      addMenuOpen={addMenuOpen}
-      setAddMenuOpen={setAddMenuOpen}
-      notice={extensionNotice}
-    >
-      <ActivePage
+    <>
+      <AppLayout
         activePage={activePage}
-        importError={importError}
-        setActivePage={setActivePage}
-        addCustomer={addCustomer}
-        isSaved={isSaved}
-        customers={customers}
-        updateCustomer={updateCustomer}
-        removeCustomer={removeCustomer}
-        openCustomerDetail={openCustomerDetail}
-        openCustomerKarte={openCustomerKarte}
-        selectedCustomer={selectedCustomer}
-        selectedCustomerId={selectedCustomerId}
-        products={products}
-        addProduct={addProduct}
-        updateProduct={updateProduct}
-        removeProduct={removeProduct}
-        adoptions={adoptions}
-        addAdoption={addAdoption}
-        updateAdoption={updateAdoption}
-        removeAdoption={removeAdoption}
-        samples={samples}
-        addSample={addSample}
-        updateSample={updateSample}
-        removeSample={removeSample}
-        quotes={quotes}
-        addQuote={addQuote}
-        updateQuote={updateQuote}
-        removeQuote={removeQuote}
-        openProductDetail={openProductDetail}
-        selectedProduct={selectedProduct}
-        contacts={contacts}
-        addContact={addContact}
-        updateContact={updateContact}
-        removeContact={removeContact}
-        suppliers={suppliers}
-        addSupplier={addSupplier}
-        updateSupplier={updateSupplier}
-        removeSupplier={removeSupplier}
-        businessCards={businessCards}
-        addBusinessCard={addBusinessCard}
-        complaints={complaints}
-        addComplaint={addComplaint}
-        updateComplaint={updateComplaint}
-        removeComplaint={removeComplaint}
-        attachments={attachments}
-        addAttachment={addAttachment}
-        syncState={syncState}
-        syncError={syncError}
-        reloadFromCloud={reloadFromCloud}
         user={user}
-        userId={userId}
-        signOut={signOut}
+        onNavigate={navigate}
+        onAddAction={handleAddAction}
+        onGlobalSearch={handleGlobalSearch}
+        onHelp={() => setActivePage('Help')}
+        onSignOut={signOut}
+        addMenuOpen={addMenuOpen}
+        setAddMenuOpen={setAddMenuOpen}
+        notice={extensionNotice}
+      >
+        <Suspense fallback={<PageLoading />}>
+          <ActivePage
+            activePage={activePage}
+            importError={importError}
+            setActivePage={setActivePage}
+            addCustomer={addCustomer}
+            isSaved={isSaved}
+            customers={customers}
+            initialSearchQuery={globalCustomerSearch}
+            updateCustomer={updateCustomer}
+            removeCustomer={removeCustomer}
+            openCustomerDetail={openCustomerDetail}
+            openCustomerKarte={openCustomerKarte}
+            selectedCustomer={selectedCustomer}
+            selectedCustomerId={selectedCustomerId}
+            products={products}
+            inventories={inventories}
+            addInventory={addInventory}
+            updateInventory={updateInventory}
+            removeInventory={removeInventory}
+            addProduct={addProduct}
+            updateProduct={updateProduct}
+            removeProduct={removeProduct}
+            adoptions={adoptions}
+            addAdoption={addAdoption}
+            updateAdoption={updateAdoption}
+            removeAdoption={removeAdoption}
+            samples={samples}
+            addSample={addSample}
+            updateSample={updateSample}
+            removeSample={removeSample}
+            quotes={quotes}
+            addQuote={addQuote}
+            updateQuote={updateQuote}
+            removeQuote={removeQuote}
+            openProductDetail={openProductDetail}
+            selectedProduct={selectedProduct}
+            contacts={contacts}
+            addContact={addContact}
+            updateContact={updateContact}
+            removeContact={removeContact}
+            suppliers={suppliers}
+            addSupplier={addSupplier}
+            updateSupplier={updateSupplier}
+            removeSupplier={removeSupplier}
+            businessCards={businessCards}
+            addBusinessCard={addBusinessCard}
+            updateBusinessCard={updateBusinessCard}
+            complaints={complaints}
+            addComplaint={addComplaint}
+            updateComplaint={updateComplaint}
+            removeComplaint={removeComplaint}
+            attachments={attachments}
+            addAttachment={addAttachment}
+            updateAttachment={updateAttachment}
+            syncState={syncState}
+            syncError={syncError}
+            reloadFromCloud={reloadFromCloud}
+            user={user}
+            userId={userId}
+            signOut={signOut}
+            onResetTutorial={resetTutorial}
+          />
+        </Suspense>
+      </AppLayout>
+      <OnboardingTutorial
+        open={tutorialOpen}
+        stepIndex={tutorialStepIndex}
+        onNext={() => setTutorialStepIndex((index) => Math.min(index + 1, 5))}
+        onBack={() => setTutorialStepIndex((index) => Math.max(index - 1, 0))}
+        onSkip={closeTutorial}
+        onClose={closeTutorial}
+        onNavigateStep={navigateTutorialStep}
       />
-    </AppLayout>
+    </>
   );
 }
 
@@ -316,6 +386,7 @@ function ActivePage({
   addCustomer,
   isSaved,
   customers,
+  initialSearchQuery,
   updateCustomer,
   removeCustomer,
   openCustomerDetail,
@@ -323,6 +394,10 @@ function ActivePage({
   selectedCustomer,
   selectedCustomerId,
   products,
+  inventories,
+  addInventory,
+  updateInventory,
+  removeInventory,
   addProduct,
   updateProduct,
   removeProduct,
@@ -350,18 +425,21 @@ function ActivePage({
   removeSupplier,
   businessCards,
   addBusinessCard,
+  updateBusinessCard,
   complaints,
   addComplaint,
   updateComplaint,
   removeComplaint,
   attachments,
   addAttachment,
+  updateAttachment,
   syncState,
   syncError,
   reloadFromCloud,
   user,
   userId,
   signOut,
+  onResetTutorial,
 }) {
   if (activePage === 'Import') {
     return <ImportPage error={importError} onGoCustomers={() => setActivePage('Customers')} />;
@@ -395,6 +473,7 @@ function ActivePage({
     return (
       <Customers
         customers={customers}
+        initialSearchQuery={initialSearchQuery}
         updateCustomer={updateCustomer}
         removeCustomer={removeCustomer}
         onOpenDetail={openCustomerDetail}
@@ -407,32 +486,38 @@ function ActivePage({
 
   if (activePage === 'CustomerKarte') {
     return (
-      <CustomerKarte
-        customerId={selectedCustomerId}
-        customers={customers}
-        contacts={contacts}
-        businessCards={businessCards}
-        products={products}
-        adoptions={adoptions}
-        samples={samples}
-        quotes={quotes}
-        suppliers={suppliers}
-        complaints={complaints}
-        attachments={attachments}
-        updateCustomer={updateCustomer}
-        addContact={addContact}
-        addBusinessCard={addBusinessCard}
-        addComplaint={addComplaint}
-        addAttachment={addAttachment}
-        addSample={addSample}
-        updateSample={updateSample}
-        addQuote={addQuote}
-        updateQuote={updateQuote}
-        addAdoption={addAdoption}
-        updateAdoption={updateAdoption}
-        setActivePage={setActivePage}
-        user={user}
-      />
+      <Suspense fallback={<KarteLoading />}>
+        <CustomerKarte
+          customerId={selectedCustomerId}
+          customers={customers}
+          contacts={contacts}
+          businessCards={businessCards}
+          products={products}
+          inventories={inventories}
+          adoptions={adoptions}
+          samples={samples}
+          quotes={quotes}
+          suppliers={suppliers}
+          complaints={complaints}
+          attachments={attachments}
+          updateCustomer={updateCustomer}
+          addContact={addContact}
+          addBusinessCard={addBusinessCard}
+          addComplaint={addComplaint}
+          addAttachment={addAttachment}
+          addSample={addSample}
+          updateSample={updateSample}
+          addQuote={addQuote}
+          updateQuote={updateQuote}
+          addInventory={addInventory}
+          updateInventory={updateInventory}
+          removeInventory={removeInventory}
+          addAdoption={addAdoption}
+          updateAdoption={updateAdoption}
+          setActivePage={setActivePage}
+          user={user}
+        />
+      </Suspense>
     );
   }
 
@@ -467,6 +552,7 @@ function ActivePage({
     return (
       <ProductDetail
         product={selectedProduct}
+        inventories={inventories}
         adoptions={adoptions}
         samples={samples}
         quotes={quotes}
@@ -477,6 +563,9 @@ function ActivePage({
         updateAdoption={updateAdoption}
         updateSample={updateSample}
         updateQuote={updateQuote}
+        addInventory={addInventory}
+        updateInventory={updateInventory}
+        removeInventory={removeInventory}
         setActivePage={setActivePage}
         userId={userId}
       />
@@ -544,6 +633,9 @@ function ActivePage({
         contacts={contacts}
         suppliers={suppliers}
         complaints={complaints}
+        quotes={quotes}
+        samples={samples}
+        inventories={inventories}
         setActivePage={setActivePage}
       />
     );
@@ -569,8 +661,40 @@ function ActivePage({
         syncError={syncError}
         reloadFromCloud={reloadFromCloud}
         signOut={signOut}
+        userId={userId}
+        backupDatasets={{
+          customers,
+          products,
+          inventories,
+          contacts,
+          businessCards,
+          suppliers,
+          complaints,
+          samples,
+          quotes,
+          adoptions,
+          attachments,
+        }}
+        restoreHandlers={{
+          customers: { records: customers, add: addCustomer, update: updateCustomer },
+          products: { records: products, add: addProduct, update: updateProduct },
+          inventories: { records: inventories, add: addInventory, update: updateInventory },
+          contacts: { records: contacts, add: addContact, update: updateContact },
+          businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },
+          suppliers: { records: suppliers, add: addSupplier, update: updateSupplier },
+          complaints: { records: complaints, add: addComplaint, update: updateComplaint },
+          samples: { records: samples, add: addSample, update: updateSample },
+          quotes: { records: quotes, add: addQuote, update: updateQuote },
+          adoptions: { records: adoptions, add: addAdoption, update: updateAdoption },
+          attachments: { records: attachments, add: addAttachment, update: updateAttachment },
+        }}
+        onResetTutorial={onResetTutorial}
       />
     );
+  }
+
+  if (activePage === 'Help') {
+    return <HelpPage setActivePage={setActivePage} />;
   }
 
   return (
@@ -585,5 +709,25 @@ function ActivePage({
       reloadFromCloud={reloadFromCloud}
       onOpenKarte={openCustomerKarte}
     />
+  );
+}
+
+function KarteLoading() {
+  return (
+    <main className="page karte-page">
+      <section className="empty-state">
+        <h3>顧客カルテを読み込み中...</h3>
+      </section>
+    </main>
+  );
+}
+
+function PageLoading() {
+  return (
+    <main className="page">
+      <section className="empty-state">
+        <h3>読み込み中...</h3>
+      </section>
+    </main>
   );
 }

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { APP_VERSION_LABEL } from '../shared/constants/appMeta.js';
 import AddActionMenu from './AddActionMenu.jsx';
 import BottomNavigation from './BottomNavigation.jsx';
 import SidebarNavigation from './SidebarNavigation.jsx';
@@ -14,6 +16,7 @@ const pageTitles = {
   Calendar: 'カレンダー',
   Analytics: '分析',
   Settings: '設定',
+  Help: 'ヘルプ',
   LeadSearch: '会社追加',
   CompanyEnrich: '企業情報補完',
   BusinessCards: '名刺',
@@ -32,15 +35,28 @@ export default function AppLayout({
   user,
   onNavigate,
   onAddAction,
+  onGlobalSearch,
+  onHelp,
   onSignOut,
   addMenuOpen,
   setAddMenuOpen,
   notice,
   children,
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
+
   function handleAction(actionKey) {
     onAddAction(actionKey);
     setAddMenuOpen(false);
+  }
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    const normalizedQuery = searchQuery.trim();
+
+    if (normalizedQuery) {
+      onGlobalSearch?.(normalizedQuery);
+    }
   }
 
   return (
@@ -52,15 +68,23 @@ export default function AppLayout({
           <header className="app-topbar">
             <div className="app-topbar-title">
               <strong>{pageTitleFor(activePage)}</strong>
-              <span>営業手帳</span>
+              <span>営業手帳 / {APP_VERSION_LABEL}</span>
             </div>
 
-            <label className="desktop-global-search" aria-label="全体検索">
+            <form className="desktop-global-search" aria-label="全体検索" onSubmit={handleSearchSubmit}>
               <span>検索</span>
-              <input type="search" placeholder="会社名・商品・担当者を検索" />
-            </label>
+              <input
+                type="search"
+                value={searchQuery}
+                placeholder="会社名・商品・担当者を検索"
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </form>
 
             <div className="desktop-quick-actions">
+              <button type="button" className="ghost-button compact-button help-button" aria-label="ヘルプ" onClick={onHelp}>
+                ?
+              </button>
               <button type="button" className="primary-button compact-button" onClick={() => handleAction('company')}>
                 追加
               </button>
@@ -83,6 +107,11 @@ export default function AppLayout({
           {notice && <div className="extension-toast">{notice}</div>}
 
           <div className="main-content">{children}</div>
+          {activePage !== 'Help' && (
+            <button type="button" className="floating-help-button" aria-label="ヘルプ" onClick={onHelp}>
+              ?
+            </button>
+          )}
         </main>
 
         <BottomNavigation

@@ -1,8 +1,8 @@
 const actions = [
-  { key: 'company', label: '会社を追加', description: '検索・補完から取引先を登録' },
-  { key: 'business-card', label: '名刺を撮影', description: '画像から担当者を作成' },
-  { key: 'deal', label: '商談メモ追加', description: '案件とフォローを記録' },
-  { key: 'complaint', label: 'クレーム記録', description: '対応状況を残す' },
+  { key: 'business-card', label: '名刺を撮影', description: 'カメラで名刺を追加', tone: 'primary' },
+  { key: 'deal', label: '商談メモ', description: '今すぐ商談内容を記録', tone: 'primary' },
+  { key: 'company', label: '会社を追加', description: '検索・補完から取引先登録' },
+  { key: 'complaint', label: 'クレーム記録', description: '対応内容と期限を残す' },
   { key: 'product', label: '商品追加', description: '商品マスターを登録' },
   { key: 'supplier', label: '仕入先追加', description: '仕入先情報を登録' },
 ];
@@ -19,10 +19,10 @@ export default function AddActionMenu({ open, onClose, onAction }) {
         aria-label="追加メニュー"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="section-heading">
+        <div className="section-heading add-action-heading">
           <div>
-            <p className="eyebrow">Add</p>
-            <h2>追加する内容を選択</h2>
+            <p className="eyebrow">Quick Add</p>
+            <h2>現場で記録する</h2>
           </div>
           <button type="button" className="text-button compact-button" onClick={onClose}>
             閉じる
@@ -34,7 +34,7 @@ export default function AddActionMenu({ open, onClose, onAction }) {
             <button
               type="button"
               key={action.key}
-              className="add-action-button"
+              className={`add-action-button ${action.tone === 'primary' ? 'primary-action' : ''}`}
               onClick={() => onAction(action.key)}
             >
               <strong>{action.label}</strong>

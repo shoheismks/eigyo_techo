@@ -1,11 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../../products/hooks/useAdoptions.js';
 import { normalizeAttachmentRecord } from '../../../shared/hooks/useAttachments.js';
-import { formatPrice } from '../../products/hooks/useProducts.js';
+import { formatPrice, parsePrice } from '../../products/hooks/useProducts.js';
+import {
+  calculateInventoryGrossMarginRate,
+  inventoryCostTotal,
+  inventoryLabel,
+} from '../../inventory/hooks/useInventory.js';
 import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../../quotes/hooks/useQuotes.js';
+import {
+  buildQuotePdfContext,
+  createQuotePdfFile,
+  downloadQuotePdf,
+  renderQuotePreviewHtml,
+} from '../../quotes/services/quotePdfService.js';
 import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../../samples/hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
-import { generateMeetingPrep } from '../../../services/meetingPrepService.js';
+import {
+  generateAiMeetingPrep,
+  generateProductProposalNote,
+  generateSalesAssistantNote,
+} from '../../../services/aiService.js';
+import { createEmptyMeetingMinutes, generateMeetingMinutesDraft } from '../../../services/meetingMinutesService.js';
+import { createLineFollowNote } from '../../../services/lineIntegrationService.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 
@@ -30,6 +47,32 @@ function displayText(value, fallback = '-') {
   return value || fallback;
 }
 
+function daysUntil(value) {
+  if (!value) return null;
+  const target = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+}
+
+function dueLabel(value, inactive = false) {
+  if (inactive) return '';
+  const days = daysUntil(value);
+  if (days === null) return '';
+  if (days < 0) return '期限切れ';
+  if (days === 0) return '今日';
+  if (days <= 7) return `あと${days}日`;
+  return '';
+}
+
+function dueClass(value, inactive = false) {
+  const label = dueLabel(value, inactive);
+  if (label === '期限切れ') return 'failed';
+  if (label === '今日') return 'ready';
+  return label ? 'muted' : '';
+}
+
 function createSampleForm(customerId = '', user) {
   return normalizeSample({
     ...emptySample,
@@ -46,6 +89,36 @@ function createQuoteForm(customerId = '', user) {
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
   }, user?.id ?? '');
+}
+
+function calculateQuoteFinancials(quote, selectedInventories = []) {
+  const quantity = parsePrice(quote.quantity);
+  const unitPrice = parsePrice(quote.unitPrice);
+  const manualCost = parsePrice(quote.costPrice);
+  const explicitTotal = parsePrice(quote.totalAmount);
+  const totalAmount = explicitTotal !== ''
+    ? explicitTotal
+    : quantity !== '' && unitPrice !== ''
+      ? quantity * unitPrice
+      : '';
+  const inventoryCost = selectedInventories.length > 0 ? inventoryCostTotal(selectedInventories) : '';
+  const costTotal = inventoryCost !== ''
+    ? inventoryCost
+    : quantity !== '' && manualCost !== ''
+      ? quantity * manualCost
+      : '';
+  const grossMarginAmount = totalAmount !== '' && costTotal !== '' ? totalAmount - costTotal : '';
+  const grossMarginRate =
+    totalAmount !== '' && totalAmount > 0 && grossMarginAmount !== ''
+      ? `${((grossMarginAmount / totalAmount) * 100).toFixed(1).replace(/\.0$/, '')}%`
+      : '';
+
+  return {
+    totalAmount,
+    costTotal,
+    grossMarginAmount,
+    grossMarginRate,
+  };
 }
 
 function createAdoptionForm(customerId = '', user) {
@@ -105,6 +178,7 @@ export default function CustomerKarte({
   contacts,
   businessCards,
   products,
+  inventories = [],
   adoptions = [],
   suppliers = [],
   complaints,
@@ -124,21 +198,62 @@ export default function CustomerKarte({
 }) {
   const [analysis, setAnalysis] = useState(null);
   const [meetingPrep, setMeetingPrep] = useState(null);
+  const [assistantNote, setAssistantNote] = useState('');
+  const [productProposalNote, setProductProposalNote] = useState('');
+  const [meetingMinutes, setMeetingMinutes] = useState(() => createEmptyMeetingMinutes());
+  const [lineNote, setLineNote] = useState('');
   const [meetingPrepLoading, setMeetingPrepLoading] = useState(false);
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [productProposalLoading, setProductProposalLoading] = useState(false);
+  const [minutesLoading, setMinutesLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [timelineOrder, setTimelineOrder] = useState('desc');
   const [sampleForm, setSampleForm] = useState(() => createSampleForm(customerId, user));
   const [quoteForm, setQuoteForm] = useState(() => createQuoteForm(customerId, user));
   const [quoteFile, setQuoteFile] = useState(null);
+  const [quotePreviewHtml, setQuotePreviewHtml] = useState('');
   const [quoteUploading, setQuoteUploading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
   const [adoptionForm, setAdoptionForm] = useState(() => createAdoptionForm(customerId, user));
 
   const karte = useMemo(
-    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, complaints, attachments, samples, quotes, adoptions }),
-    [attachments, businessCards, complaints, contacts, customerId, customers, products, samples, quotes, adoptions],
+    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, attachments, samples, quotes, adoptions }),
+    [attachments, businessCards, complaints, contacts, customerId, customers, products, inventories, samples, quotes, adoptions],
   );
+  const quoteInventoryOptions = useMemo(
+    () =>
+      inventories.filter(
+        (inventory) =>
+          quoteForm.productIds.length === 0 ||
+          quoteForm.productIds.includes(inventory.productId),
+      ),
+    [inventories, quoteForm.productIds],
+  );
+  const selectedQuoteInventories = useMemo(
+    () => inventories.filter((inventory) => quoteForm.inventoryIds.includes(inventory.id)),
+    [inventories, quoteForm.inventoryIds],
+  );
+  const inventoryGrossMarginRate = useMemo(
+    () => calculateInventoryGrossMarginRate(selectedQuoteInventories, quoteForm.totalAmount),
+    [quoteForm.totalAmount, selectedQuoteInventories],
+  );
+  const quoteFinancials = useMemo(
+    () => calculateQuoteFinancials(quoteForm, selectedQuoteInventories),
+    [quoteForm, selectedQuoteInventories],
+  );
+  const karteInventories = useMemo(() => {
+    if (!karte) return [];
+
+    const productIds = new Set([
+      ...karte.products.map((product) => product.id),
+      ...karte.adoptions.map((adoption) => adoption.productId),
+      ...karte.samples.flatMap((sample) => sample.productIds ?? []),
+      ...karte.estimates.flatMap((quote) => quote.productIds ?? []),
+    ].filter(Boolean));
+
+    return inventories.filter((inventory) => productIds.has(inventory.productId));
+  }, [inventories, karte]);
   const sortedActivityTimeline = useMemo(() => {
     if (!karte) return [];
     const nextTimeline = [...karte.activityTimeline];
@@ -150,6 +265,7 @@ export default function CustomerKarte({
     setQuoteForm(createQuoteForm(customerId, user));
     setAdoptionForm(createAdoptionForm(customerId, user));
     setQuoteFile(null);
+    setQuotePreviewHtml('');
     setQuoteError('');
   }, [customerId, user?.email, user?.id]);
 
@@ -221,6 +337,56 @@ export default function CustomerKarte({
     });
   }
 
+  function toggleQuoteInventory(inventory) {
+    setQuoteForm((current) => {
+      const inventoryIds = new Set(current.inventoryIds ?? []);
+      const productIds = new Set(current.productIds ?? []);
+
+      if (inventoryIds.has(inventory.id)) {
+        inventoryIds.delete(inventory.id);
+      } else {
+        inventoryIds.add(inventory.id);
+        if (inventory.productId) {
+          productIds.add(inventory.productId);
+        }
+      }
+
+      return { ...current, inventoryIds: [...inventoryIds], productIds: [...productIds] };
+    });
+  }
+
+  function buildCurrentQuoteContext(quoteId = quoteForm.id || crypto.randomUUID()) {
+    const normalizedQuote = normalizeQuote({
+      ...quoteForm,
+      id: quoteId,
+      customerId: customer.id,
+      totalAmount: quoteFinancials.totalAmount || quoteForm.totalAmount,
+      inventoryCostTotal: quoteFinancials.costTotal || quoteForm.inventoryCostTotal,
+      grossMarginAmount: quoteFinancials.grossMarginAmount || quoteForm.grossMarginAmount,
+      grossMarginRate: quoteForm.grossMarginRate || quoteFinancials.grossMarginRate || inventoryGrossMarginRate,
+      createdBy: user?.id ?? customer.userId,
+      createdByName: user?.email ?? '',
+    }, user?.id ?? customer.userId);
+
+    return buildQuotePdfContext({
+      quote: normalizedQuote,
+      customer,
+      contacts: karte.contacts,
+      products,
+      inventories,
+      suppliers,
+      financials: quoteFinancials,
+    });
+  }
+
+  function handleQuotePreview() {
+    setQuotePreviewHtml(renderQuotePreviewHtml(buildCurrentQuoteContext()));
+  }
+
+  function handleQuoteDownload() {
+    downloadQuotePdf(buildCurrentQuoteContext());
+  }
+
   function handleAddSample(event) {
     event.preventDefault();
     if (!addSample || !sampleForm.sampleName.trim()) {
@@ -242,12 +408,15 @@ export default function CustomerKarte({
       return;
     }
 
-    setQuoteUploading(Boolean(quoteFile));
+    setQuoteUploading(true);
     setQuoteError('');
 
     try {
       const quoteId = quoteForm.id || crypto.randomUUID();
       let uploadedFile = null;
+      let uploadedPdf = null;
+      const context = buildCurrentQuoteContext(quoteId);
+      const pdfFile = createQuotePdfFile(context);
 
       if (quoteFile) {
         uploadedFile = await uploadAttachment({
@@ -259,19 +428,36 @@ export default function CustomerKarte({
         });
       }
 
+      uploadedPdf = await uploadAttachment({
+        file: pdfFile,
+        userId: user?.id ?? customer.userId,
+        ownerType: 'quote',
+        ownerId: quoteId,
+        field: 'quotePdf',
+      });
+
       addQuote(normalizeQuote({
         ...quoteForm,
         id: quoteId,
         customerId: customer.id,
+        totalAmount: quoteFinancials.totalAmount || quoteForm.totalAmount,
+        inventoryCostTotal: quoteFinancials.costTotal || quoteForm.inventoryCostTotal,
+        grossMarginAmount: quoteFinancials.grossMarginAmount || quoteForm.grossMarginAmount,
+        grossMarginRate: quoteForm.grossMarginRate || quoteFinancials.grossMarginRate || inventoryGrossMarginRate,
         fileUrl: uploadedFile?.publicUrl || uploadedFile?.url || quoteForm.fileUrl,
         fileName: uploadedFile?.name || quoteFile?.name || quoteForm.fileName,
+        pdfUrl: uploadedPdf?.publicUrl || uploadedPdf?.url || quoteForm.pdfUrl,
+        pdfFileName: uploadedPdf?.name || pdfFile.name || quoteForm.pdfFileName,
+        pdfStoragePath: uploadedPdf?.path || quoteForm.pdfStoragePath,
+        pdfGeneratedAt: new Date().toISOString(),
         createdBy: user?.id ?? customer.userId,
         createdByName: user?.email ?? '',
       }, user?.id ?? customer.userId));
       setQuoteForm(createQuoteForm(customer.id, user));
       setQuoteFile(null);
+      setQuotePreviewHtml('');
     } catch (error) {
-      setQuoteError(error.message || '見積ファイルのアップロードに失敗しました。');
+      setQuoteError(error.message || '見積PDFの作成またはアップロードに失敗しました。');
     } finally {
       setQuoteUploading(false);
     }
@@ -294,11 +480,55 @@ export default function CustomerKarte({
   async function handleMeetingPrep() {
     setMeetingPrepLoading(true);
     try {
-      const nextPrep = await generateMeetingPrep(karte);
+      const nextPrep = await generateAiMeetingPrep(karte);
       setMeetingPrep(nextPrep);
     } finally {
       setMeetingPrepLoading(false);
     }
+  }
+
+  async function handleSalesAssistant() {
+    setAssistantLoading(true);
+    try {
+      setAssistantNote(await generateSalesAssistantNote(karte));
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleProductProposal() {
+    setProductProposalLoading(true);
+    try {
+      setProductProposalNote(await generateProductProposalNote(karte));
+    } finally {
+      setProductProposalLoading(false);
+    }
+  }
+
+  function updateMeetingMinutes(field, value) {
+    setMeetingMinutes((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleMeetingAudio(file) {
+    if (!file) return;
+    updateMeetingMinutes('audioFileName', file.name);
+  }
+
+  async function handleGenerateMinutes() {
+    setMinutesLoading(true);
+    try {
+      setMeetingMinutes(await generateMeetingMinutesDraft({
+        transcript: meetingMinutes.transcript,
+        audioFileName: meetingMinutes.audioFileName,
+        customerName: customer.companyName,
+      }));
+    } finally {
+      setMinutesLoading(false);
+    }
+  }
+
+  function handleCreateLineNote() {
+    setLineNote(createLineFollowNote({ customer, contacts: karte.contacts }));
   }
 
   async function handleAttachment(file, field = 'customer-file') {
@@ -516,6 +746,42 @@ export default function CustomerKarte({
           </div>
         </Section>
 
+        <Section title="在庫・仕入参照" count={karteInventories.length} defaultOpen={karteInventories.length > 0}>
+          {karteInventories.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {karteInventories.map((inventory) => {
+                const product = products.find((item) => item.id === inventory.productId);
+                const supplier = suppliers.find((item) => item.id === inventory.supplierId);
+                return (
+                  <article className="karte-mini-card" key={inventory.id}>
+                    <div className="history-meta">
+                      <span>{inventoryLabel(inventory, product, supplier)}</span>
+                      <small>{inventory.stockType || '-'}</small>
+                    </div>
+                    <div className="lead-badges">
+                      <span className="info-badge ready">{inventory.inventoryStatus || '-'}</span>
+                      {inventory.firmDeadline && <span className="info-badge">ファーム {inventory.firmDeadline}</span>}
+                      {inventory.eta && <span className="info-badge">ETA {inventory.eta}</span>}
+                      {inventory.expiryDate && <span className="info-badge">賞味 {inventory.expiryDate}</span>}
+                    </div>
+                    <dl className="company-details">
+                      <div><dt>商品</dt><dd>{product?.name || '-'}</dd></div>
+                      <div><dt>仕入先</dt><dd>{supplier?.name || supplier?.companyName || '-'}</dd></div>
+                      <div><dt>コスト</dt><dd>{formatPrice(inventory.cost) || '-'} {inventory.currency}/{inventory.unit}</dd></div>
+                      <div><dt>数量</dt><dd>{inventory.quantity || '-'} {inventory.unit}</dd></div>
+                      <div><dt>所有者</dt><dd>{inventory.owner || '-'}</dd></div>
+                      <div><dt>LOT</dt><dd>{inventory.lot || '-'}</dd></div>
+                    </dl>
+                    {inventory.memo && <p className="inline-helper">{inventory.memo}</p>}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="inline-helper">この顧客に関連する商品の在庫はまだ登録されていません。</p>
+          )}
+        </Section>
+
         <Section title="採用品一覧" count={karte.adoptions.length} defaultOpen={karte.adoptions.length > 0}>
           <form className="sample-form" onSubmit={handleAddAdoption}>
             <div className="date-grid">
@@ -628,6 +894,42 @@ export default function CustomerKarte({
                 <input value={quoteForm.grossMarginRate} placeholder="例: 20%" onChange={(event) => updateQuoteField('grossMarginRate', event.target.value)} />
               </label>
             </div>
+            <div className="date-grid">
+              <label className="field-label">
+                数量
+                <input inputMode="decimal" value={quoteForm.quantity} placeholder="例: 10" onChange={(event) => updateQuoteField('quantity', event.target.value)} />
+              </label>
+              <label className="field-label">
+                単価
+                <input inputMode="decimal" value={quoteForm.unitPrice} placeholder="例: 1200" onChange={(event) => updateQuoteField('unitPrice', event.target.value)} />
+              </label>
+              <label className="field-label">
+                単位
+                <input value={quoteForm.unit} placeholder="kg / ケース など" onChange={(event) => updateQuoteField('unit', event.target.value)} />
+              </label>
+              <label className="field-label">
+                原価
+                <input inputMode="decimal" value={quoteForm.costPrice} placeholder="例: 800" onChange={(event) => updateQuoteField('costPrice', event.target.value)} />
+              </label>
+            </div>
+            <div className="price-preview">
+              <div>
+                <span>見積金額</span>
+                <strong>{formatPrice(quoteFinancials.totalAmount || quoteForm.totalAmount) || '-'} {quoteForm.currency}</strong>
+              </div>
+              <div>
+                <span>原価合計</span>
+                <strong>{formatPrice(quoteFinancials.costTotal || quoteForm.inventoryCostTotal) || '-'} {quoteForm.currency}</strong>
+              </div>
+              <div>
+                <span>粗利額</span>
+                <strong>{formatPrice(quoteFinancials.grossMarginAmount || quoteForm.grossMarginAmount) || '-'} {quoteForm.currency}</strong>
+              </div>
+              <div>
+                <span>粗利率</span>
+                <strong>{quoteForm.grossMarginRate || quoteFinancials.grossMarginRate || inventoryGrossMarginRate || '-'}</strong>
+              </div>
+            </div>
             <div className="sample-picker-grid">
               <div>
                 <span>関連担当者</span>
@@ -656,10 +958,53 @@ export default function CustomerKarte({
                 )) : <p className="inline-helper">商品は未登録です。</p>}
               </div>
             </div>
+            <div className="sample-picker-grid">
+              <div>
+                <span>参照在庫</span>
+                {quoteInventoryOptions.length > 0 ? quoteInventoryOptions.map((inventory) => {
+                  const product = products.find((item) => item.id === inventory.productId);
+                  const supplier = suppliers.find((item) => item.id === inventory.supplierId);
+                  return (
+                    <label className="mini-check" key={inventory.id}>
+                      <input
+                        type="checkbox"
+                        checked={quoteForm.inventoryIds.includes(inventory.id)}
+                        onChange={() => toggleQuoteInventory(inventory)}
+                      />
+                      {inventoryLabel(inventory, product, supplier)}
+                    </label>
+                  );
+                }) : <p className="inline-helper">選択中の商品に紐づく在庫はありません。</p>}
+              </div>
+              <div>
+                <span>在庫粗利計算</span>
+                <dl className="company-details">
+                  <div><dt>在庫コスト合計</dt><dd>{formatPrice(inventoryCostTotal(selectedQuoteInventories)) || '-'}</dd></div>
+                  <div><dt>在庫ベース粗利率</dt><dd>{inventoryGrossMarginRate || '-'}</dd></div>
+                </dl>
+                {inventoryGrossMarginRate && !quoteForm.grossMarginRate && (
+                  <p className="inline-helper">粗利率が未入力の場合、登録時に在庫ベース粗利率を保存します。</p>
+                )}
+              </div>
+            </div>
             <label className="field-label file-field">
               見積ファイル
               <input type="file" onChange={(event) => setQuoteFile(event.target.files?.[0] ?? null)} />
               <span>{quoteFile?.name || quoteForm.fileName || '未添付'}</span>
+            </label>
+            <div className="date-grid">
+              <label className="field-label">
+                支払条件
+                <input value={quoteForm.paymentTerms} placeholder="例: 月末締め翌月末払い" onChange={(event) => updateQuoteField('paymentTerms', event.target.value)} />
+              </label>
+              <label className="field-label">
+                納品条件
+                <input value={quoteForm.deliveryTerms} placeholder="例: 冷凍便 / FOB / CIF など" onChange={(event) => updateQuoteField('deliveryTerms', event.target.value)} />
+              </label>
+            </div>
+            <label className="field-label">
+              備考
+              <textarea value={quoteForm.remarks} onChange={(event) => updateQuoteField('remarks', event.target.value)} />
             </label>
             <label className="field-label">
               メモ
@@ -671,13 +1016,26 @@ export default function CustomerKarte({
             </label>
             {quoteUploading && <p className="notice-text">見積ファイルをアップロード中...</p>}
             {quoteError && <p className="error-text">{quoteError}</p>}
-            <button className="primary-button" type="submit" disabled={!quoteForm.quoteNumber.trim() || quoteUploading}>
-              見積を登録
-            </button>
+            <div className="mail-action-row">
+              <button className="ghost-button" type="button" onClick={handleQuotePreview} disabled={!quoteForm.quoteNumber.trim()}>
+                PDFプレビュー
+              </button>
+              <button className="ghost-button" type="button" onClick={handleQuoteDownload} disabled={!quoteForm.quoteNumber.trim()}>
+                PDFダウンロード
+              </button>
+              <button className="primary-button" type="submit" disabled={!quoteForm.quoteNumber.trim() || quoteUploading}>
+                PDF出力して見積を登録
+              </button>
+            </div>
+            {quotePreviewHtml && (
+              <div className="quote-preview-frame" dangerouslySetInnerHTML={{ __html: quotePreviewHtml }} />
+            )}
           </form>
           <QuoteList
             quotes={karte.estimates}
             products={products}
+            inventories={inventories}
+            suppliers={suppliers}
             contacts={karte.contacts}
             updateQuote={updateQuote}
           />
@@ -816,6 +1174,71 @@ export default function CustomerKarte({
         </Section>
 
         <Section title="AI分析枠" defaultOpen={false}>
+          <div className="mail-action-row">
+            <button className="primary-button" type="button" onClick={handleSalesAssistant} disabled={assistantLoading}>
+              {assistantLoading ? 'AI営業秘書生成中...' : 'AI営業秘書'}
+            </button>
+            <button className="primary-button" type="button" onClick={handleProductProposal} disabled={productProposalLoading}>
+              {productProposalLoading ? 'AI商品提案生成中...' : 'AI商品提案'}
+            </button>
+          </div>
+          {assistantNote && (
+            <label className="field-label">
+              AI営業秘書メモ
+              <textarea value={assistantNote} onChange={(event) => setAssistantNote(event.target.value)} />
+            </label>
+          )}
+          {productProposalNote && (
+            <label className="field-label">
+              AI商品提案メモ
+              <textarea value={productProposalNote} onChange={(event) => setProductProposalNote(event.target.value)} />
+            </label>
+          )}
+          <div className="sample-form">
+            <div className="section-heading">
+              <h3>AI議事録</h3>
+              <button className="ghost-button" type="button" onClick={handleGenerateMinutes} disabled={minutesLoading}>
+                {minutesLoading ? '要約中...' : '議事録を作成'}
+              </button>
+            </div>
+            <label className="field-label file-field">
+              音声添付
+              <input type="file" accept="audio/*" onChange={(event) => handleMeetingAudio(event.target.files?.[0])} />
+              <span>{meetingMinutes.audioFileName || '未添付'}</span>
+            </label>
+            <label className="field-label">
+              文字起こし
+              <textarea value={meetingMinutes.transcript} onChange={(event) => updateMeetingMinutes('transcript', event.target.value)} />
+            </label>
+            <label className="field-label">
+              要約
+              <textarea value={meetingMinutes.summary} onChange={(event) => updateMeetingMinutes('summary', event.target.value)} />
+            </label>
+            <label className="field-label">
+              決定事項
+              <textarea value={meetingMinutes.decisions} onChange={(event) => updateMeetingMinutes('decisions', event.target.value)} />
+            </label>
+            <label className="field-label">
+              宿題
+              <textarea value={meetingMinutes.homework} onChange={(event) => updateMeetingMinutes('homework', event.target.value)} />
+            </label>
+            <label className="field-label">
+              次回アクション
+              <textarea value={meetingMinutes.nextActions} onChange={(event) => updateMeetingMinutes('nextActions', event.target.value)} />
+            </label>
+          </div>
+          <div className="sample-form">
+            <div className="section-heading">
+              <h3>LINE枠</h3>
+              <button className="ghost-button" type="button" onClick={handleCreateLineNote}>
+                LINE連携メモ作成
+              </button>
+            </div>
+            <label className="field-label">
+              LINE連携メモ
+              <textarea value={lineNote} onChange={(event) => setLineNote(event.target.value)} />
+            </label>
+          </div>
           <button className="primary-button" type="button" onClick={handleMeetingPrep} disabled={meetingPrepLoading}>
             {meetingPrepLoading ? 'AI商談準備中...' : 'AI商談準備'}
           </button>
@@ -872,11 +1295,17 @@ function SampleList({ samples, products, contacts, updateSample }) {
   }
 
   function productNames(sample) {
-    return products
+    const matchedProducts = products
       .filter((product) => (sample.productIds ?? []).includes(product.id))
-      .map((product) => product.name)
-      .filter(Boolean)
-      .join(', ') || displayText(sample.productNames);
+      .map((product) => [
+        product.name,
+        product.manufacturerName,
+        product.origin,
+        product.temperatureZone,
+      ].filter(Boolean).join(' / '))
+      .filter(Boolean);
+
+    return matchedProducts.join(', ') || displayText(sample.productNames);
   }
 
   function contactNames(sample) {
@@ -889,11 +1318,21 @@ function SampleList({ samples, products, contacts, updateSample }) {
 
   return (
     <div className="karte-card-list sample-card-list">
-      {samples.map((sample) => (
+      {samples.map((sample) => {
+        const arrivalLabel = dueLabel(sample.arrivalDate, ['到着済', '評価待ち', '採用', '不採用', '保留'].includes(sample.status));
+        const followLabel = dueLabel(sample.followUpDate, ['採用', '不採用'].includes(sample.status));
+
+        return (
         <article className="karte-mini-card sample-card" key={sample.id}>
           <div className="history-meta">
             <span>{sample.sampleName || sample.title || sample.name || sample.type || 'サンプル'}</span>
             <small>{sample.status || '-'}</small>
+          </div>
+          <div className="lead-badges">
+            {arrivalLabel && <span className={`info-badge ${dueClass(sample.arrivalDate)}`}>到着 {arrivalLabel}</span>}
+            {followLabel && <span className={`info-badge ${dueClass(sample.followUpDate)}`}>フォロー {followLabel}</span>}
+            {sample.trackingNumber && <span className="info-badge ready">追跡あり</span>}
+            {sample.feedback && <span className="info-badge ready">評価あり</span>}
           </div>
           {sample.customerId && (
             <div className="sample-status-row">
@@ -939,7 +1378,8 @@ function SampleList({ samples, products, contacts, updateSample }) {
           )}
           {sample.memo && sample.customerId && <p className="inline-helper">{sample.memo}</p>}
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -992,17 +1432,23 @@ function AdoptionList({ adoptions, products, updateAdoption }) {
   );
 }
 
-function QuoteList({ quotes, products, contacts, updateQuote }) {
+function QuoteList({ quotes, products, inventories = [], suppliers = [], contacts, updateQuote }) {
   if (!quotes.length) {
     return null;
   }
 
   function productNames(quote) {
-    return products
+    const matchedProducts = products
       .filter((product) => (quote.productIds ?? []).includes(product.id))
-      .map((product) => product.name)
-      .filter(Boolean)
-      .join(', ') || displayText(quote.productNames);
+      .map((product) => [
+        product.name,
+        product.manufacturerName,
+        product.origin,
+        product.temperatureZone,
+      ].filter(Boolean).join(' / '))
+      .filter(Boolean);
+
+    return matchedProducts.join(', ') || displayText(quote.productNames);
   }
 
   function contactNames(quote) {
@@ -1013,13 +1459,36 @@ function QuoteList({ quotes, products, contacts, updateQuote }) {
       .join(', ') || '-';
   }
 
+  function inventoryNames(quote) {
+    return inventories
+      .filter((inventory) => (quote.inventoryIds ?? []).includes(inventory.id))
+      .map((inventory) => {
+        const product = products.find((item) => item.id === inventory.productId);
+        const supplier = suppliers.find((item) => item.id === inventory.supplierId);
+        return inventoryLabel(inventory, product, supplier);
+      })
+      .filter(Boolean)
+      .join(', ') || '-';
+  }
+
   return (
     <div className="karte-card-list sample-card-list">
-      {quotes.map((quote) => (
+      {quotes.map((quote) => {
+        const inactive = ['採用', '失注', '期限切れ'].includes(quote.status);
+        const validLabel = dueLabel(quote.validUntil, inactive);
+
+        return (
         <article className="karte-mini-card quote-card" key={quote.id}>
           <div className="history-meta">
             <span>{quote.quoteNumber || quote.title || quote.type || '見積'}</span>
             <small>{quote.status || '-'}</small>
+          </div>
+          <div className="lead-badges">
+            {validLabel && <span className={`info-badge ${dueClass(quote.validUntil, inactive)}`}>有効期限 {validLabel}</span>}
+            {quote.fileUrl && <span className="info-badge ready">見積ファイルあり</span>}
+            {quote.pdfUrl && <span className="info-badge ready">PDFあり</span>}
+            {(quote.productIds ?? []).length > 0 && <span className="info-badge ready">商品連携あり</span>}
+            {(quote.inventoryIds ?? []).length > 0 && <span className="info-badge ready">在庫参照あり</span>}
           </div>
           {quote.customerId && (
             <div className="sample-status-row">
@@ -1036,11 +1505,18 @@ function QuoteList({ quotes, products, contacts, updateQuote }) {
           )}
           <dl className="company-details">
             <div><dt>商品</dt><dd>{productNames(quote)}</dd></div>
+            <div><dt>参照在庫</dt><dd>{inventoryNames(quote)}</dd></div>
             <div><dt>担当者</dt><dd>{contactNames(quote)}</dd></div>
             <div><dt>提出日</dt><dd>{formatDate(quote.submittedDate || quote.date || quote.createdAt)}</dd></div>
             <div><dt>有効期限</dt><dd>{formatDate(quote.validUntil)}</dd></div>
+            <div><dt>数量</dt><dd>{quote.quantity || '-'} {quote.unit || ''}</dd></div>
+            <div><dt>単価</dt><dd>{quote.unitPrice || '-'}</dd></div>
+            <div><dt>原価</dt><dd>{quote.costPrice || '-'}</dd></div>
             <div><dt>合計金額</dt><dd>{quote.totalAmount || '-'}</dd></div>
+            <div><dt>粗利額</dt><dd>{quote.grossMarginAmount || '-'}</dd></div>
             <div><dt>粗利率</dt><dd>{quote.grossMarginRate || '-'}</dd></div>
+            <div><dt>支払条件</dt><dd>{quote.paymentTerms || '-'}</dd></div>
+            <div><dt>納品条件</dt><dd>{quote.deliveryTerms || '-'}</dd></div>
           </dl>
           {quote.customerId ? (
             <>
@@ -1060,6 +1536,13 @@ function QuoteList({ quotes, products, contacts, updateQuote }) {
                   />
                 </label>
               )}
+              <label className="field-label">
+                備考
+                <textarea
+                  value={quote.remarks || ''}
+                  onChange={(event) => updateQuote?.(quote.id, { remarks: event.target.value })}
+                />
+              </label>
             </>
           ) : (
             <p className="inline-helper">{quote.summary || quote.memo || quote.name || '-'}</p>
@@ -1069,8 +1552,14 @@ function QuoteList({ quotes, products, contacts, updateQuote }) {
               {quote.fileName || '見積ファイルを開く'}
             </a>
           )}
+          {quote.pdfUrl && (
+            <a className="ghost-button external-button" href={quote.pdfUrl} target="_blank" rel="noreferrer">
+              {quote.pdfFileName || '見積PDFを開く'}
+            </a>
+          )}
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }

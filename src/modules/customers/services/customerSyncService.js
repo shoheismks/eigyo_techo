@@ -3,7 +3,7 @@ import { hasSupabaseConfig, supabase } from '../../../lib/supabase.js';
 const TABLE_NAME = 'customers';
 
 export function canUseSupabase() {
-  return hasSupabaseConfig && Boolean(supabase) && navigator.onLine;
+  return hasSupabaseConfig && Boolean(supabase) && isOnline();
 }
 
 export function hasCloudConfig() {
@@ -49,26 +49,26 @@ export async function upsertRemoteCustomers(customers) {
     return;
   }
 
-  const rows = customers.map(toSupabaseRow);
-  const { error } = await supabase
-    .from(TABLE_NAME)
-    .upsert(rows, { onConflict: 'id' });
+  let rows = customers.map(toSupabaseRow);
+  const omittedColumns = new Set();
 
-  if (error) {
-    if (isMissingColumnError(error, 'company_note') || isMissingColumnError(error, 'user_id')) {
-      const fallbackRows = rows.map(({ company_note: _companyNote, user_id: _userId, ...row }) => row);
-      const { error: fallbackError } = await supabase
-        .from(TABLE_NAME)
-        .upsert(fallbackRows, { onConflict: 'id' });
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .upsert(rows, { onConflict: 'id' });
 
-      if (!fallbackError) {
-        return;
-      }
-
-      throw fallbackError;
+    if (!error) {
+      return;
     }
 
-    throw error;
+    const missingColumn = getMissingColumnName(error);
+
+    if (!missingColumn || omittedColumns.has(missingColumn)) {
+      throw error;
+    }
+
+    omittedColumns.add(missingColumn);
+    rows = rows.map(({ [missingColumn]: _omitted, ...row }) => row);
   }
 }
 
@@ -186,4 +186,17 @@ function fromSupabaseRow(row) {
 function isMissingColumnError(error, columnName) {
   const message = error?.message || error?.details || '';
   return message.includes(columnName) && message.includes('column');
+}
+
+function getMissingColumnName(error) {
+  const message = error?.message || error?.details || '';
+  const match =
+    message.match(/column ["']?([a-zA-Z0-9_]+)["']?/) ||
+    message.match(/Could not find the '([^']+)' column/);
+
+  return match?.[1] || '';
+}
+
+function isOnline() {
+  return typeof navigator === 'undefined' ? true : navigator.onLine;
 }

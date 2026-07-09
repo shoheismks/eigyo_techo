@@ -44,7 +44,7 @@ export default function BusinessCards({
       setRawText(result.data.text);
       setNotice('OCRが完了しました。内容を確認して保存してください。');
     } catch {
-      setError('OCRライブラリが未導入です。今は下のテキスト欄に名刺情報を貼り付けてください。');
+      setError('OCRを実行できませんでした。下の入力欄へ名刺情報を貼り付けてください。');
     } finally {
       setIsOcrRunning(false);
     }
@@ -98,10 +98,10 @@ export default function BusinessCards({
       <section className="page-header">
         <p className="eyebrow">Business cards</p>
         <h1>名刺OCR</h1>
-        <p>OCRはこの画面でだけ遅延読み込みします。画像は圧縮してSupabase Storageへ保存します。</p>
+        <p>スマホではカメラ、PCでは画像アップロードから名刺を登録できます。OCR結果は確認・編集してから保存します。</p>
       </section>
 
-      <section className="detail-section">
+      <section className="detail-section business-card-form">
         <label className="field-label file-field">
           名刺画像
           <input type="file" accept="image/*" capture="environment" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />

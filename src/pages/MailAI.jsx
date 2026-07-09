@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SALES_PURPOSES, createMailDrafts } from '../services/mailDraftService.js';
 import { createGmailDraft } from '../services/gmailService.js';
 import { createOutlookDraft } from '../services/outlookService.js';
+import { generateMailSupportNote } from '../services/aiService.js';
 import {
   fetchMailDrafts,
   normalizeGeneratedDrafts,
@@ -18,7 +19,9 @@ export default function MailAI({ customers, products = [], userId = '' }) {
   const [drafts, setDrafts] = useState([]);
   const [generationSource, setGenerationSource] = useState('');
   const [fallbackReason, setFallbackReason] = useState('');
+  const [aiMailNote, setAiMailNote] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingMailNote, setIsGeneratingMailNote] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [draftSyncNotice, setDraftSyncNotice] = useState('');
@@ -120,6 +123,29 @@ export default function MailAI({ customers, products = [], userId = '' }) {
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleCreateMailNote() {
+    setIsGeneratingMailNote(true);
+    setError('');
+
+    try {
+      setAiMailNote(await generateMailSupportNote({
+        customer: selectedCustomer,
+        productName,
+        purpose,
+      }));
+    } finally {
+      setIsGeneratingMailNote(false);
+    }
+  }
+
+  function updateDraft(draftId, field, value) {
+    setDrafts((currentDrafts) =>
+      currentDrafts.map((draft) =>
+        draft.id === draftId ? { ...draft, [field]: value } : draft,
+      ),
+    );
   }
 
   async function handleCopy(draft) {
@@ -253,6 +279,7 @@ export default function MailAI({ customers, products = [], userId = '' }) {
         </label>
 
         {!selectedCustomer?.isDoNotContact && (
+          <div className="mail-action-row">
           <button
             className="primary-button"
             disabled={!selectedCustomer || isGenerating}
@@ -260,8 +287,25 @@ export default function MailAI({ customers, products = [], userId = '' }) {
           >
             {isGenerating ? 'AI生成中...' : 'メール案を作成'}
           </button>
+          <button
+            className="ghost-button"
+            disabled={!selectedCustomer || isGeneratingMailNote}
+            onClick={handleCreateMailNote}
+          >
+            {isGeneratingMailNote ? 'AI方針生成中...' : 'AIメール方針'}
+          </button>
+          </div>
         )}
       </section>
+
+      {aiMailNote && (
+        <section className="mail-context">
+          <label className="field-label">
+            AIメール方針メモ
+            <textarea value={aiMailNote} onChange={(event) => setAiMailNote(event.target.value)} />
+          </label>
+        </section>
+      )}
 
       {selectedCustomer && (
         <section className="mail-context">
@@ -331,9 +375,12 @@ export default function MailAI({ customers, products = [], userId = '' }) {
               )}
               <div className="mail-subject">
                 <span>件名</span>
-                <strong>{draft.subject}</strong>
+                <input
+                  value={draft.subject}
+                  onChange={(event) => updateDraft(draft.id, 'subject', event.target.value)}
+                />
               </div>
-              <textarea readOnly value={draft.body} />
+              <textarea value={draft.body} onChange={(event) => updateDraft(draft.id, 'body', event.target.value)} />
             </article>
           ))
         ) : (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
 
 const statusLabels = {
@@ -72,9 +72,24 @@ export default function Pipeline({ customers, updateCustomer }) {
         ))}
       </section>
 
+      <section className="mobile-field-panel pipeline-mobile-controls" aria-label="スマホ用案件検索">
+        <label className="field-label">
+          会社名・メモ検索
+          <input value={keyword} placeholder="現場で会社名やメモを検索" onChange={(event) => setKeyword(event.target.value)} />
+        </label>
+        <label className="field-label">
+          ステータス
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            {['すべて', ...PIPELINE_STATUSES].map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </label>
+      </section>
+
       <section className="pipeline-desktop">
         <aside className="pipeline-list-pane">
-          <div className="search-panel desktop-filter-panel">
+          <div className="pipeline-filter-panel">
             <label className="field-label filter-search">
               検索
               <input value={keyword} placeholder="会社名・メモ・タグで検索" onChange={(event) => setKeyword(event.target.value)} />
@@ -126,7 +141,7 @@ export default function Pipeline({ customers, updateCustomer }) {
 
       <section className="pipeline-board">
         {PIPELINE_STATUSES.map((status) => {
-          const items = customers
+          const items = filteredCustomers
             .filter((customer) => customer.status === status)
             .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
@@ -159,6 +174,17 @@ export default function Pipeline({ customers, updateCustomer }) {
 
 function PipelineDetail({ customer, updateCustomer }) {
   const histories = customer.dealHistories ?? [];
+  const [memoDraft, setMemoDraft] = useState(customer.pipelineMemo || '');
+
+  useEffect(() => {
+    setMemoDraft(customer.pipelineMemo || '');
+  }, [customer.id, customer.pipelineMemo]);
+
+  function saveMemoDraft() {
+    if (memoDraft !== (customer.pipelineMemo || '')) {
+      updateCustomer(customer.id, { pipelineMemo: memoDraft });
+    }
+  }
 
   return (
     <article className={`pipeline-card ${statusLabels[customer.status]}`}>
@@ -220,9 +246,10 @@ function PipelineDetail({ customer, updateCustomer }) {
       <label className="field-label">
         案件メモ
         <textarea
-          value={customer.pipelineMemo || ''}
+          value={memoDraft}
           placeholder="次にやること、温度感、提案内容など"
-          onChange={(event) => updateCustomer(customer.id, { pipelineMemo: event.target.value })}
+          onChange={(event) => setMemoDraft(event.target.value)}
+          onBlur={saveMemoDraft}
         />
       </label>
 
@@ -253,6 +280,18 @@ function PipelineDetail({ customer, updateCustomer }) {
 }
 
 function PipelineCard({ customer, updateCustomer }) {
+  const [memoDraft, setMemoDraft] = useState(customer.pipelineMemo || '');
+
+  useEffect(() => {
+    setMemoDraft(customer.pipelineMemo || '');
+  }, [customer.id, customer.pipelineMemo]);
+
+  function saveMemoDraft() {
+    if (memoDraft !== (customer.pipelineMemo || '')) {
+      updateCustomer(customer.id, { pipelineMemo: memoDraft });
+    }
+  }
+
   return (
     <article className={`pipeline-card ${statusLabels[customer.status]}`} key={customer.id}>
       <div className="pipeline-card-heading">
@@ -310,9 +349,10 @@ function PipelineCard({ customer, updateCustomer }) {
       <label className="field-label">
         案件メモ
         <textarea
-          value={customer.pipelineMemo || ''}
+          value={memoDraft}
           placeholder="次にやること、温度感、提案内容など"
-          onChange={(event) => updateCustomer(customer.id, { pipelineMemo: event.target.value })}
+          onChange={(event) => setMemoDraft(event.target.value)}
+          onBlur={saveMemoDraft}
         />
       </label>
     </article>

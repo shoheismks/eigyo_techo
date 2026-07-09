@@ -3,31 +3,40 @@ import { supabase, hasSupabaseConfig } from '../../lib/supabase.js';
 export const ATTACHMENT_BUCKET = 'app-attachments';
 
 export function isUploadable() {
-  return hasSupabaseConfig && Boolean(supabase) && navigator.onLine;
+  return hasSupabaseConfig && Boolean(supabase) && isOnline();
 }
 
 export async function compressImageFile(file, maxWidth = 1600, quality = 0.82) {
-  if (!file?.type?.startsWith('image/')) {
+  if (!file?.type?.startsWith('image/') || typeof createImageBitmap === 'undefined') {
     return file;
   }
 
-  const image = await createImageBitmap(file);
-  const scale = Math.min(1, maxWidth / image.width);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(image.width * scale));
-  canvas.height = Math.max(1, Math.round(image.height * scale));
-  const context = canvas.getContext('2d');
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  try {
+    const image = await createImageBitmap(file);
+    const scale = Math.min(1, maxWidth / image.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext('2d');
 
-  const blob = await new Promise((resolve) => {
-    canvas.toBlob(resolve, file.type || 'image/jpeg', quality);
-  });
+    if (!context) {
+      return file;
+    }
 
-  if (!blob || blob.size >= file.size) {
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, file.type || 'image/jpeg', quality);
+    });
+
+    if (!blob || blob.size >= file.size) {
+      return file;
+    }
+
+    return new File([blob], file.name, { type: blob.type || file.type });
+  } catch {
     return file;
   }
-
-  return new File([blob], file.name, { type: blob.type || file.type });
 }
 
 export async function uploadAttachment({ file, userId, ownerType, ownerId, field }) {
@@ -75,4 +84,8 @@ export async function uploadAttachment({ file, userId, ownerType, ownerId, field
 function getExtension(fileName = '') {
   const index = fileName.lastIndexOf('.');
   return index >= 0 ? fileName.slice(index) : '';
+}
+
+function isOnline() {
+  return typeof navigator === 'undefined' ? true : navigator.onLine;
 }

@@ -41,6 +41,23 @@ function relatedContactNames(record, contacts) {
   return contacts.filter((contact) => ids.has(contact.id)).map((contact) => contact.name).filter(Boolean);
 }
 
+function actorName(record = {}) {
+  return (
+    record.createdByName ||
+    record.updatedByName ||
+    record.createdBy ||
+    record.updatedBy ||
+    record.userName ||
+    record.userId ||
+    '-'
+  );
+}
+
+function isMeaningfulUpdate(record = {}) {
+  if (!record.updatedAt || !record.createdAt) return Boolean(record.updatedAt);
+  return String(record.updatedAt) !== String(record.createdAt);
+}
+
 function hasAttachment(record, attachments) {
   if (record.attachment || record.attachmentUrl || record.file || record.fileUrl) return true;
   if (record.fileName || record.fileUrl) return true;
@@ -100,11 +117,25 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: contact.createdAt,
         type: '担当者追加',
         content: `${contact.name || '担当者'} ${contact.department || ''} ${contact.role || ''}`.trim(),
-        createdBy: contact.createdByName || contact.createdBy || contact.userId,
+        createdBy: actorName(contact),
         relatedContacts: [contact.name].filter(Boolean),
         source: 'contact',
       }),
     );
+
+    if (isMeaningfulUpdate(contact)) {
+      events.push(
+        timelineEvent({
+          id: `contact-updated-${contact.id}`,
+          date: contact.updatedAt,
+          type: '担当者変更',
+          content: `${contact.name || '担当者'}の情報を更新`,
+          createdBy: contact.updatedByName || contact.updatedBy || actorName(contact),
+          relatedContacts: [contact.name].filter(Boolean),
+          source: 'contact-update',
+        }),
+      );
+    }
   });
 
   businessCards.forEach((card) => {
@@ -115,7 +146,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: card.createdAt,
         type: '名刺登録',
         content: `${name}の名刺を登録`,
-        createdBy: card.createdByName || card.createdBy || card.userId,
+        createdBy: actorName(card),
         relatedContacts: [name].filter(Boolean),
         hasAttachment: Boolean(card.imageFile?.url || card.imageFile),
         source: 'business-card',
@@ -132,7 +163,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: history.date || history.createdAt,
         type: eventType,
         content: history.summary || history.nextAction || typeText,
-        createdBy: history.createdByName || history.createdBy,
+        createdBy: actorName(history),
         relatedContacts: relatedContactNames(history, contacts),
         hasAttachment: hasAttachment(history, attachments),
         source: 'deal-history',
@@ -148,7 +179,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: sample.shippedDate || sample.createdAt,
         type: 'サンプル発送',
         content: `${sample.sampleName || productText || 'サンプル'} / ${sample.status || '発送前'}`,
-        createdBy: sample.createdByName || sample.createdBy,
+        createdBy: actorName(sample),
         relatedContacts: relatedContactNames(sample, contacts),
         hasAttachment: hasAttachment(sample, attachments),
         source: 'sample',
@@ -162,7 +193,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
           date: sample.followUpDate,
           type: 'フォロー予定',
           content: sample.nextAction || `${sample.sampleName || 'サンプル'}の反応確認`,
-          createdBy: sample.createdByName || sample.createdBy,
+          createdBy: actorName(sample),
           relatedContacts: relatedContactNames(sample, contacts),
           hasAttachment: hasAttachment(sample, attachments),
           source: 'sample-follow',
@@ -178,7 +209,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: quote.submittedDate || quote.createdAt,
         type: '見積提出',
         content: `${quote.quoteNumber || '見積'} / ${quote.status || '提出済'} / ${quote.totalAmount || '-'}`,
-        createdBy: quote.createdByName || quote.createdBy,
+        createdBy: actorName(quote),
         relatedContacts: relatedContactNames(quote, contacts),
         hasAttachment: hasAttachment(quote, attachments),
         source: 'quote',
@@ -193,7 +224,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: adoption.adoptedDate || adoption.createdAt,
         type: '商品採用',
         content: `${adoption.productName || '商品'} / ${adoption.status || '採用中'}`,
-        createdBy: adoption.createdByName || adoption.createdBy || adoption.userId,
+        createdBy: actorName(adoption),
         source: 'adoption',
       }),
     );
@@ -206,7 +237,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: mail.sentAt || mail.createdAt,
         type: 'メール送信履歴',
         content: mail.subject || mail.summary || 'メール送信',
-        createdBy: mail.createdByName || mail.createdBy,
+        createdBy: actorName(mail),
         relatedContacts: relatedContactNames(mail, contacts),
         hasAttachment: hasAttachment(mail, attachments),
         source: 'mail',
@@ -221,7 +252,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: customer.nextFollowUpDate || customer.nextFollowDate,
         type: 'フォロー予定',
         content: customer.pipelineMemo || customer.memo || '次回フォロー予定',
-        createdBy: customer.updatedByName || customer.updatedBy || customer.userId,
+        createdBy: actorName(customer),
         source: 'follow',
       }),
     );
@@ -234,7 +265,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: complaint.occurredAt || complaint.createdAt,
         type: 'クレーム記録',
         content: complaint.title || complaint.memo || 'クレーム記録',
-        createdBy: complaint.createdByName || complaint.createdBy,
+        createdBy: actorName(complaint),
         relatedContacts: relatedContactNames(complaint, contacts),
         hasAttachment: hasAttachment(complaint, attachments),
         source: 'complaint',
@@ -249,7 +280,8 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: attachment.createdAt,
         type: '添付ファイル追加',
         content: attachment.name || attachment.field || 'ファイル追加',
-        createdBy: attachment.createdByName || attachment.createdBy || attachment.userId,
+        createdBy: actorName(attachment),
+        relatedContacts: relatedContactNames(attachment, contacts),
         hasAttachment: true,
         source: 'attachment',
       }),
@@ -263,7 +295,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
         date: log.date || log.createdAt,
         type: 'ステータス変更',
         content: `${log.from ? `${log.from} → ` : ''}${log.to || log.status || currentStatus}`,
-        createdBy: log.createdByName || log.createdBy,
+        createdBy: actorName(log),
         source: 'status',
       }),
     );
@@ -275,7 +307,7 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
       date: customer.updatedAt || customer.createdAt,
       type: 'ステータス変更',
       content: `現在のステータス: ${currentStatus}`,
-      createdBy: customer.updatedByName || customer.updatedBy || customer.userId,
+      createdBy: actorName(customer),
       source: 'status-current',
     }),
   );

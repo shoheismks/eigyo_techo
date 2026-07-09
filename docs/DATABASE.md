@@ -314,3 +314,159 @@ erDiagram
 - calendar_events
 - sales_reports
 - inventory_links
+
+---
+
+## Step26 追記: 在庫・見積PDF・営業データ集約
+
+### 追加予定テーブル: inventories
+
+- 目的: 商品ごとの在庫状態を管理する。
+- 主キー: `id`
+- 主要カラム:
+  - `user_id`
+  - `product_id`
+  - `supplier_id`
+  - `inventory_status`
+  - `current_stock`
+  - `reserved_stock`
+  - `available_stock`
+  - `reorder_point`
+  - `unit`
+  - `warehouse_location`
+  - `lot_number`
+  - `expiry_date`
+  - `next_arrival_date`
+  - `memo`
+  - `created_by`
+  - `created_at`
+  - `updated_at`
+- 外部キー:
+  - `product_id` -> `products.id`
+  - `supplier_id` -> `suppliers.id`
+  - `user_id` -> `auth.users.id`
+- 関連テーブル:
+  - `products`
+  - `suppliers`
+  - `quotes`
+  - `samples`
+  - `adoptions`
+- Storage利用有無: なし
+- RLS有無: あり。`auth.uid() = user_id` のデータのみアクセス可能。
+- 検索対象項目:
+  - 商品名
+  - 仕入先名
+  - 在庫ステータス
+  - ロット番号
+  - 倉庫・保管場所
+- 今後追加予定項目:
+  - 入出庫履歴
+  - 複数倉庫
+  - 温度帯別在庫
+  - 賞味期限アラート
+
+### 追加予定テーブル: inventory_movements
+
+- 目的: 在庫の入出庫履歴を監査ログとして保持する。
+- 主キー: `id`
+- 主要カラム:
+  - `user_id`
+  - `inventory_id`
+  - `product_id`
+  - `movement_type`
+  - `quantity`
+  - `unit`
+  - `movement_date`
+  - `reason`
+  - `related_quote_id`
+  - `related_sample_id`
+  - `created_by`
+  - `created_by_name`
+  - `created_at`
+- 外部キー:
+  - `inventory_id` -> `inventories.id`
+  - `product_id` -> `products.id`
+  - `related_quote_id` -> `quotes.id`
+  - `related_sample_id` -> `samples.id`
+- 関連テーブル:
+  - `inventories`
+  - `products`
+  - `quotes`
+  - `samples`
+- Storage利用有無: なし
+- RLS有無: あり
+- 検索対象項目:
+  - 入出庫種別
+  - 理由
+  - 商品
+  - ロット番号
+- 今後追加予定項目:
+  - 棚卸差異
+  - 自動引当
+  - ERP/WMS連携
+
+### quotes 拡張: 見積PDF
+
+見積PDF対応のため、`quotes` には以下のメタ情報を持たせる。
+
+- `pdf_url`
+- `pdf_storage_path`
+- `pdf_file_name`
+- `pdf_generated_at`
+- `pdf_generated_by`
+- `pdf_version`
+- `pdf_status`
+
+PDF本体はStorageに保存し、DBにはURLとメタ情報のみ保存する。
+
+### 追加予定テーブル: dashboard_snapshots
+
+- 目的: 経営判断ダッシュボード用の集計結果を任意で保存する。
+- 主キー: `id`
+- 主要カラム:
+  - `user_id`
+  - `snapshot_date`
+  - `period_type`
+  - `metrics`
+  - `created_at`
+- 外部キー:
+  - `user_id` -> `auth.users.id`
+- 関連テーブル:
+  - `customers`
+  - `deal_histories`
+  - `quotes`
+  - `samples`
+  - `claims`
+  - `products`
+  - `inventories`
+- Storage利用有無: なし
+- RLS有無: あり
+- 検索対象項目:
+  - 集計期間
+  - 作成日
+- 今後追加予定項目:
+  - 売上実績
+  - 粗利実績
+  - 担当者別KPI
+  - 部署別KPI
+
+### Storage追加方針
+
+- 見積PDF: `quote-pdfs` または `app-attachments/quotes/`
+- 在庫関連資料: `app-attachments/inventory/`
+- ダッシュボード出力: `app-attachments/reports/`
+
+### Mermaid ER図 追記
+
+```mermaid
+erDiagram
+  products ||--o{ inventories : has
+  suppliers ||--o{ inventories : supplies
+  inventories ||--o{ inventory_movements : logs
+  customers ||--o{ quotes : receives
+  quotes ||--o{ attachments : has_pdf
+  products ||--o{ quotes : quoted_in
+  customers ||--o{ samples : receives
+  products ||--o{ samples : sampled_in
+  customers ||--o{ dashboard_snapshots : aggregated_for
+```

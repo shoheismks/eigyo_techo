@@ -292,3 +292,136 @@
 - 権限管理
 - チーム共有
 - オフライン差分同期
+
+---
+
+## Step26 追記: 在庫管理
+
+- ステータス: 未実装
+- 目的: 商品ごとの在庫状態を把握し、提案・見積・サンプル発送の判断に使う。
+- 画面: Products、ProductDetail、Suppliers、Dashboard、将来のInventory画面。
+- 入力:
+  - 商品
+  - 仕入先
+  - 在庫ステータス
+  - 現在庫
+  - 引当数
+  - 利用可能数
+  - 単位
+  - ロット番号
+  - 賞味期限
+  - 入荷予定日
+  - 保管場所
+  - メモ
+- 出力:
+  - 在庫ステータス表示
+  - 欠品・残少・期限間近の警告
+  - 見積・サンプル作成時の在庫確認
+- 保存先: Supabase Database。添付がある場合のみSupabase Storage。
+- 関連データ:
+  - products
+  - suppliers
+  - quotes
+  - samples
+  - adoptions
+- 今後の拡張:
+  - 入出庫履歴
+  - 棚卸
+  - 複数倉庫
+  - ERP/WMS連携
+
+### 在庫ステータス
+
+- 未連携
+- 在庫あり
+- 残少
+- 欠品
+- 入荷待ち
+- 取扱停止
+- 要確認
+
+## Step26 追記: 見積PDF
+
+- ステータス: 未実装
+- 目的: 見積履歴からPDFを作成し、顧客へ提出できる状態で保存する。
+- 画面: CustomerKarte、Quotes、ProductDetail。
+- 入力:
+  - 顧客情報
+  - 担当者
+  - 見積番号
+  - 商品
+  - 数量
+  - 単価
+  - 金額
+  - 粗利率
+  - 有効期限
+  - 備考
+- 出力:
+  - 見積PDF
+  - PDF URL
+  - ファイル名
+  - 生成日時
+  - 版数
+- 保存先:
+  - PDF本体: Supabase Storage
+  - メタ情報: Supabase Database `quotes`
+- 関連データ:
+  - customers
+  - contacts
+  - products
+  - suppliers
+  - quotes
+  - attachments
+- 今後の拡張:
+  - 見積テンプレート
+  - 承認フロー
+  - Gmail/Outlook下書き添付
+  - 電子署名
+  - 送信履歴
+
+### quotePdfService
+
+`quotePdfService` は見積PDF生成を担当する。UIコンポーネントへPDF生成ロジックを直書きしない。
+
+## Step26 追記: 経営判断ダッシュボード
+
+- ステータス: 開発中
+- 目的: 営業活動と商品・在庫・見積データを集約し、経営判断に必要な指標を確認する。
+- 画面: Home、Dashboard、Analytics。
+- 入力:
+  - 顧客
+  - 商談
+  - 見積
+  - サンプル
+  - 採用
+  - クレーム
+  - 商品
+  - 在庫
+- 出力:
+  - 今週のフォロー件数
+  - 見積提出額
+  - 採用見込み
+  - 粗利率
+  - 高重要度顧客
+  - 欠品・残少商品
+  - クレーム未対応
+  - 担当者別活動量
+- 保存先: 基本はSupabaseから都度集計。必要に応じて `dashboard_snapshots` に保存。
+- 関連データ:
+  - customers
+  - deal_histories
+  - quotes
+  - samples
+  - claims
+  - products
+  - inventories
+- 今後の拡張:
+  - 売上分析
+  - 粗利分析
+  - 営業KPI
+  - 担当者別ランキング
+  - 月次レポートPDF
+
+### dashboardService
+
+`dashboardService` は営業データ集約を担当する。画面側では集計済みデータを受け取り、表示に集中する。

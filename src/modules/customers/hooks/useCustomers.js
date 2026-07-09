@@ -184,11 +184,15 @@ function getLocalReason(fallback = '') {
     return 'Supabase env vars are not set. LocalStorage fallback is active.';
   }
 
-  if (!navigator.onLine) {
+  if (!isOnline()) {
     return 'Offline. LocalStorage fallback is active.';
   }
 
   return fallback;
+}
+
+function isOnline() {
+  return typeof navigator === 'undefined' ? true : navigator.onLine;
 }
 
 export function useCustomers(userId = '') {

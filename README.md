@@ -1,40 +1,48 @@
 # 営業手帳
 
-## 開発ルール
+食品業界向けの営業CRMです。取引先、担当者、名刺、商談、商品、仕入先、見積、サンプル、クレーム、添付ファイルを管理し、AIメールやAI商談準備の土台を備えています。
 
-今後の設計方針と実装ルールは [docs/PROJECT_RULE.md](docs/PROJECT_RULE.md) を参照してください。
-システム全体構成と設計方針は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
-営業業務・食品商社業務のルールは [docs/BUSINESS_RULE.md](docs/BUSINESS_RULE.md) を参照してください。
-外部API・内部API・連携仕様は [docs/API_SPEC.md](docs/API_SPEC.md) を参照してください。
-回帰バグ修正時の共通ルールは [docs/BUGFIX_RULE.md](docs/BUGFIX_RULE.md) を参照してください。
-
-営業先を探し、保存し、連絡先取得、AIメール作成、案件管理まで行うスマホファーストの営業支援Webアプリです。
-
-## 公開URL
+公開URL:
 
 ```text
 https://eigyo-techo.vercel.app/
 ```
 
+## Version
+
+Version 1.0 Release Candidate
+
+## Trial Operation
+
+1-2週間の実運用に向けたチェックリスト、既知バグ一覧、改善メモ欄、フィードバック記録、Ver1.0運用手順は以下を参照してください。
+
+- [TRIAL_OPERATION.md](docs/TRIAL_OPERATION.md)
+
 ## 主な機能
 
-- 営業先検索
-- 無料優先の企業情報補完
-- 得意先管理
-- 案件管理、パイプライン管理
-- 今日フォローすべき案件のダッシュボード
-- 企業スコアリング
-- OpenAI APIによる営業メール案生成
-- Gmail / Outlook 下書き作成のモック実装
-- Supabase同期
-- Supabase未設定またはオフライン時のLocalStorage fallback
+- Supabase Authによるメールアドレス・パスワードログイン
+- 取引先管理、顧客カルテ、担当者、名刺管理
+- 商談履歴、活動タイムライン、フォロー管理
+- 商品マスター、商品画像、資料、スペックシートのURL管理
+- 仕入先管理、海外メーカー項目
+- 見積履歴、サンプル管理、採用履歴
+- クレーム管理、通知カード、カレンダー表示
+- AIメール、AI商談準備、AI営業支援のダミー生成
+- Chrome拡張から選択した会社名を `/import?companyName=` で取り込み
+- Supabase DB / Supabase Storage連携
+- LocalStorage fallback
+- JSON Export / JSON Import
+- PCはサイドバー・テーブル中心、スマホは5タブ・カードUI
 
 ## 技術構成
 
 - React
 - Vite
-- Supabase
-- LocalStorage fallback
+- Supabase Auth
+- Supabase Database
+- Supabase Storage
+- Chrome Extension
+- Vercel
 
 ## セットアップ
 
@@ -43,7 +51,7 @@ npm install
 npm run dev
 ```
 
-ローカル起動後、以下を開きます。
+ローカルURL:
 
 ```text
 http://127.0.0.1:5173/
@@ -55,9 +63,11 @@ http://127.0.0.1:5173/
 npm run build
 ```
 
+ビルド成果物は `dist/` に生成されます。
+
 ## 環境変数
 
-`.env.example` を参考に、ローカルでは `.env` を作成してください。
+`.env.example` を参考に `.env` を作成してください。`.env` はGitHubへ上げないでください。
 
 ```text
 VITE_GOOGLE_PLACES_API_KEY=
@@ -72,114 +82,123 @@ VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_SUPABASE_ANON_KEY=
 ```
 
-重要: `.env` やAPIキー、認証情報はGitHubへコミットしないでください。
+フロントエンドに露出するVite環境変数へ秘密キーやservice role keyを入れないでください。
 
 ## Supabase
 
-Supabaseを未設定でもアプリはLocalStorageで動作します。Supabaseを利用する場合は、Vercelまたはローカルの環境変数に以下を設定します。
+Supabase未設定または接続失敗時はLocalStorage fallbackで最低限動作します。PC・スマホ同期を使う場合は、Vercel環境変数に以下を設定してください。
 
-- `VITE_SUPABASE_URL=https://rwiviwmyqguaazqyzdny.supabase.co`
+- `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY` または `VITE_SUPABASE_ANON_KEY`
 
-ブラウザアプリでは `VITE_SUPABASE_PUBLISHABLE_KEY` の利用を推奨します。どちらも設定されている場合は `VITE_SUPABASE_PUBLISHABLE_KEY` を優先します。
+推奨は `VITE_SUPABASE_PUBLISHABLE_KEY` です。両方が設定されている場合はpublishable keyを優先します。
 
-Home下部に現在の保存先が表示されます。PCとスマホで同期されない場合は、両方の端末で「保存先: Supabase」になっているか確認し、「クラウドから再読み込み」を押してください。
+### Migration
 
-### Supabase schema
+Supabase CLIを使う場合は `supabase/migrations/` を順番に適用してください。
 
-現在のアプリは `customers`, `products`, `contacts`, `suppliers`, `business_cards`, `complaints`, `samples`, `quotes`, `adoptions`, `attachments`, `mail_drafts` テーブルを使用します。
+主な対象:
 
-Supabase CLIを使う場合は [supabase/migrations](supabase/migrations) のSQLを順番に適用してください。SQL Editorで手動実行する場合も、ファイル名順に実行できます。旧一括SQLは [supabase/legacy/customers.sql](supabase/legacy/customers.sql) に退避しています。
+- extensions
+- tables
+- indexes
+- storage
+- RLS
+- functions
+- triggers
+- views
+- Step18 optimization migration
 
-`Could not find the table 'public.customers' in the schema cache` が出る場合は、テーブルがまだ作成されていません。
+SQL Editorで手動実行する場合も、ファイル名順に実行してください。既存データを消すSQLは含めない方針です。
 
-主なカラム想定は以下です。
+### Storage
 
-```sql
-create table customers (
-  id text primary key,
-  place_id text,
-  corporate_number text,
-  company_name text,
-  industry text,
-  area text,
-  address text,
-  phone text,
-  website text,
-  email text,
-  email_type text,
-  inquiry_url text,
-  status text,
-  tags jsonb,
-  memo text,
-  next_follow_up_date date,
-  is_do_not_contact boolean default false,
-  do_not_contact_reason text,
-  deal_histories jsonb,
-  proposed_products jsonb,
-  source text,
-  contact_status text,
-  last_contact_date date,
-  next_follow_date date,
-  pipeline_memo text,
-  score integer,
-  rank text,
-  score_reasons jsonb,
-  created_at timestamptz,
-  updated_at timestamptz
-);
+Storage bucket:
+
+```text
+app-attachments
 ```
 
-このSQLは初期公開確認用として `anon` に `select`, `insert`, `update`, `delete` を許可します。ログイン機能を追加する場合は、ユーザー単位のRLSポリシーへ変更してください。
-
-## Vercel公開手順
-
-1. GitHubリポジトリをVercelでimportします。
-2. Framework Preset は `Vite` を選びます。
-3. Build Command は `npm run build` のままで問題ありません。
-4. Output Directory は `dist` のままで問題ありません。
-5. Vercelの `Environment Variables` に必要な環境変数を登録します。
-6. Deployします。
-
-## API連携
-
-### Google Places
-
-`VITE_GOOGLE_PLACES_API_KEY` が未設定の場合は仮データ検索にフォールバックします。
-
-### 無料優先の企業情報補完
-
-「補完」画面では会社名を一括貼り付けできます。国税庁 法人番号APIのアプリケーションIDがある場合は正式社名、所在地、法人番号の取得を試みます。未設定でもGoogle検索URLとgBizINFO確認URLを生成し、人間が公式サイトを確認して入力できます。
-
-Google検索API、Google Mapsスクレイピング、Baseconnect自動巡回は行いません。公式サイトURLを手動入力した会社だけ、公開メールアドレスと問い合わせフォームURLの抽出を試みます。
+DBにはファイル本体ではなく、Storage URL、path、ファイル名、content type、sizeなどのメタ情報だけを保存します。
 
 ## Chrome拡張
 
-`extension/` にローカル開発用のChrome拡張があります。
+Chrome拡張は `extension/` にあります。
 
-1. 営業手帳を `http://localhost:5173/` で起動します。
-2. Chromeで `chrome://extensions` を開きます。
-3. デベロッパーモードを有効にします。
-4. `パッケージ化されていない拡張機能を読み込む` から `extension/` を選択します。
-5. 任意のWebページで会社名テキストを選択し、右クリックの「営業手帳に追加」を押します。
+使い方:
 
-拡張はユーザーが選択したテキストだけを営業手帳へ送信します。ページ全体のスクレイピングや自動巡回は行いません。
+1. Chromeで `chrome://extensions` を開く
+2. デベロッパーモードを有効化
+3. 「パッケージ化されていない拡張機能を読み込む」から `extension/` を選択
+4. 任意のWebページで会社名テキストを選択
+5. 右クリックの「営業手帳に追加」を押す
 
-### OpenAI
+送信先:
 
-`VITE_OPENAI_API_KEY` が未設定または通信エラーの場合はテンプレート生成にフォールバックします。
+```text
+https://eigyo-techo.vercel.app/import?companyName=選択した会社名
+```
 
-注意: Viteの環境変数はブラウザに露出します。本番でOpenAI APIキーを安全に扱う場合は、バックエンドAPIまたはVercel Functions経由に移行してください。
+ページ全体のスクレイピングは行いません。ユーザーが選択したテキストだけを送信します。
 
-### Gmail / Outlook
+## Vercel公開
 
-現在は下書き作成のモック実装です。自動送信は行いません。後でGoogle OAuth、Gmail API、Microsoft OAuth、Microsoft Graph APIへ差し替えられるようにサービス層を分けています。
+1. GitHubリポジトリをVercelでImport
+2. Framework Presetは `Vite`
+3. Build Commandは `npm run build`
+4. Output Directoryは `dist`
+5. Environment Variablesに必要なVite環境変数を登録
+6. Deploy
 
-## GitHubに上げないもの
+`/import` などの直接アクセスに対応するため、`vercel.json` でSPA rewriteを設定しています。
+
+## バックアップ・復元
+
+設定画面からJSON Export / JSON Importができます。
+
+- Exportはアプリ内データをJSONで保存します
+- Importは既存データを削除せず、同じIDは更新、ないIDは追加します
+- Storageのファイル本体は含めず、URLとメタ情報のみ含めます
+
+## 開発ドキュメント
+
+- [PROJECT_RULE.md](docs/PROJECT_RULE.md)
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [DATABASE.md](docs/DATABASE.md)
+- [FEATURE_SPEC.md](docs/FEATURE_SPEC.md)
+- [BUSINESS_RULE.md](docs/BUSINESS_RULE.md)
+- [API_SPEC.md](docs/API_SPEC.md)
+- [BUGFIX_RULE.md](docs/BUGFIX_RULE.md)
+- [MANUAL.md](docs/MANUAL.md)
+- [DATA_RULE.md](docs/DATA_RULE.md)
+- [ADMIN.md](docs/ADMIN.md)
+- [ROADMAP.md](docs/ROADMAP.md)
+- [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
+- [TRIAL_OPERATION.md](docs/TRIAL_OPERATION.md)
+- [CHANGELOG.md](CHANGELOG.md)
+
+今後の実装は上記ドキュメントを前提に進めます。
+
+## GitHubへ上げないもの
 
 - `.env`
 - APIキー
-- OAuthクライアントシークレット
+- OAuth secret
 - Supabase service role key
 - `node_modules`
 - `dist`
+
+## リリース確認
+
+Version1.0候補の確認項目は [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) を参照してください。
+
+### Version1.0前 安定化確認
+
+2026-07-05 時点で以下を確認済みです。
+
+- PCヘッダー検索から取引先一覧へ検索語が反映されること
+- Supabase優先同期とLocalStorageフォールバックの実装経路
+- Supabase Storageへ添付し、DBにはURLとメタ情報のみ保存する方針
+- Chrome拡張取り込み用 `/import?companyName=` のローカルHTTP 200応答
+- 在庫管理、見積PDF、経営判断ダッシュボード、顧客カルテのbuild経路
+- `npm.cmd run build` が成功すること

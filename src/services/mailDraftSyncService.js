@@ -4,7 +4,7 @@ const TABLE_NAME = 'mail_drafts';
 const STORAGE_KEY = 'eigyo-techo-mail-drafts';
 
 function canUseSupabase() {
-  return hasSupabaseConfig && Boolean(supabase) && navigator.onLine;
+  return hasSupabaseConfig && Boolean(supabase) && isOnline();
 }
 
 export function readLocalMailDrafts(customerId = '', userId = '') {
@@ -178,4 +178,8 @@ function fromSupabaseRow(row, userId = '') {
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
   }, userId);
+}
+
+function isOnline() {
+  return typeof navigator === 'undefined' ? true : navigator.onLine;
 }

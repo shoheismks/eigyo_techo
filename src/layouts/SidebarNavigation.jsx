@@ -1,3 +1,5 @@
+import { APP_VERSION_LABEL } from '../shared/constants/appMeta.js';
+
 const customerPages = [
   'Customers',
   'CustomerDetail',
@@ -21,6 +23,7 @@ const navItems = [
   { key: 'Calendar', label: 'カレンダー', helper: 'フォロー予定' },
   { key: 'Analytics', label: '分析', helper: '営業状況' },
   { key: 'Settings', label: '設定', helper: '同期・ログアウト' },
+  { key: 'Help', label: 'ヘルプ', helper: '操作マニュアル' },
 ];
 
 function activeGroupFor(page) {
@@ -30,6 +33,7 @@ function activeGroupFor(page) {
   if (page === 'Calendar') return 'Calendar';
   if (page === 'Analytics') return 'Analytics';
   if (page === 'Settings') return 'Settings';
+  if (page === 'Help') return 'Help';
   if (page === 'Pipeline') return 'Pipeline';
   return 'Home';
 }
@@ -41,6 +45,7 @@ export default function SidebarNavigation({ activePage, onNavigate, user }) {
     <aside className="sidebar-nav" aria-label="PC用メインナビゲーション">
       <div className="sidebar-brand">
         <strong>営業手帳</strong>
+        <span>{APP_VERSION_LABEL}</span>
         <span>{user?.email || 'Signed in'}</span>
       </div>
 

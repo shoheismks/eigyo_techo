@@ -10,6 +10,14 @@ import {
   parsePrice,
 } from '../hooks/useProducts.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
+import {
+  INVENTORY_STATUSES,
+  INVENTORY_TYPES,
+  INVENTORY_UNITS,
+  emptyInventory,
+  inventoryLabel,
+  normalizeInventory,
+} from '../../inventory/hooks/useInventory.js';
 
 function fileLabel(file) {
   return file?.name ? `${file.name} (${Math.ceil((file.size ?? 0) / 1024)}KB)` : '未添付';
@@ -17,6 +25,7 @@ function fileLabel(file) {
 
 export default function ProductDetail({
   product,
+  inventories = [],
   adoptions = [],
   samples = [],
   quotes = [],
@@ -27,11 +36,17 @@ export default function ProductDetail({
   updateAdoption,
   updateSample,
   updateQuote,
+  addInventory,
+  updateInventory,
+  removeInventory,
   setActivePage,
   userId = '',
 }) {
   const [form, setForm] = useState(() =>
     normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId),
+  );
+  const [inventoryForm, setInventoryForm] = useState(() =>
+    normalizeInventory({ ...emptyInventory, productId: product?.id ?? '', userId }, userId),
   );
   const [uploadingField, setUploadingField] = useState('');
   const [uploadError, setUploadError] = useState('');
@@ -41,9 +56,28 @@ export default function ProductDetail({
     setForm(normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId));
   }, [product, userId]);
 
+  useEffect(() => {
+    setInventoryForm(normalizeInventory({
+      ...emptyInventory,
+      productId: product?.id ?? '',
+      userId,
+    }, userId));
+  }, [product?.id, userId]);
+
   const grossMarginRate = useMemo(
     () => calculateGrossMarginRate(form.costPrice, form.desiredSellingPrice),
     [form.costPrice, form.desiredSellingPrice],
+  );
+  const relatedInventories = useMemo(
+    () =>
+      inventories
+        .filter((inventory) => inventory.productId === form.id)
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))),
+    [form.id, inventories],
+  );
+  const relatedInventoryIds = useMemo(
+    () => new Set(relatedInventories.map((inventory) => inventory.id)),
+    [relatedInventories],
   );
   const relatedSamples = useMemo(
     () =>
@@ -59,13 +93,17 @@ export default function ProductDetail({
   const relatedQuotes = useMemo(
     () =>
       quotes
-        .filter((quote) => (quote.productIds ?? []).includes(form.id))
+        .filter(
+          (quote) =>
+            (quote.productIds ?? []).includes(form.id) ||
+            (quote.inventoryIds ?? []).some((id) => relatedInventoryIds.has(id)),
+        )
         .sort((a, b) =>
           String(b.submittedDate || b.createdAt || '').localeCompare(
             String(a.submittedDate || a.createdAt || ''),
           ),
         ),
-    [form.id, quotes],
+    [form.id, quotes, relatedInventoryIds],
   );
   const relatedAdoptions = useMemo(
     () =>
@@ -100,6 +138,24 @@ export default function ProductDetail({
         .map((tag) => tag.trim())
         .filter(Boolean),
     );
+  }
+
+  function updateInventoryField(field, value) {
+    setInventoryForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleAddInventory(event) {
+    event.preventDefault();
+    if (!addInventory || isNew) {
+      return;
+    }
+
+    addInventory(normalizeInventory({
+      ...inventoryForm,
+      productId: form.id,
+      userId,
+    }, userId));
+    setInventoryForm(normalizeInventory({ ...emptyInventory, productId: form.id, userId }, userId));
   }
 
   async function handleFile(field, file) {
@@ -336,6 +392,177 @@ export default function ProductDetail({
               <strong>{grossMarginRate || '-'}</strong>
             </div>
           </div>
+        </section>
+
+        <section className="detail-section">
+          <div className="section-heading">
+            <h2>在庫・仕入</h2>
+            <span className="info-badge">{relatedInventories.length}件</span>
+          </div>
+
+          {isNew ? (
+            <p className="inline-helper">商品を保存すると、この商品に複数の在庫を登録できます。</p>
+          ) : (
+            <form className="sample-form" onSubmit={handleAddInventory}>
+              <div className="date-grid">
+                <label className="field-label">
+                  コスト
+                  <input inputMode="decimal" value={inventoryForm.cost} placeholder="例: 800" onChange={(event) => updateInventoryField('cost', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  通貨
+                  <input value={inventoryForm.currency} placeholder="JPY" onChange={(event) => updateInventoryField('currency', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  数量
+                  <input inputMode="decimal" value={inventoryForm.quantity} placeholder="例: 100" onChange={(event) => updateInventoryField('quantity', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  単位
+                  <select value={inventoryForm.unit} onChange={(event) => updateInventoryField('unit', event.target.value)}>
+                    {INVENTORY_UNITS.map((unit) => <option key={unit}>{unit}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div className="date-grid">
+                <label className="field-label">
+                  現物/先物
+                  <select value={inventoryForm.stockType} onChange={(event) => updateInventoryField('stockType', event.target.value)}>
+                    {INVENTORY_TYPES.map((type) => <option key={type}>{type}</option>)}
+                  </select>
+                </label>
+                <label className="field-label">
+                  所有者
+                  <input value={inventoryForm.owner} placeholder="例: 自社 / 仕入先 / 顧客予約" onChange={(event) => updateInventoryField('owner', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  在庫ステータス
+                  <select value={inventoryForm.inventoryStatus} onChange={(event) => updateInventoryField('inventoryStatus', event.target.value)}>
+                    {INVENTORY_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </label>
+                <label className="field-label">
+                  仕入先
+                  <select value={inventoryForm.supplierId} onChange={(event) => updateInventoryField('supplierId', event.target.value)}>
+                    <option value="">未選択</option>
+                    {suppliers.map((supplier) => (
+                      <option value={supplier.id} key={supplier.id}>
+                        {supplier.name || supplier.companyName || '仕入先名未設定'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="date-grid">
+                <label className="field-label">
+                  ファーム期限
+                  <input type="date" value={inventoryForm.firmDeadline} onChange={(event) => updateInventoryField('firmDeadline', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  ETA
+                  <input type="date" value={inventoryForm.eta} onChange={(event) => updateInventoryField('eta', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  LOT
+                  <input value={inventoryForm.lot} onChange={(event) => updateInventoryField('lot', event.target.value)} />
+                </label>
+                <label className="field-label">
+                  賞味期限
+                  <input type="date" value={inventoryForm.expiryDate} onChange={(event) => updateInventoryField('expiryDate', event.target.value)} />
+                </label>
+              </div>
+
+              <label className="field-label">
+                メモ
+                <textarea value={inventoryForm.memo} onChange={(event) => updateInventoryField('memo', event.target.value)} />
+              </label>
+
+              <button className="primary-button" type="submit">在庫を追加</button>
+            </form>
+          )}
+
+          {relatedInventories.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {relatedInventories.map((inventory) => {
+                const supplier = suppliers.find((item) => item.id === inventory.supplierId);
+                return (
+                  <article className="karte-mini-card" key={inventory.id}>
+                    <div className="history-meta">
+                      <span>{inventoryLabel(inventory, form, supplier)}</span>
+                      <small>{inventory.stockType}</small>
+                    </div>
+                    <div className="lead-badges">
+                      <span className="info-badge ready">{inventory.inventoryStatus}</span>
+                      {inventory.firmDeadline && <span className="info-badge">ファーム {inventory.firmDeadline}</span>}
+                      {inventory.eta && <span className="info-badge">ETA {inventory.eta}</span>}
+                      {inventory.expiryDate && <span className="info-badge">賞味 {inventory.expiryDate}</span>}
+                    </div>
+                    <dl className="company-details">
+                      <div><dt>コスト</dt><dd>{formatPrice(inventory.cost) || '-'} {inventory.currency}/{inventory.unit}</dd></div>
+                      <div><dt>数量</dt><dd>{inventory.quantity || '-'} {inventory.unit}</dd></div>
+                      <div><dt>所有者</dt><dd>{inventory.owner || '-'}</dd></div>
+                      <div><dt>LOT</dt><dd>{inventory.lot || '-'}</dd></div>
+                    </dl>
+                    <label className="field-label">
+                      在庫ステータス
+                      <select value={inventory.inventoryStatus} onChange={(event) => updateInventory?.(inventory.id, { inventoryStatus: event.target.value })}>
+                        {INVENTORY_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
+                    <div className="date-grid">
+                      <label className="field-label">
+                        コスト
+                        <input inputMode="decimal" value={inventory.cost} onChange={(event) => updateInventory?.(inventory.id, { cost: event.target.value })} />
+                      </label>
+                      <label className="field-label">
+                        数量
+                        <input inputMode="decimal" value={inventory.quantity} onChange={(event) => updateInventory?.(inventory.id, { quantity: event.target.value })} />
+                      </label>
+                      <label className="field-label">
+                        所有者
+                        <input value={inventory.owner || ''} onChange={(event) => updateInventory?.(inventory.id, { owner: event.target.value })} />
+                      </label>
+                      <label className="field-label">
+                        LOT
+                        <input value={inventory.lot || ''} onChange={(event) => updateInventory?.(inventory.id, { lot: event.target.value })} />
+                      </label>
+                    </div>
+                    <div className="date-grid">
+                      <label className="field-label">
+                        ファーム期限
+                        <input type="date" value={inventory.firmDeadline || ''} onChange={(event) => updateInventory?.(inventory.id, { firmDeadline: event.target.value })} />
+                      </label>
+                      <label className="field-label">
+                        ETA
+                        <input type="date" value={inventory.eta || ''} onChange={(event) => updateInventory?.(inventory.id, { eta: event.target.value })} />
+                      </label>
+                      <label className="field-label">
+                        賞味期限
+                        <input type="date" value={inventory.expiryDate || ''} onChange={(event) => updateInventory?.(inventory.id, { expiryDate: event.target.value })} />
+                      </label>
+                      <label className="field-label">
+                        現物/先物
+                        <select value={inventory.stockType || '現物'} onChange={(event) => updateInventory?.(inventory.id, { stockType: event.target.value })}>
+                          {INVENTORY_TYPES.map((type) => <option key={type}>{type}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <label className="field-label">
+                      メモ
+                      <textarea value={inventory.memo || ''} onChange={(event) => updateInventory?.(inventory.id, { memo: event.target.value })} />
+                    </label>
+                    <button className="ghost-button danger" type="button" onClick={() => removeInventory?.(inventory.id)}>
+                      在庫を削除
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            !isNew && <p className="inline-helper">この商品の在庫はまだ登録されていません。</p>
+          )}
         </section>
 
         <section className="detail-section">

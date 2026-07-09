@@ -1,24 +1,24 @@
 .bottom-nav {
   position: fixed;
   left: 50%;
-  bottom: 12px;
+  bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 10;
-  width: min(calc(100% - 24px), 496px);
+  width: min(calc(100% - 18px), 496px);
   transform: translateX(-50%);
   display: flex;
   overflow-x: auto;
-  gap: 6px;
+  gap: 5px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(7, 11, 19, 0.92);
-  padding: 8px;
+  padding: 7px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
 
 .bottom-nav button {
   min-width: 64px;
-  min-height: 54px;
+  min-height: 58px;
   display: grid;
   place-items: center;
   gap: 2px;
@@ -26,8 +26,13 @@
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 900;
+}
+
+.bottom-nav button:focus-visible {
+  outline: 3px solid rgba(102, 163, 255, 0.42);
+  outline-offset: 2px;
 }
 
 .bottom-nav::-webkit-scrollbar {
@@ -273,8 +278,8 @@
   }
 
   .bottom-nav button {
-    min-height: 50px;
-    font-size: 0.55rem;
+    min-height: 54px;
+    font-size: 0.6rem;
   }
 
   .bottom-nav button span {
@@ -321,7 +326,7 @@
 }
 
 .bottom-nav button span {
-  font-size: 1.18rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 
@@ -491,22 +496,24 @@ body,
 
 .add-action-menu {
   width: min(100%, 520px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   display: grid;
-  gap: 16px;
+  gap: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(17, 26, 43, 0.98), rgba(7, 11, 19, 0.98));
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
 }
 
 .add-action-grid {
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .add-action-button {
-  min-height: 66px;
+  min-height: 76px;
   display: grid;
   gap: 4px;
   border: 1px solid var(--line);
@@ -515,6 +522,21 @@ body,
   color: var(--text);
   padding: 12px;
   text-align: left;
+}
+
+.add-action-heading {
+  align-items: flex-start;
+}
+
+.add-action-button.primary-action {
+  border-color: rgba(102, 163, 255, 0.58);
+  background: rgba(40, 120, 255, 0.14);
+}
+
+.add-action-button:hover,
+.add-action-button:focus-visible {
+  border-color: rgba(102, 163, 255, 0.5);
+  background: rgba(40, 120, 255, 0.12);
 }
 
 .add-action-button strong {
@@ -544,11 +566,135 @@ body,
 }
 
 .bottom-nav .add-tab span {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   background: var(--blue);
   box-shadow: 0 10px 24px rgba(40, 120, 255, 0.35);
+}
+
+.mobile-field-panel {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .page {
+    padding: 16px 12px calc(110px + env(safe-area-inset-bottom));
+  }
+
+  .page-header,
+  .search-panel,
+  .mail-builder,
+  .detail-section,
+  .product-card,
+  .company-card,
+  .pipeline-card,
+  .empty-state {
+    padding: 14px;
+  }
+
+  .page-header {
+    margin-bottom: 12px;
+  }
+
+  .page-header h1,
+  .hero-panel h1 {
+    font-size: 1.72rem;
+    line-height: 1.12;
+  }
+
+  .field-label {
+    gap: 7px;
+    font-size: 0.86rem;
+  }
+
+  input,
+  select {
+    min-height: 54px;
+    font-size: 1rem;
+  }
+
+  textarea {
+    min-height: 132px;
+    font-size: 1rem;
+  }
+
+  .mobile-field-panel {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(102, 163, 255, 0.28);
+    border-radius: 8px;
+    background: rgba(40, 120, 255, 0.08);
+    padding: 12px;
+  }
+
+  .pipeline-mobile-controls {
+    position: sticky;
+    top: 52px;
+    z-index: 5;
+    backdrop-filter: blur(14px);
+  }
+
+  .pipeline-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .pipeline-count {
+    min-height: 66px;
+    padding: 12px;
+  }
+
+  .pipeline-board {
+    gap: 18px;
+  }
+
+  .pipeline-lane-heading {
+    position: sticky;
+    top: 178px;
+    z-index: 4;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(7, 11, 19, 0.92);
+    padding: 10px 12px;
+    backdrop-filter: blur(12px);
+  }
+
+  .pipeline-card textarea {
+    min-height: 150px;
+  }
+
+  .card-actions {
+    gap: 8px;
+  }
+
+  .card-actions button,
+  .mail-action-row .ghost-button,
+  .karte-header-actions .primary-button,
+  .karte-header-actions .ghost-button {
+    min-height: 48px;
+  }
+
+  .file-field {
+    border-color: rgba(102, 163, 255, 0.42);
+    background: rgba(40, 120, 255, 0.1);
+  }
+
+  .file-field input[type='file'] {
+    min-height: 52px;
+    padding: 12px;
+  }
+
+  .karte-header {
+    top: 48px;
+    gap: 10px;
+  }
+
+  .tutorial-actions {
+    grid-template-columns: 1fr;
+  }
 }

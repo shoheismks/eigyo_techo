@@ -132,3 +132,92 @@ OpenAI APIは以下のAI機能に利用する。
 - insert/update/delete後は必要に応じて再取得する。
 - APIレスポンス形式はservice層でアプリ内部形式へ変換する。
 - 外部APIへの依存をUIから切り離し、モック・フォールバック・本番APIを差し替えやすくする。
+
+---
+
+## Step26 追記: inventory module / quotePdfService / dashboardService
+
+### inventory module
+
+在庫管理はまず内部サービスとして実装し、将来の外部在庫システム連携に備える。
+
+- 対象:
+  - 商品在庫
+  - ロット
+  - 賞味期限
+  - 入荷予定
+  - 欠品・残少
+  - 取扱停止
+- 外部API:
+  - 初期実装では未接続。
+  - 将来、ERP / WMS / 仕入先CSV / EDI へ拡張可能にする。
+- API設計方針:
+  - UIに在庫判定ロジックを直書きしない。
+  - 在庫ステータス判定はサービス層に分離する。
+  - 在庫更新は監査ログを残せる構成にする。
+
+### quotePdfService
+
+`quotePdfService` は見積PDF生成を担当する内部サービスである。
+
+- 入力:
+  - customer
+  - contacts
+  - quote
+  - products
+  - supplier
+  - company settings
+- 出力:
+  - PDF file
+  - `pdf_url`
+  - `pdf_storage_path`
+  - `pdf_file_name`
+  - `pdf_generated_at`
+  - `pdf_version`
+- 保存:
+  - PDF本体はSupabase Storage。
+  - DBにはURLとメタ情報のみ保存。
+- 注意:
+  - 自動送信は禁止。
+  - ユーザー確認後にダウンロード、共有、メール添付へ進む。
+  - 将来、Edge Functionsでサーバー側PDF生成へ移行可能にする。
+
+### dashboardService
+
+`dashboardService` は営業データ集約を担当する内部サービスである。
+
+- 集約対象:
+  - customers
+  - contacts
+  - deal_histories
+  - quotes
+  - samples
+  - claims
+  - products
+  - suppliers
+  - inventories
+  - adoptions
+- 出力:
+  - KPIカード
+  - ステータス別件数
+  - 見積金額
+  - 粗利率
+  - フォロー期限
+  - 在庫リスク
+  - クレーム未対応
+- 方針:
+  - UIコンポーネントに集計式を分散させない。
+  - 初期はフロント側集計でよい。
+  - データ量が増えたらSupabase View / RPC / Edge Functionsへ移行する。
+  - 集計失敗時も元データを壊さない。
+
+### Storage 方針追加
+
+- 見積PDF:
+  - `quote-pdfs` bucket または `app-attachments/quotes/` に保存。
+- 在庫関連資料:
+  - `app-attachments/inventory/` に保存。
+- 経営レポート:
+  - `app-attachments/reports/` に保存。
+
+Storageに保存したファイル本体は一覧画面で読み込まず、DBのURLとメタ情報のみ表示する。

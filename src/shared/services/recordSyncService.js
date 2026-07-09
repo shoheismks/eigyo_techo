@@ -1,7 +1,7 @@
 import { hasSupabaseConfig, supabase } from '../../lib/supabase.js';
 
 export function canUseCloud() {
-  return hasSupabaseConfig && Boolean(supabase) && navigator.onLine;
+  return hasSupabaseConfig && Boolean(supabase) && isOnline();
 }
 
 export function hasCloudConfig() {
@@ -78,7 +78,7 @@ export function getLocalSyncReason(fallback = '') {
     return 'Supabase設定がないため、LocalStorageバックアップで動作しています。';
   }
 
-  if (!navigator.onLine) {
+  if (!isOnline()) {
     return 'オフラインのため、LocalStorageバックアップで動作しています。';
   }
 
@@ -87,4 +87,8 @@ export function getLocalSyncReason(fallback = '') {
 
 function getTime(record) {
   return new Date(record.updatedAt ?? record.updated_at ?? record.createdAt ?? record.created_at ?? 0).getTime();
+}
+
+function isOnline() {
+  return typeof navigator === 'undefined' ? true : navigator.onLine;
 }

@@ -22,6 +22,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
   const [temperatureFilter, setTemperatureFilter] = useState(ALL);
   const [manufacturerFilter, setManufacturerFilter] = useState(ALL);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedPreviewId, setSelectedPreviewId] = useState('');
 
   const manufacturers = useMemo(
     () => uniqueValues(products, 'manufacturerName'),
@@ -57,6 +58,9 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
   }, [categoryFilter, keyword, manufacturerFilter, products, temperatureFilter]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
+  const selectedPreviewProduct =
+    visibleProducts.find((product) => product.id === selectedPreviewId) ||
+    visibleProducts[0];
 
   function resetPaging(handler) {
     return (event) => {
@@ -135,7 +139,9 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
 
         {visibleProducts.length > 0 ? (
           <>
-            <div className="desktop-table products-table">
+            <div className="desktop-workbench products-workbench">
+              <div className="desktop-table-pane">
+                <div className="desktop-table products-table">
               <div className="desktop-table-head">
                 <span>商品名</span>
                 <span>カテゴリー</span>
@@ -150,7 +156,16 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
                 <span>操作</span>
               </div>
               {visibleProducts.map((product) => (
-                <div className="desktop-table-row" key={product.id}>
+                <div
+                  className={`desktop-table-row ${selectedPreviewProduct?.id === product.id ? 'selected' : ''}`}
+                  key={product.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedPreviewId(product.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') setSelectedPreviewId(product.id);
+                  }}
+                >
                   <strong>{product.name}</strong>
                   <span>{product.category || '-'}</span>
                   <span>{product.manufacturerName || '-'}</span>
@@ -167,12 +182,50 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
                       product.specSheetFile && 'スペック',
                     ].filter(Boolean).join(', ') || 'なし'}
                   </span>
-                  <span className="table-actions">
+                  <span className="table-actions" onClick={(event) => event.stopPropagation()}>
                     <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>編集</button>
                     <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>削除</button>
                   </span>
                 </div>
               ))}
+                </div>
+              </div>
+
+              {selectedPreviewProduct && (
+                <aside className="desktop-detail-preview">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Preview</p>
+                      <h2>{selectedPreviewProduct.name}</h2>
+                    </div>
+                    <span className="status-pill active">{selectedPreviewProduct.temperatureZone || '-'}</span>
+                  </div>
+                  {selectedPreviewProduct.imageFile?.url ? (
+                    <img
+                      className="product-preview-image"
+                      loading="lazy"
+                      src={selectedPreviewProduct.imageFile.url}
+                      alt={`${selectedPreviewProduct.name}の商品画像`}
+                    />
+                  ) : (
+                    <div className="product-thumb placeholder desktop-preview-thumb">No Image</div>
+                  )}
+                  <dl className="company-details">
+                    <div><dt>カテゴリー</dt><dd>{selectedPreviewProduct.category || '-'}</dd></div>
+                    <div><dt>メーカー</dt><dd>{selectedPreviewProduct.manufacturerName || '-'}</dd></div>
+                    <div><dt>産地</dt><dd>{selectedPreviewProduct.origin || '-'}</dd></div>
+                    <div><dt>荷姿</dt><dd>{selectedPreviewProduct.packageStyle || '-'}</dd></div>
+                    <div><dt>原価</dt><dd>{formatPrice(selectedPreviewProduct.costPrice) || '-'}</dd></div>
+                    <div><dt>希望価格</dt><dd>{formatPrice(selectedPreviewProduct.desiredSellingPrice) || '-'}</dd></div>
+                    <div><dt>粗利率</dt><dd>{selectedPreviewProduct.grossMarginRate || '-'}</dd></div>
+                  </dl>
+                  <p className="inline-helper">{selectedPreviewProduct.memo || selectedPreviewProduct.description || 'メモは未登録です。'}</p>
+                  <div className="card-actions">
+                    <button className="primary-button" onClick={() => onOpenProductDetail(selectedPreviewProduct.id)}>詳細編集</button>
+                    <button className="ghost-button danger" onClick={() => removeProduct(selectedPreviewProduct.id)}>削除</button>
+                  </div>
+                </aside>
+              )}
             </div>
 
             <div className="card-list-mobile">

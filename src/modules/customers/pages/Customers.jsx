@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import CompanyCard from '../../../components/CompanyCard.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import CompanyCard from '../../../shared/components/CompanyCard.jsx';
 import { discoverContactInfo } from '../services/contactDiscoveryService.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 
@@ -29,6 +29,7 @@ export default function Customers({
   customers,
   updateCustomer,
   removeCustomer,
+  initialSearchQuery = '',
   onOpenDetail,
   onOpenKarte,
   onOpenPipeline,
@@ -43,8 +44,16 @@ export default function Customers({
   const [followFilter, setFollowFilter] = useState(ALL);
   const [sortMode, setSortMode] = useState('created');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedPreviewId, setSelectedPreviewId] = useState('');
   const [loadingCustomerId, setLoadingCustomerId] = useState('');
   const [contactErrors, setContactErrors] = useState({});
+
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
+      setVisibleCount(PAGE_SIZE);
+    }
+  }, [initialSearchQuery]);
 
   const tagOptions = useMemo(
     () => [
@@ -122,6 +131,15 @@ export default function Customers({
   ]);
 
   const visibleCustomers = filteredCustomers.slice(0, visibleCount);
+  const selectedPreviewCustomer =
+    visibleCustomers.find((customer) => customer.id === selectedPreviewId) ||
+    visibleCustomers[0];
+
+  useEffect(() => {
+    if (visibleCustomers.length > 0 && !visibleCustomers.some((customer) => customer.id === selectedPreviewId)) {
+      setSelectedPreviewId(visibleCustomers[0].id);
+    }
+  }, [selectedPreviewId, visibleCustomers]);
 
   async function handleDiscoverContact(customer) {
     setLoadingCustomerId(customer.id);
@@ -225,7 +243,7 @@ export default function Customers({
         </label>
       </section>
 
-      <section className="result-stack">
+      <section className="result-stack customers-list-section">
         <div className="section-heading">
           <h2>営業手帳</h2>
           <span>{filteredCustomers.length}件</span>
@@ -233,7 +251,60 @@ export default function Customers({
 
         {visibleCustomers.length > 0 ? (
           <>
-            <div className="desktop-table customers-table">
+            <div className="customers-desktop-table-shell">
+              <table className="customers-desktop-table">
+                <thead>
+                  <tr>
+                    <th>会社名</th>
+                    <th>業種</th>
+                    <th>地域</th>
+                    <th>重要度</th>
+                    <th>ステータス</th>
+                    <th>次回フォロー</th>
+                    <th>担当者</th>
+                    <th>タグ</th>
+                    <th>クレーム</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleCustomers.map((customer) => (
+                    <tr
+                      className={`${selectedPreviewCustomer?.id === customer.id ? 'selected' : ''} ${customer.isDoNotContact ? 'ng-row' : ''}`}
+                      key={customer.id}
+                      onClick={() => setSelectedPreviewId(customer.id)}
+                    >
+                      <td><strong>{customer.companyName}</strong></td>
+                      <td>{customer.industry || '-'}</td>
+                      <td>{customer.area || '-'}</td>
+                      <td>
+                        <strong>{customer.customerRank || customer.rank || 'D'}</strong>
+                        <small>{customer.score ?? 0}</small>
+                      </td>
+                      <td>{customer.status || '-'}</td>
+                      <td className={isOverdue(customer) ? 'danger' : ''}>{followDate(customer) || '-'}</td>
+                      <td>{customer.contactName || customer.contactPerson || '-'}</td>
+                      <td>{(customer.tags ?? []).slice(0, 3).join(', ') || '-'}</td>
+                      <td>{hasComplaint(customer) ? 'あり' : 'なし'}</td>
+                      <td onClick={(event) => event.stopPropagation()}>
+                        <div className="customers-desktop-actions">
+                          <button type="button" className="ghost-button" onClick={() => onOpenKarte(customer.id)}>カルテ</button>
+                          <button type="button" className="ghost-button" onClick={() => onOpenDetail(customer.id)}>編集</button>
+                          <button type="button" className="ghost-button" onClick={onOpenPipeline}>商談</button>
+                          {!customer.isDoNotContact && (
+                            <button type="button" className="ghost-button" onClick={onCreateMail}>メール</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="legacy-customers-workbench" aria-hidden="true">
+              <div className="desktop-table-pane customers-table-scroll">
+                <div className="desktop-table customers-table">
               <div className="desktop-table-head">
                 <span>会社名</span>
                 <span>業種</span>
@@ -250,7 +321,16 @@ export default function Customers({
 
               {visibleCustomers.map((customer) => {
                 return (
-                  <div className={`desktop-table-row ${customer.isDoNotContact ? 'ng-row' : ''}`} key={customer.id}>
+                  <div
+                    className={`desktop-table-row ${selectedPreviewCustomer?.id === customer.id ? 'selected' : ''} ${customer.isDoNotContact ? 'ng-row' : ''}`}
+                    key={customer.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedPreviewId(customer.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') setSelectedPreviewId(customer.id);
+                    }}
+                  >
                     <strong>{customer.companyName}</strong>
                     <span>{customer.industry || '-'}</span>
                     <span>{customer.area || '-'}</span>
@@ -264,7 +344,7 @@ export default function Customers({
                     <span>{customer.lastContactDate || '-'}</span>
                     <span>{hasComplaint(customer) ? 'あり' : 'なし'}</span>
                     <span>{(customer.tags ?? []).slice(0, 3).join(', ') || '-'}</span>
-                    <span className="table-actions">
+                    <span className="table-actions" onClick={(event) => event.stopPropagation()}>
                       <button type="button" className="ghost-button" onClick={() => onOpenKarte(customer.id)}>カルテ</button>
                       <button type="button" className="ghost-button" onClick={() => onOpenDetail(customer.id)}>編集</button>
                       <button type="button" className="ghost-button" onClick={onOpenPipeline}>商談</button>
@@ -275,6 +355,46 @@ export default function Customers({
                   </div>
                 );
               })}
+                </div>
+              </div>
+
+              {selectedPreviewCustomer && (
+                <aside className="desktop-detail-preview">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Preview</p>
+                      <h2>{selectedPreviewCustomer.companyName}</h2>
+                    </div>
+                    <span className="status-pill active">{selectedPreviewCustomer.status || '-'}</span>
+                  </div>
+                  <div className="score-panel">
+                    <div>
+                      <span>Rank</span>
+                      <strong>{selectedPreviewCustomer.customerRank || selectedPreviewCustomer.rank || 'D'}</strong>
+                    </div>
+                    <div>
+                      <span>Score</span>
+                      <strong>{selectedPreviewCustomer.score ?? 0}</strong>
+                    </div>
+                  </div>
+                  <dl className="company-details">
+                    <div><dt>業種</dt><dd>{selectedPreviewCustomer.industry || '-'}</dd></div>
+                    <div><dt>地域</dt><dd>{selectedPreviewCustomer.area || '-'}</dd></div>
+                    <div><dt>次回</dt><dd className={isOverdue(selectedPreviewCustomer) ? 'danger' : ''}>{followDate(selectedPreviewCustomer) || '-'}</dd></div>
+                    <div><dt>最終</dt><dd>{selectedPreviewCustomer.lastContactDate || '-'}</dd></div>
+                    <div><dt>電話</dt><dd>{selectedPreviewCustomer.phone || '-'}</dd></div>
+                    <div><dt>メール</dt><dd>{selectedPreviewCustomer.email || '-'}</dd></div>
+                  </dl>
+                  <p className="inline-helper">{selectedPreviewCustomer.pipelineMemo || selectedPreviewCustomer.memo || selectedPreviewCustomer.companyNote || 'メモは未登録です。'}</p>
+                  <div className="card-actions">
+                    <button type="button" className="primary-button" onClick={() => onOpenKarte(selectedPreviewCustomer.id)}>カルテ</button>
+                    <button type="button" className="ghost-button" onClick={() => onOpenDetail(selectedPreviewCustomer.id)}>編集</button>
+                    {!selectedPreviewCustomer.isDoNotContact && (
+                      <button type="button" className="ghost-button" onClick={onCreateMail}>メール</button>
+                    )}
+                  </div>
+                </aside>
+              )}
             </div>
 
             <div className="card-list-mobile">

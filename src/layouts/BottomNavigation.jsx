@@ -14,11 +14,11 @@ const pipelinePages = ['Pipeline'];
 const productPages = ['Products', 'ProductDetail'];
 
 const tabs = [
-  { key: 'Home', label: 'ホーム', icon: 'H' },
-  { key: 'Customers', label: '取引先', icon: 'C' },
-  { key: 'Add', label: '＋追加', icon: '+' },
-  { key: 'Pipeline', label: '案件', icon: 'P' },
-  { key: 'Products', label: '商品', icon: 'B' },
+  { key: 'Home', label: 'ホーム', icon: '⌂' },
+  { key: 'Customers', label: '取引先', icon: '□' },
+  { key: 'Add', label: '追加', icon: '+' },
+  { key: 'Pipeline', label: '案件', icon: '◇' },
+  { key: 'Products', label: '商品', icon: '▣' },
 ];
 
 function activeTabFor(page) {

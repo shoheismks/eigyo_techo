@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import CompanyCard from '../../../components/CompanyCard.jsx';
+import CompanyCard from '../../../shared/components/CompanyCard.jsx';
 import { getFallbackAreas, searchPlaces } from '../services/placesService.js';
 import { calculateCompanyScore } from '../services/scoringService.js';
 
