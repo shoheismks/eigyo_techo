@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import DesktopTable from '../shared/components/DesktopTable.jsx';
 import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
+
+const ALL = 'すべて';
 
 const statusLabels = {
   未接触: 'gray',
@@ -17,7 +20,7 @@ function followDate(customer) {
 
 export default function Pipeline({ customers, updateCustomer }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '');
-  const [statusFilter, setStatusFilter] = useState('すべて');
+  const [statusFilter, setStatusFilter] = useState(ALL);
   const [keyword, setKeyword] = useState('');
 
   const counts = PIPELINE_STATUSES.reduce((summary, status) => {
@@ -28,7 +31,7 @@ export default function Pipeline({ customers, updateCustomer }) {
   const filteredCustomers = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
     return customers
-      .filter((customer) => statusFilter === 'すべて' || customer.status === statusFilter)
+      .filter((customer) => statusFilter === ALL || customer.status === statusFilter)
       .filter((customer) => {
         if (!normalizedKeyword) return true;
         return [
@@ -48,6 +51,16 @@ export default function Pipeline({ customers, updateCustomer }) {
     filteredCustomers[0] ||
     customers[0];
 
+  const desktopColumns = useMemo(
+    () => [
+      { key: 'companyName', label: '会社名', width: '32%', render: (customer) => <strong>{customer.companyName}</strong> },
+      { key: 'status', label: '状況', minWidth: '110px', render: (customer) => customer.status || '-' },
+      { key: 'follow', label: '次回', minWidth: '120px', render: (customer) => followDate(customer) || '-' },
+      { key: 'score', label: 'スコア', minWidth: '80px', render: (customer) => customer.score ?? 0 },
+    ],
+    [],
+  );
+
   return (
     <main className="page pipeline-page">
       <section className="page-header">
@@ -62,7 +75,7 @@ export default function Pipeline({ customers, updateCustomer }) {
         {PIPELINE_STATUSES.map((status) => (
           <button
             type="button"
-            className={`pipeline-count ${statusLabels[status]} ${statusFilter === status ? 'selected' : ''}`}
+            className={`pipeline-count ${statusLabels[status] || 'gray'} ${statusFilter === status ? 'selected' : ''}`}
             key={status}
             onClick={() => setStatusFilter(status)}
           >
@@ -75,12 +88,12 @@ export default function Pipeline({ customers, updateCustomer }) {
       <section className="mobile-field-panel pipeline-mobile-controls" aria-label="スマホ用案件検索">
         <label className="field-label">
           会社名・メモ検索
-          <input value={keyword} placeholder="現場で会社名やメモを検索" onChange={(event) => setKeyword(event.target.value)} />
+          <input value={keyword} placeholder="会社名やメモを検索" onChange={(event) => setKeyword(event.target.value)} />
         </label>
         <label className="field-label">
           ステータス
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            {['すべて', ...PIPELINE_STATUSES].map((status) => (
+            {[ALL, ...PIPELINE_STATUSES].map((status) => (
               <option key={status}>{status}</option>
             ))}
           </select>
@@ -97,34 +110,21 @@ export default function Pipeline({ customers, updateCustomer }) {
             <label className="field-label">
               ステータス
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                {['すべて', ...PIPELINE_STATUSES].map((status) => (
+                {[ALL, ...PIPELINE_STATUSES].map((status) => (
                   <option key={status}>{status}</option>
                 ))}
               </select>
             </label>
           </div>
 
-          <div className="desktop-table pipeline-history-table">
-            <div className="desktop-table-head">
-              <span>会社名</span>
-              <span>状況</span>
-              <span>次回</span>
-              <span>スコア</span>
-            </div>
-            {filteredCustomers.map((customer) => (
-              <button
-                type="button"
-                className={`desktop-table-row row-button ${selectedCustomer?.id === customer.id ? 'selected' : ''}`}
-                key={customer.id}
-                onClick={() => setSelectedCustomerId(customer.id)}
-              >
-                <strong>{customer.companyName}</strong>
-                <span>{customer.status || '-'}</span>
-                <span>{followDate(customer) || '-'}</span>
-                <span>{customer.score ?? 0}</span>
-              </button>
-            ))}
-          </div>
+          <DesktopTable
+            className="pipeline-common-table"
+            columns={desktopColumns}
+            minWidth={620}
+            onRowClick={(customer) => setSelectedCustomerId(customer.id)}
+            rows={filteredCustomers}
+            selectedRowId={selectedCustomer?.id}
+          />
         </aside>
 
         <section className="pipeline-detail-pane">
@@ -149,7 +149,7 @@ export default function Pipeline({ customers, updateCustomer }) {
             <section className="pipeline-lane" key={status}>
               <div className="pipeline-lane-heading">
                 <h2>
-                  <span className={`pipeline-dot ${statusLabels[status]}`} />
+                  <span className={`pipeline-dot ${statusLabels[status] || 'gray'}`} />
                   {status}
                 </h2>
                 <span>{items.length}件</span>
@@ -187,7 +187,7 @@ function PipelineDetail({ customer, updateCustomer }) {
   }
 
   return (
-    <article className={`pipeline-card ${statusLabels[customer.status]}`}>
+    <article className={`pipeline-card ${statusLabels[customer.status] || 'gray'}`}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">Deal Detail</p>
@@ -293,7 +293,7 @@ function PipelineCard({ customer, updateCustomer }) {
   }
 
   return (
-    <article className={`pipeline-card ${statusLabels[customer.status]}`} key={customer.id}>
+    <article className={`pipeline-card ${statusLabels[customer.status] || 'gray'}`} key={customer.id}>
       <div className="pipeline-card-heading">
         <h3>{customer.companyName}</h3>
         <p>{customer.industry || '業種未設定'} / {customer.area || 'エリア未設定'}</p>

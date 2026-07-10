@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 
 const emptyForm = {
   customerId: '',
@@ -40,6 +41,30 @@ export default function Contacts({ contacts, customers, addContact, updateContac
       ].some((value) => includesText(value, normalizedKeyword));
     });
   }, [contacts, keyword]);
+
+  const desktopColumns = useMemo(
+    () => [
+      { key: 'name', label: '氏名', width: '16%', render: (contact) => <strong>{contact.name}</strong> },
+      { key: 'companyName', label: '会社名', minWidth: '150px', render: (contact) => contact.companyName || '-' },
+      { key: 'department', label: '部署', minWidth: '120px', render: (contact) => contact.department || '-' },
+      { key: 'role', label: '役職', minWidth: '130px', render: (contact) => contact.role || '-' },
+      { key: 'email', label: 'メール', minWidth: '170px', render: (contact) => contact.email || '-' },
+      { key: 'phone', label: '電話', minWidth: '120px', render: (contact) => contact.phone || '-' },
+      {
+        key: 'importance',
+        label: '重要度',
+        minWidth: '100px',
+        render: (contact) => (
+          <>
+            <strong>{contact.importanceRank || '-'}</strong>
+            <small>{contact.importanceScore ?? 0}</small>
+          </>
+        ),
+      },
+      { key: 'tags', label: 'タグ', minWidth: '160px', render: (contact) => (contact.tags ?? []).join(', ') || '-' },
+    ],
+    [],
+  );
 
   function updateField(field, value) {
     const selectedCustomer = field === 'customerId'
@@ -145,7 +170,19 @@ export default function Contacts({ contacts, customers, addContact, updateContac
           <h2>担当者一覧</h2>
           <span>{filteredContacts.length}件</span>
         </div>
-        <div className="card-grid two-column-grid">
+        <DesktopTable
+          actions={(contact) => (
+            <>
+              <button className="ghost-button" onClick={() => updateContact(contact.id, { memo: `${contact.memo}\n${new Date().toLocaleDateString('ja-JP')} メモ追記` })}>メモ</button>
+              <button className="ghost-button danger" onClick={() => removeContact(contact.id)}>削除</button>
+            </>
+          )}
+          className="contacts-common-table"
+          columns={desktopColumns}
+          minWidth={1120}
+          rows={filteredContacts}
+        />
+        <div className="card-grid two-column-grid desktop-card-fallback">
           {filteredContacts.map((contact) => (
             <article className="company-card" key={contact.id}>
               <div className="company-heading">

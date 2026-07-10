@@ -50,3 +50,129 @@
   min-height: 34px;
   padding: 0 10px;
 }
+
+.desktop-table-shell {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .desktop-table-shell {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #0b111d;
+  }
+
+  .desktop-data-table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  .desktop-data-table thead {
+    display: table-header-group;
+    position: static;
+  }
+
+  .desktop-data-table tbody {
+    display: table-row-group;
+    position: static;
+  }
+
+  .desktop-data-table tr {
+    display: table-row;
+    position: static;
+  }
+
+  .desktop-data-table th,
+  .desktop-data-table td {
+    display: table-cell;
+    position: static;
+    height: 52px;
+    border-bottom: 1px solid var(--line);
+    padding: 12px 10px;
+    color: #dfe9f7;
+    font-size: 0.82rem;
+    text-align: left;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-data-table th {
+    position: static;
+    top: auto;
+    z-index: auto;
+    transform: none;
+    background: #13213a;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  .desktop-data-table tbody tr {
+    height: 52px;
+  }
+
+  .desktop-data-table tbody tr.clickable {
+    cursor: pointer;
+  }
+
+  .desktop-data-table tbody tr.clickable:hover {
+    background: rgba(40, 120, 255, 0.1);
+  }
+
+  .desktop-data-table tbody tr.selected {
+    background: rgba(40, 120, 255, 0.16);
+    box-shadow: inset 3px 0 0 var(--blue);
+  }
+
+  .desktop-data-table td strong,
+  .desktop-data-table td span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-data-table td small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.68rem;
+  }
+
+  .desktop-data-table td::before,
+  .desktop-data-table th::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  .desktop-table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .desktop-table-actions .ghost-button {
+    min-width: 0;
+    min-height: 32px;
+    padding: 0 9px;
+    font-size: 0.72rem;
+  }
+
+  .desktop-table-empty {
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .desktop-card-fallback {
+    display: none;
+  }
+}

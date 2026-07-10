@@ -1078,3 +1078,57 @@
     display: none;
   }
 }
+
+@media (min-width: 768px) {
+  .customers-page .customers-desktop-table-shell,
+  .customers-page .legacy-customers-workbench,
+  .products-page .products-workbench,
+  .pipeline-page .pipeline-history-table {
+    display: none;
+  }
+
+  .customers-page .customers-common-table,
+  .products-page .products-common-table,
+  .contacts-common-table,
+  .suppliers-common-table,
+  .pipeline-common-table {
+    display: block;
+  }
+
+  .desktop-table-shell .desktop-data-table {
+    display: table !important;
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  .desktop-table-shell .desktop-data-table thead {
+    display: table-header-group !important;
+    position: static !important;
+  }
+
+  .desktop-table-shell .desktop-data-table tbody {
+    display: table-row-group !important;
+    position: static !important;
+  }
+
+  .desktop-table-shell .desktop-data-table tr {
+    display: table-row !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  .desktop-table-shell .desktop-data-table th,
+  .desktop-table-shell .desktop-data-table td {
+    display: table-cell !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  .desktop-table-shell .desktop-data-table th::before,
+  .desktop-table-shell .desktop-data-table td::before {
+    display: none !important;
+    content: none !important;
+  }
+}

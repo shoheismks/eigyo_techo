@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import {
   PRODUCT_CATEGORIES,
   TEMPERATURE_ZONES,
@@ -46,12 +47,9 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
           ...(product.tags ?? []),
         ].some((value) => includesText(value, normalizedKeyword));
 
-      const matchesCategory =
-        categoryFilter === ALL || product.category === categoryFilter;
-      const matchesTemperature =
-        temperatureFilter === ALL || product.temperatureZone === temperatureFilter;
-      const matchesManufacturer =
-        manufacturerFilter === ALL || product.manufacturerName === manufacturerFilter;
+      const matchesCategory = categoryFilter === ALL || product.category === categoryFilter;
+      const matchesTemperature = temperatureFilter === ALL || product.temperatureZone === temperatureFilter;
+      const matchesManufacturer = manufacturerFilter === ALL || product.manufacturerName === manufacturerFilter;
 
       return matchesKeyword && matchesCategory && matchesTemperature && matchesManufacturer;
     });
@@ -61,6 +59,48 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
   const selectedPreviewProduct =
     visibleProducts.find((product) => product.id === selectedPreviewId) ||
     visibleProducts[0];
+
+  const desktopColumns = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: '商品名',
+        width: '18%',
+        render: (product) => <strong>{product.name}</strong>,
+      },
+      { key: 'category', label: 'カテゴリー', minWidth: '110px', render: (product) => product.category || '-' },
+      { key: 'manufacturerName', label: 'メーカー', minWidth: '130px', render: (product) => product.manufacturerName || '-' },
+      { key: 'origin', label: '産地', minWidth: '100px', render: (product) => product.origin || '-' },
+      { key: 'temperatureZone', label: '温度帯', minWidth: '90px', render: (product) => product.temperatureZone || '-' },
+      { key: 'packageStyle', label: '荷姿', minWidth: '110px', render: (product) => product.packageStyle || '-' },
+      {
+        key: 'costPrice',
+        label: '原価',
+        minWidth: '110px',
+        render: (product) => `${formatPrice(product.costPrice) || '-'}${product.costPrice !== '' ? `/${product.costUnit}` : ''}`,
+      },
+      {
+        key: 'desiredSellingPrice',
+        label: '希望販売価格',
+        minWidth: '130px',
+        render: (product) =>
+          `${formatPrice(product.desiredSellingPrice) || '-'}${product.desiredSellingPrice !== '' ? `/${product.sellingPriceUnit}` : ''}`,
+      },
+      { key: 'grossMarginRate', label: '粗利率', minWidth: '90px', render: (product) => product.grossMarginRate || '-' },
+      {
+        key: 'files',
+        label: '資料',
+        minWidth: '130px',
+        render: (product) =>
+          [
+            product.imageFile && '画像',
+            product.productMaterialFile && '資料',
+            product.specSheetFile && 'スペック',
+          ].filter(Boolean).join(', ') || 'なし',
+      },
+    ],
+    [],
+  );
 
   function resetPaging(handler) {
     return (event) => {
@@ -139,94 +179,20 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
 
         {visibleProducts.length > 0 ? (
           <>
-            <div className="desktop-workbench products-workbench">
-              <div className="desktop-table-pane">
-                <div className="desktop-table products-table">
-              <div className="desktop-table-head">
-                <span>商品名</span>
-                <span>カテゴリー</span>
-                <span>メーカー</span>
-                <span>産地</span>
-                <span>温度帯</span>
-                <span>荷姿</span>
-                <span>原価</span>
-                <span>希望販売価格</span>
-                <span>粗利率</span>
-                <span>資料</span>
-                <span>操作</span>
-              </div>
-              {visibleProducts.map((product) => (
-                <div
-                  className={`desktop-table-row ${selectedPreviewProduct?.id === product.id ? 'selected' : ''}`}
-                  key={product.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedPreviewId(product.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') setSelectedPreviewId(product.id);
-                  }}
-                >
-                  <strong>{product.name}</strong>
-                  <span>{product.category || '-'}</span>
-                  <span>{product.manufacturerName || '-'}</span>
-                  <span>{product.origin || '-'}</span>
-                  <span>{product.temperatureZone || '-'}</span>
-                  <span>{product.packageStyle || '-'}</span>
-                  <span>{formatPrice(product.costPrice) || '-'}{product.costPrice !== '' ? `円/${product.costUnit}` : ''}</span>
-                  <span>{formatPrice(product.desiredSellingPrice) || '-'}{product.desiredSellingPrice !== '' ? `円/${product.sellingPriceUnit}` : ''}</span>
-                  <span>{product.grossMarginRate || '-'}</span>
-                  <span>
-                    {[
-                      product.imageFile && '画像',
-                      product.productMaterialFile && '資料',
-                      product.specSheetFile && 'スペック',
-                    ].filter(Boolean).join(', ') || 'なし'}
-                  </span>
-                  <span className="table-actions" onClick={(event) => event.stopPropagation()}>
-                    <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>編集</button>
-                    <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>削除</button>
-                  </span>
-                </div>
-              ))}
-                </div>
-              </div>
-
-              {selectedPreviewProduct && (
-                <aside className="desktop-detail-preview">
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">Preview</p>
-                      <h2>{selectedPreviewProduct.name}</h2>
-                    </div>
-                    <span className="status-pill active">{selectedPreviewProduct.temperatureZone || '-'}</span>
-                  </div>
-                  {selectedPreviewProduct.imageFile?.url ? (
-                    <img
-                      className="product-preview-image"
-                      loading="lazy"
-                      src={selectedPreviewProduct.imageFile.url}
-                      alt={`${selectedPreviewProduct.name}の商品画像`}
-                    />
-                  ) : (
-                    <div className="product-thumb placeholder desktop-preview-thumb">No Image</div>
-                  )}
-                  <dl className="company-details">
-                    <div><dt>カテゴリー</dt><dd>{selectedPreviewProduct.category || '-'}</dd></div>
-                    <div><dt>メーカー</dt><dd>{selectedPreviewProduct.manufacturerName || '-'}</dd></div>
-                    <div><dt>産地</dt><dd>{selectedPreviewProduct.origin || '-'}</dd></div>
-                    <div><dt>荷姿</dt><dd>{selectedPreviewProduct.packageStyle || '-'}</dd></div>
-                    <div><dt>原価</dt><dd>{formatPrice(selectedPreviewProduct.costPrice) || '-'}</dd></div>
-                    <div><dt>希望価格</dt><dd>{formatPrice(selectedPreviewProduct.desiredSellingPrice) || '-'}</dd></div>
-                    <div><dt>粗利率</dt><dd>{selectedPreviewProduct.grossMarginRate || '-'}</dd></div>
-                  </dl>
-                  <p className="inline-helper">{selectedPreviewProduct.memo || selectedPreviewProduct.description || 'メモは未登録です。'}</p>
-                  <div className="card-actions">
-                    <button className="primary-button" onClick={() => onOpenProductDetail(selectedPreviewProduct.id)}>詳細編集</button>
-                    <button className="ghost-button danger" onClick={() => removeProduct(selectedPreviewProduct.id)}>削除</button>
-                  </div>
-                </aside>
+            <DesktopTable
+              actions={(product) => (
+                <>
+                  <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>編集</button>
+                  <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>削除</button>
+                </>
               )}
-            </div>
+              className="products-common-table"
+              columns={desktopColumns}
+              minWidth={1180}
+              onRowClick={(product) => setSelectedPreviewId(product.id)}
+              rows={visibleProducts}
+              selectedRowId={selectedPreviewProduct?.id}
+            />
 
             <div className="card-list-mobile">
               {visibleProducts.map((product) => (
@@ -294,11 +260,11 @@ function ProductCard({ product, removeProduct, onOpenProductDetail }) {
         </div>
         <div>
           <dt>原価</dt>
-          <dd>{formatPrice(product.costPrice) || '未入力'}{product.costPrice !== '' ? `円/${product.costUnit}` : ''}</dd>
+          <dd>{formatPrice(product.costPrice) || '未入力'}{product.costPrice !== '' ? `/${product.costUnit}` : ''}</dd>
         </div>
         <div>
-          <dt>希望価格</dt>
-          <dd>{formatPrice(product.desiredSellingPrice) || '未入力'}{product.desiredSellingPrice !== '' ? `円/${product.sellingPriceUnit}` : ''}</dd>
+          <dt>希望販売価格</dt>
+          <dd>{formatPrice(product.desiredSellingPrice) || '未入力'}{product.desiredSellingPrice !== '' ? `/${product.sellingPriceUnit}` : ''}</dd>
         </div>
         <div>
           <dt>粗利率</dt>

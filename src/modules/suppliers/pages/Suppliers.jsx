@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 
 const emptySupplier = {
@@ -47,6 +48,24 @@ export default function Suppliers({ suppliers, addSupplier, updateSupplier, remo
       ].some((value) => includesText(value, normalizedKeyword));
     });
   }, [keyword, suppliers]);
+
+  const desktopColumns = useMemo(
+    () => [
+      { key: 'name', label: '仕入先名', width: '18%', render: (supplier) => <strong>{supplier.name}</strong> },
+      { key: 'area', label: '地域', minWidth: '110px', render: (supplier) => supplier.area || supplier.country || '-' },
+      { key: 'phone', label: '電話', minWidth: '120px', render: (supplier) => supplier.phone || '-' },
+      { key: 'email', label: 'メール', minWidth: '170px', render: (supplier) => supplier.email || '-' },
+      { key: 'website', label: 'Web', minWidth: '170px', render: (supplier) => supplier.website || '-' },
+      { key: 'tags', label: 'タグ', minWidth: '160px', render: (supplier) => (supplier.tags ?? []).join(', ') || '-' },
+      {
+        key: 'histories',
+        label: '商談',
+        minWidth: '90px',
+        render: (supplier) => `${(supplier.dealHistories ?? []).length}件`,
+      },
+    ],
+    [],
+  );
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -164,7 +183,16 @@ export default function Suppliers({ suppliers, addSupplier, updateSupplier, remo
           <h2>仕入先一覧</h2>
           <span>{filteredSuppliers.length}件</span>
         </div>
-        <div className="card-grid two-column-grid">
+        <DesktopTable
+          actions={(supplier) => (
+            <button className="ghost-button danger" onClick={() => removeSupplier(supplier.id)}>削除</button>
+          )}
+          className="suppliers-common-table"
+          columns={desktopColumns}
+          minWidth={1080}
+          rows={filteredSuppliers}
+        />
+        <div className="card-grid two-column-grid desktop-card-fallback">
           {filteredSuppliers.map((supplier) => (
             <article className="company-card" key={supplier.id}>
               <div className="company-heading">
