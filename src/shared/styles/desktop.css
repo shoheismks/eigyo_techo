@@ -201,7 +201,19 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .products-page .result-stack {
+    display: block;
+    width: 100%;
+    max-width: none;
+    gap: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .customers-page .result-stack > .section-heading {
+    margin-bottom: 12px;
+  }
+
+  .products-page .result-stack > .section-heading {
     margin-bottom: 12px;
   }
 
@@ -1093,6 +1105,12 @@
   .suppliers-common-table,
   .pipeline-common-table {
     display: block;
+  }
+
+  .products-page .products-common-table {
+    width: 100%;
+    max-width: none;
+    justify-self: stretch;
   }
 
   .desktop-table-shell .desktop-data-table {

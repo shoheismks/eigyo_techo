@@ -65,14 +65,15 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
       {
         key: 'name',
         label: '商品名',
-        width: '18%',
+        width: '24%',
+        minWidth: '260px',
         render: (product) => <strong>{product.name}</strong>,
       },
-      { key: 'category', label: 'カテゴリー', minWidth: '110px', render: (product) => product.category || '-' },
-      { key: 'manufacturerName', label: 'メーカー', minWidth: '130px', render: (product) => product.manufacturerName || '-' },
-      { key: 'origin', label: '産地', minWidth: '100px', render: (product) => product.origin || '-' },
-      { key: 'temperatureZone', label: '温度帯', minWidth: '90px', render: (product) => product.temperatureZone || '-' },
-      { key: 'packageStyle', label: '荷姿', minWidth: '110px', render: (product) => product.packageStyle || '-' },
+      { key: 'category', label: 'カテゴリー', minWidth: '100px', render: (product) => product.category || '-' },
+      { key: 'manufacturerName', label: 'メーカー', width: '16%', minWidth: '180px', render: (product) => product.manufacturerName || '-' },
+      { key: 'origin', label: '産地', minWidth: '90px', render: (product) => product.origin || '-' },
+      { key: 'temperatureZone', label: '温度帯', width: '90px', minWidth: '90px', render: (product) => product.temperatureZone || '-' },
+      { key: 'packageStyle', label: '荷姿', minWidth: '90px', render: (product) => product.packageStyle || '-' },
       {
         key: 'costPrice',
         label: '原価',
@@ -82,11 +83,12 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
       {
         key: 'desiredSellingPrice',
         label: '希望販売価格',
+        width: '130px',
         minWidth: '130px',
         render: (product) =>
           `${formatPrice(product.desiredSellingPrice) || '-'}${product.desiredSellingPrice !== '' ? `/${product.sellingPriceUnit}` : ''}`,
       },
-      { key: 'grossMarginRate', label: '粗利率', minWidth: '90px', render: (product) => product.grossMarginRate || '-' },
+      { key: 'grossMarginRate', label: '粗利率', width: '90px', minWidth: '90px', render: (product) => product.grossMarginRate || '-' },
       {
         key: 'files',
         label: '資料',
@@ -180,6 +182,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
         {visibleProducts.length > 0 ? (
           <>
             <DesktopTable
+              actionWidth="110px"
               actions={(product) => (
                 <>
                   <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>編集</button>
@@ -188,7 +191,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
               )}
               className="products-common-table"
               columns={desktopColumns}
-              minWidth={1180}
+              minWidth={1120}
               onRowClick={(product) => setSelectedPreviewId(product.id)}
               rows={visibleProducts}
               selectedRowId={selectedPreviewProduct?.id}

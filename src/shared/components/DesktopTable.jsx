@@ -2,6 +2,7 @@ export default function DesktopTable({
   columns,
   rows,
   actions,
+  actionWidth = '220px',
   getRowKey = (row) => row.id,
   minWidth = 960,
   selectedRowId = '',
@@ -10,7 +11,8 @@ export default function DesktopTable({
   emptyMessage = 'No data',
   className = '',
 }) {
-  const tableStyle = { minWidth: `${minWidth}px` };
+  const tableStyle = { minWidth: typeof minWidth === 'number' ? `${minWidth}px` : minWidth };
+  const actionStyle = { width: typeof actionWidth === 'number' ? `${actionWidth}px` : actionWidth };
 
   return (
     <div className={`desktop-table-shell ${className}`.trim()}>
@@ -28,7 +30,7 @@ export default function DesktopTable({
                 {column.label}
               </th>
             ))}
-            {actions && <th style={{ width: '220px' }}>操作</th>}
+            {actions && <th style={actionStyle}>操作</th>}
           </tr>
         </thead>
         <tbody>
@@ -58,7 +60,7 @@ export default function DesktopTable({
                     </td>
                   ))}
                   {actions && (
-                    <td onClick={(event) => event.stopPropagation()} style={{ width: '220px' }}>
+                    <td onClick={(event) => event.stopPropagation()} style={actionStyle}>
                       <div className="desktop-table-actions">{actions(row)}</div>
                     </td>
                   )}
