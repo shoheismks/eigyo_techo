@@ -131,11 +131,48 @@ export function inventoryCostTotal(inventories = []) {
   }, 0);
 }
 
-export function calculateInventoryGrossMarginRate(inventories = [], totalAmount = '') {
+export function inventoryUnitCost(inventories = []) {
+  const validInventories = inventories
+    .map((inventory) => ({
+      cost: normalizeNumber(inventory.cost),
+      quantity: normalizeNumber(inventory.quantity),
+    }))
+    .filter((inventory) => inventory.cost !== '');
+
+  if (validInventories.length === 0) return '';
+
+  const quantityTotal = validInventories.reduce(
+    (sum, inventory) => sum + (inventory.quantity === '' ? 0 : inventory.quantity),
+    0,
+  );
+
+  if (quantityTotal > 0) {
+    const weightedCostTotal = validInventories.reduce(
+      (sum, inventory) => sum + inventory.cost * (inventory.quantity === '' ? 0 : inventory.quantity),
+      0,
+    );
+    return weightedCostTotal / quantityTotal;
+  }
+
+  return validInventories.reduce((sum, inventory) => sum + inventory.cost, 0) / validInventories.length;
+}
+
+export function inventoryQuoteCostTotal(inventories = [], quoteQuantity = '') {
+  const quantity = normalizeNumber(quoteQuantity);
+  const unitCost = inventoryUnitCost(inventories);
+
+  if (quantity !== '' && quantity > 0 && unitCost !== '') {
+    return unitCost * quantity;
+  }
+
+  return inventoryCostTotal(inventories);
+}
+
+export function calculateInventoryGrossMarginRate(inventories = [], totalAmount = '', quoteQuantity = '') {
   const sales = normalizeNumber(totalAmount);
   if (sales === '' || sales <= 0) return '';
 
-  const costTotal = inventoryCostTotal(inventories);
+  const costTotal = inventoryQuoteCostTotal(inventories, quoteQuantity);
   if (costTotal <= 0) return '';
 
   return `${(((sales - costTotal) / sales) * 100).toFixed(1).replace(/\.0$/, '')}%`;

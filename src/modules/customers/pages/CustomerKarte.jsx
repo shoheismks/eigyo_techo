@@ -4,8 +4,8 @@ import { normalizeAttachmentRecord } from '../../../shared/hooks/useAttachments.
 import { formatPrice, parsePrice } from '../../products/hooks/useProducts.js';
 import {
   calculateInventoryGrossMarginRate,
-  inventoryCostTotal,
   inventoryLabel,
+  inventoryQuoteCostTotal,
 } from '../../inventory/hooks/useInventory.js';
 import { QUOTE_STATUSES, emptyQuote, normalizeQuote } from '../../quotes/hooks/useQuotes.js';
 import {
@@ -101,7 +101,9 @@ function calculateQuoteFinancials(quote, selectedInventories = []) {
     : quantity !== '' && unitPrice !== ''
       ? quantity * unitPrice
       : '';
-  const inventoryCost = selectedInventories.length > 0 ? inventoryCostTotal(selectedInventories) : '';
+  const inventoryCost = selectedInventories.length > 0
+    ? inventoryQuoteCostTotal(selectedInventories, quantity)
+    : '';
   const costTotal = inventoryCost !== ''
     ? inventoryCost
     : quantity !== '' && manualCost !== ''
@@ -236,8 +238,8 @@ export default function CustomerKarte({
     [inventories, quoteForm.inventoryIds],
   );
   const inventoryGrossMarginRate = useMemo(
-    () => calculateInventoryGrossMarginRate(selectedQuoteInventories, quoteForm.totalAmount),
-    [quoteForm.totalAmount, selectedQuoteInventories],
+    () => calculateInventoryGrossMarginRate(selectedQuoteInventories, quoteForm.totalAmount, quoteForm.quantity),
+    [quoteForm.quantity, quoteForm.totalAmount, selectedQuoteInventories],
   );
   const quoteFinancials = useMemo(
     () => calculateQuoteFinancials(quoteForm, selectedQuoteInventories),
@@ -980,7 +982,7 @@ export default function CustomerKarte({
               <div>
                 <span>在庫粗利計算</span>
                 <dl className="company-details">
-                  <div><dt>在庫コスト合計</dt><dd>{formatPrice(inventoryCostTotal(selectedQuoteInventories)) || '-'}</dd></div>
+                  <div><dt>在庫コスト合計</dt><dd>{formatPrice(inventoryQuoteCostTotal(selectedQuoteInventories, quoteForm.quantity)) || '-'}</dd></div>
                   <div><dt>在庫ベース粗利率</dt><dd>{inventoryGrossMarginRate || '-'}</dd></div>
                 </dl>
                 {inventoryGrossMarginRate && !quoteForm.grossMarginRate && (
