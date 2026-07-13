@@ -59,7 +59,7 @@
   .desktop-table-shell {
     display: block;
     width: 100%;
-    max-width: 100%;
+    max-width: none;
     overflow-x: auto;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -71,7 +71,7 @@
     width: 100%;
     border-collapse: collapse;
     border-spacing: 0;
-    table-layout: fixed;
+    table-layout: auto;
   }
 
   .desktop-data-table thead {
