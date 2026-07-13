@@ -7,6 +7,7 @@ import { useBusinessCards } from './modules/businessCards/hooks/useBusinessCards
 import { useComplaints } from './modules/claims/hooks/useComplaints.js';
 import { useContacts } from './modules/contacts/hooks/useContacts.js';
 import { useCustomers } from './modules/customers/hooks/useCustomers.js';
+import { useEvents } from './modules/calendar/hooks/useEvents.js';
 import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
 import { useQuotes } from './modules/quotes/hooks/useQuotes.js';
@@ -141,6 +142,12 @@ function AuthenticatedApp() {
     updateRecord: updateComplaint,
     removeRecord: removeComplaint,
   } = useComplaints(userId);
+  const {
+    records: events,
+    addRecord: addEvent,
+    updateRecord: updateEvent,
+    removeRecord: removeEvent,
+  } = useEvents(userId);
   const {
     records: attachments,
     addRecord: addAttachment,
@@ -353,6 +360,10 @@ function AuthenticatedApp() {
             addComplaint={addComplaint}
             updateComplaint={updateComplaint}
             removeComplaint={removeComplaint}
+            events={events}
+            addEvent={addEvent}
+            updateEvent={updateEvent}
+            removeEvent={removeEvent}
             attachments={attachments}
             addAttachment={addAttachment}
             updateAttachment={updateAttachment}
@@ -430,6 +441,10 @@ function ActivePage({
   addComplaint,
   updateComplaint,
   removeComplaint,
+  events,
+  addEvent,
+  updateEvent,
+  removeEvent,
   attachments,
   addAttachment,
   updateAttachment,
@@ -452,6 +467,7 @@ function ActivePage({
         samples={samples}
         quotes={quotes}
         complaints={complaints}
+        events={events}
         setActivePage={setActivePage}
         syncState={syncState}
         syncError={syncError}
@@ -499,6 +515,7 @@ function ActivePage({
           quotes={quotes}
           suppliers={suppliers}
           complaints={complaints}
+          events={events}
           attachments={attachments}
           updateCustomer={updateCustomer}
           addContact={addContact}
@@ -633,6 +650,7 @@ function ActivePage({
         contacts={contacts}
         suppliers={suppliers}
         complaints={complaints}
+        events={events}
         quotes={quotes}
         samples={samples}
         inventories={inventories}
@@ -645,9 +663,16 @@ function ActivePage({
     return (
       <CalendarPage
         customers={customers}
+        contacts={contacts}
+        events={events}
         samples={samples}
         quotes={quotes}
         complaints={complaints}
+        addEvent={addEvent}
+        updateEvent={updateEvent}
+        removeEvent={removeEvent}
+        updateCustomer={updateCustomer}
+        user={user}
         onOpenKarte={openCustomerKarte}
       />
     );
@@ -674,6 +699,7 @@ function ActivePage({
           quotes,
           adoptions,
           attachments,
+          events,
         }}
         restoreHandlers={{
           customers: { records: customers, add: addCustomer, update: updateCustomer },
@@ -687,6 +713,7 @@ function ActivePage({
           quotes: { records: quotes, add: addQuote, update: updateQuote },
           adoptions: { records: adoptions, add: addAdoption, update: updateAdoption },
           attachments: { records: attachments, add: addAttachment, update: updateAttachment },
+          events: { records: events, add: addEvent, update: updateEvent },
         }}
         onResetTutorial={onResetTutorial}
       />
@@ -703,6 +730,7 @@ function ActivePage({
       samples={samples}
       quotes={quotes}
       complaints={complaints}
+      events={events}
       setActivePage={setActivePage}
       syncState={syncState}
       syncError={syncError}

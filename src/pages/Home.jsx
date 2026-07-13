@@ -25,6 +25,10 @@ function followDate(customer) {
   return customer.nextFollowUpDate || customer.nextFollowDate || '';
 }
 
+function eventDate(event) {
+  return String(event.startAt || event.nextFollowDate || event.createdAt || '').slice(0, 10);
+}
+
 function withScore(customer) {
   return {
     ...customer,
@@ -37,6 +41,7 @@ export default function Home({
   samples = [],
   quotes = [],
   complaints = [],
+  events = [],
   setActivePage,
   syncState = 'local',
   syncError = '',
@@ -46,7 +51,20 @@ export default function Home({
   const today = todayString();
   const weekEnd = addDaysString(today, 6);
   const scoredCustomers = customers.map(withScore);
-  const notifications = buildNotifications({ customers: scoredCustomers, samples, quotes, complaints });
+  const notifications = buildNotifications({ customers: scoredCustomers, samples, quotes, complaints, events });
+  const activeEvents = events.filter((event) => !['完了', '中止'].includes(event.status));
+  const todayEvents = activeEvents
+    .filter((event) => eventDate(event) === today)
+    .sort((a, b) => String(a.startAt).localeCompare(String(b.startAt)))
+    .slice(0, 5);
+  const weekEvents = activeEvents
+    .filter((event) => eventDate(event) > today && eventDate(event) <= weekEnd)
+    .sort((a, b) => eventDate(a).localeCompare(eventDate(b)))
+    .slice(0, 5);
+  const overdueEvents = activeEvents
+    .filter((event) => eventDate(event) && eventDate(event) < today)
+    .sort((a, b) => eventDate(a).localeCompare(eventDate(b)))
+    .slice(0, 5);
   const sRankCount = scoredCustomers.filter((customer) => customer.customerRank === 'S').length;
   const followToday = scoredCustomers.filter(
     (customer) =>
@@ -98,6 +116,8 @@ export default function Home({
 
       <section className="dashboard-metrics" aria-label="今日の営業指標">
         <DashboardMetric label="通知" value={notifications.length} tone={notifications.some((item) => item.tone === 'danger') ? 'red' : 'blue'} />
+        <DashboardMetric label="今日の予定" value={todayEvents.length} tone="blue" />
+        <DashboardMetric label="期限切れ予定" value={overdueEvents.length} tone={overdueEvents.length > 0 ? 'red' : 'blue'} />
         <DashboardMetric label="Sランク顧客" value={sRankCount} tone="gold" />
         <DashboardMetric label="本日フォロー" value={followToday.length} tone="blue" />
         <DashboardMetric label="今週フォロー" value={followThisWeek.length} tone="blue" />
@@ -133,6 +153,62 @@ export default function Home({
           <div className="empty-state compact-empty">
             <h3>通知はありません</h3>
             <p>今日対応が必要なフォロー、見積、サンプル、クレームがあるとここに表示されます。</p>
+          </div>
+        )}
+      </section>
+
+      <section className="section-block follow-section">
+        <div className="section-heading">
+          <h2>今日の予定</h2>
+          <button className="text-button" onClick={() => setActivePage('Calendar')}>
+            カレンダーへ
+          </button>
+        </div>
+        {todayEvents.length > 0 ? (
+          <div className="dashboard-card-list">
+            {todayEvents.map((event) => (
+              <button
+                className="dashboard-row"
+                key={event.id}
+                onClick={() => event.customerId ? onOpenKarte?.(event.customerId) : setActivePage('Calendar')}
+              >
+                <span>{event.title || event.eventType}</span>
+                <small>{eventDate(event)} / {event.status}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">
+            <h3>今日の予定はありません</h3>
+            <p>カレンダーで予定を登録すると、ここに表示されます。</p>
+          </div>
+        )}
+      </section>
+
+      <section className="section-block follow-section">
+        <div className="section-heading">
+          <h2>今週の予定</h2>
+          <button className="text-button" onClick={() => setActivePage('Calendar')}>
+            一覧を見る
+          </button>
+        </div>
+        {weekEvents.length > 0 ? (
+          <div className="dashboard-card-list">
+            {weekEvents.map((event) => (
+              <button
+                className="dashboard-row"
+                key={event.id}
+                onClick={() => event.customerId ? onOpenKarte?.(event.customerId) : setActivePage('Calendar')}
+              >
+                <span>{event.title || event.eventType}</span>
+                <small>{eventDate(event)} / {event.status}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">
+            <h3>今週の追加予定はありません</h3>
+            <p>商談・訪問・フォロー予定をカレンダーから登録できます。</p>
           </div>
         )}
       </section>

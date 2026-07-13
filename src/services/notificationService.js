@@ -23,10 +23,30 @@ function pushNotification(items, notification) {
   });
 }
 
-export function buildNotifications({ customers = [], samples = [], quotes = [], complaints = [] }) {
+export function buildNotifications({ customers = [], samples = [], quotes = [], complaints = [], events = [] }) {
   const today = todayKey();
   const customersById = new Map(customers.map((customer) => [customer.id, customer]));
   const items = [];
+
+  events.forEach((event) => {
+    if (!event.startAt && !event.nextFollowDate) return;
+    if (['完了', '中止'].includes(event.status)) return;
+
+    const date = String(event.startAt || event.nextFollowDate).slice(0, 10);
+    const isOverdue = date < today;
+    const isToday = date === today;
+    if (!isToday && !isOverdue) return;
+
+    pushNotification(items, {
+      id: `event-${event.id}`,
+      type: isOverdue ? '期限切れ予定' : '今日の予定',
+      title: event.title || event.eventType || '予定があります',
+      customerId: event.customerId,
+      customerName: event.customerId ? getCustomerName(customersById, event.customerId) : '顧客未設定',
+      date,
+      tone: isOverdue ? 'danger' : 'today',
+    });
+  });
 
   customers.forEach((customer) => {
     const followDate = customer.nextFollowUpDate || customer.nextFollowDate;

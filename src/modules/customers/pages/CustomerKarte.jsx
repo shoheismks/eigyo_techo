@@ -182,6 +182,7 @@ export default function CustomerKarte({
   adoptions = [],
   suppliers = [],
   complaints,
+  events = [],
   attachments,
   samples = [],
   quotes = [],
@@ -218,8 +219,8 @@ export default function CustomerKarte({
   const [adoptionForm, setAdoptionForm] = useState(() => createAdoptionForm(customerId, user));
 
   const karte = useMemo(
-    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, attachments, samples, quotes, adoptions }),
-    [attachments, businessCards, complaints, contacts, customerId, customers, products, inventories, samples, quotes, adoptions],
+    () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
+    [attachments, businessCards, complaints, contacts, customerId, customers, products, inventories, samples, quotes, adoptions, events],
   );
   const quoteInventoryOptions = useMemo(
     () =>
@@ -1154,6 +1155,18 @@ export default function CustomerKarte({
               </article>
             )) : <p className="inline-helper">添付ファイルはまだありません。</p>}
           </div>
+        </Section>
+
+        <Section title="予定" count={karte.events.length} defaultOpen={karte.events.length > 0}>
+          <RecordList
+            records={karte.events.map((event) => ({
+              ...event,
+              title: event.title || event.eventType,
+              summary: [event.eventType, event.status, event.location].filter(Boolean).join(' / '),
+              date: event.startAt || event.nextFollowDate || event.createdAt,
+            }))}
+            emptyText="予定はまだありません。"
+          />
         </Section>
 
         <Section title="フォロー予定">

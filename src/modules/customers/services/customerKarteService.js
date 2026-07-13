@@ -95,7 +95,18 @@ function timelineEvent({
   };
 }
 
-function buildActivityTimeline({ customer, contacts, businessCards, dealHistories, complaints, attachments, samples = [], quotes = [], adoptions = [] }) {
+function buildActivityTimeline({
+  customer,
+  contacts,
+  businessCards,
+  dealHistories,
+  complaints,
+  attachments,
+  samples = [],
+  quotes = [],
+  adoptions = [],
+  calendarEvents = [],
+}) {
   const events = [];
   const currentStatus = customer.status || '未接触';
 
@@ -230,6 +241,20 @@ function buildActivityTimeline({ customer, contacts, businessCards, dealHistorie
     );
   });
 
+  calendarEvents.forEach((event) => {
+    events.push(
+      timelineEvent({
+        id: `event-${event.id}`,
+        date: event.startAt || event.nextFollowDate || event.createdAt,
+        type: `予定: ${event.eventType || 'その他'}`,
+        content: `${event.title || event.eventType || '予定'} / ${event.status || '予定'}`,
+        createdBy: actorName(event),
+        relatedContacts: relatedContactNames(event, contacts),
+        source: 'event',
+      }),
+    );
+  });
+
   (customer.mailHistories ?? customer.emailHistories ?? []).forEach((mail) => {
     events.push(
       timelineEvent({
@@ -328,6 +353,7 @@ export function getCustomerKarte({
   samples: sampleRecords = [],
   quotes: quoteRecords = [],
   adoptions: adoptionRecords = [],
+  events: eventRecords = [],
 }) {
   const customer = customers.find((item) => item.id === customerId) ?? null;
 
@@ -380,6 +406,9 @@ export function getCustomerKarte({
       productName: products.find((product) => product.id === adoption.productId)?.name || '',
     }))
     .sort(byDateDesc);
+  const customerEvents = eventRecords
+    .filter((event) => sameCustomer(event, customer))
+    .sort(byDateDesc);
   const estimates = [
     ...customerQuotes,
     ...dealHistories.filter((history) => hasWord(history, ['見積', '価格'])),
@@ -400,6 +429,7 @@ export function getCustomerKarte({
     samples: customerSamples,
     quotes: customerQuotes,
     adoptions: customerAdoptions,
+    calendarEvents: customerEvents,
   });
 
   return {
@@ -413,6 +443,7 @@ export function getCustomerKarte({
     attachments: customerAttachments,
     estimates,
     samples,
+    events: customerEvents,
     activityTimeline,
   };
 }

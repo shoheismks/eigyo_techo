@@ -35,7 +35,7 @@
 
 ### ユーザーごとのデータ分離
 
-- `customers`, `contacts`, `business_cards`, `products`, `suppliers`, `quotes`, `samples`, `deal_histories`, `claims`, `attachments`, `notifications` はユーザーごとに分離する。
+- `customers`, `contacts`, `business_cards`, `products`, `suppliers`, `quotes`, `samples`, `deal_histories`, `claims`, `attachments`, `events`, `notifications` はユーザーごとに分離する。
 - 共有機能を追加する場合は、別途チーム・権限テーブルを設計する。
 
 ## 2. Chrome拡張
@@ -103,7 +103,15 @@ OpenAI APIは以下のAI機能に利用する。
 - Google Places APIを利用する場合も、APIキー未設定時は仮データや手動入力へフォールバックする。
 - 無料優先の企業情報補完では、公開情報と人間確認を前提とする。
 
-## 7. OCR / 音声
+## 7. カレンダー
+
+- 初期実装は外部カレンダーAPIへ接続しない。
+- 予定はSupabase `events` に保存し、ユーザーごとにRLSで分離する。
+- 顧客、担当者、案件、商談履歴、Home通知とは内部データで連携する。
+- 将来Google Calendar / Microsoft 365 Calendarへ接続する場合も、ユーザー確認なしの外部送信は行わない。
+- 外部連携用IDは `external_calendar_id` などの追加カラムで管理する。
+
+## 8. OCR / 音声
 
 ### 名刺OCR
 
@@ -119,7 +127,7 @@ OpenAI APIは以下のAI機能に利用する。
 - 音声ファイルはSupabase Storageに保存し、DBにはURLとメタ情報のみ保存する。
 - 将来OpenAI Vision / Whisper等へ差し替え可能な構成にする。
 
-## 8. API設計方針
+## 9. API設計方針
 
 - 各API処理は `shared/services` に分離する。
 - UIコンポーネントにAPI処理を直書きしない。

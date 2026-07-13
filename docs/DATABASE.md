@@ -16,6 +16,7 @@
 - deal_histories
 - claims
 - attachments
+- events
 - notifications
 - users
 
@@ -26,6 +27,7 @@ erDiagram
   users ||--o{ customers : owns
   users ||--o{ products : owns
   users ||--o{ suppliers : owns
+  users ||--o{ events : owns
   users ||--o{ notifications : receives
 
   customers ||--o{ contacts : has
@@ -39,7 +41,9 @@ erDiagram
   products ||--o{ samples : included
   customers ||--o{ claims : has
   customers ||--o{ attachments : has
+  customers ||--o{ events : schedules
   contacts ||--o{ attachments : has
+  contacts ||--o{ events : attends
   products ||--o{ attachments : has
   suppliers ||--o{ attachments : has
 
@@ -128,6 +132,17 @@ erDiagram
     text file_name
   }
 
+  events {
+    uuid id PK
+    uuid user_id FK
+    uuid customer_id FK
+    text title
+    text event_type
+    timestamptz start_at
+    timestamptz end_at
+    text status
+  }
+
   notifications {
     uuid id PK
     uuid user_id FK
@@ -149,7 +164,7 @@ erDiagram
 - 主キー: `id`
 - 主要カラム: `user_id`, `company_name`, `formal_name`, `industry`, `area`, `address`, `phone`, `website`, `email`, `inquiry_url`, `status`, `rank`, `score`, `tags`, `company_note`, `next_follow_up_date`, `last_contact_date`, `is_do_not_contact`, `created_at`, `updated_at`
 - 外部キー: `user_id -> users.id`
-- 関連テーブル: `contacts`, `business_cards`, `deal_histories`, `quotes`, `samples`, `claims`, `attachments`, `notifications`
+- 関連テーブル: `contacts`, `business_cards`, `deal_histories`, `quotes`, `samples`, `claims`, `attachments`, `events`, `notifications`
 - Storage利用有無: なし
 - RLS有無: あり。`auth.uid() = user_id`
 - 検索対象項目: `company_name`, `formal_name`, `industry`, `area`, `address`, `phone`, `website`, `email`, `tags`, `company_note`
@@ -263,6 +278,18 @@ erDiagram
 - 検索対象項目: `file_name`, `file_type`, `uploaded_by_name`
 - 今後追加予定項目: `preview_url`, `thumbnail_url`, `checksum`, `retention_policy`, `virus_scan_status`
 
+## events
+
+- 目的: カレンダー予定、商談予定、フォロー予定、延期・完了状態を管理する。
+- 主キー: `id`
+- 主要カラム: `user_id`, `title`, `event_type`, `customer_id`, `contact_ids`, `deal_id`, `location`, `start_at`, `end_at`, `all_day`, `priority`, `color`, `memo`, `next_follow_date`, `reminder`, `status`, `postponed_from_event_id`, `completed_at`, `created_by`, `created_by_name`, `created_at`, `updated_at`
+- 外部キー: `user_id -> users.id`, `customer_id -> customers.id`
+- 関連テーブル: `customers`, `contacts`, `deal_histories`, `notifications`
+- Storage利用有無: なし。資料や画像は `attachments` で管理する。
+- RLS有無: あり。`auth.uid() = user_id`
+- 検索対象項目: `title`, `event_type`, `location`, `memo`, `status`, `created_by_name`
+- 今後追加予定項目: `external_calendar_id`, `recurrence_rule`, `attendee_user_ids`, `reminder_sent_at`
+
 ## notifications
 
 - 目的: ホーム画面に表示する通知や未対応タスクを管理する。
@@ -281,7 +308,7 @@ erDiagram
 - 主キー: `id`
 - 主要カラム: `id`, `email`, `display_name`, `avatar_url`, `role`, `created_at`, `updated_at`
 - 外部キー: `id -> auth.users.id`
-- 関連テーブル: `customers`, `contacts`, `business_cards`, `products`, `suppliers`, `quotes`, `samples`, `deal_histories`, `claims`, `attachments`, `notifications`
+- 関連テーブル: `customers`, `contacts`, `business_cards`, `products`, `suppliers`, `quotes`, `samples`, `deal_histories`, `claims`, `attachments`, `events`, `notifications`
 - Storage利用有無: あり。プロフィール画像を使用する場合のみSupabase Storageに保存する。
 - RLS有無: あり。`auth.uid() = id`
 - 検索対象項目: `email`, `display_name`, `role`
@@ -297,6 +324,7 @@ erDiagram
 - 見積
 - サンプル
 - クレーム
+- 予定
 
 ### Storage
 
@@ -311,7 +339,6 @@ erDiagram
 - mail_logs
 - line_logs
 - ai_logs
-- calendar_events
 - sales_reports
 - inventory_links
 
