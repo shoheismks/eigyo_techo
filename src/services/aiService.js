@@ -1,4 +1,5 @@
 import { generateMeetingPrep } from './meetingPrepService.js';
+import { productDisplayName } from '../modules/products/hooks/useProducts.js';
 
 function compactLines(lines) {
   return lines.filter(Boolean).join('\n');
@@ -15,7 +16,7 @@ function latest(records = [], dateFields = ['date', 'submittedDate', 'followUpDa
 function productSummary(product) {
   if (!product) return '';
   return [
-    product.name,
+    productDisplayName(product, ''),
     product.category,
     product.manufacturerName,
     product.origin,

@@ -11,6 +11,7 @@ import {
   normalizeProjectProductProposal,
   summarizeProjectProductProposals,
 } from '../services/projectProductProposalService.js';
+import { productDisplayName } from '../../products/hooks/useProducts.js';
 
 function formatCurrency(value) {
   if (value === '' || value === null || value === undefined) return '-';
@@ -346,7 +347,7 @@ function buildProjectTimeline({
         id: `product-${product.id}`,
         date: project.updatedAt || project.createdAt,
         type: '商品提案',
-        content: `${product.name || '商品'}を案件に紐付け`,
+        content: `${productDisplayName(product, '商品')}を案件に紐付け`,
         owner,
         writer: project.ownerUserId || project.createdBy || '-',
         action: { label: '商品', type: 'products' },
@@ -665,7 +666,7 @@ export default function ProjectPanel({
           </div>
 
           <ProjectCheckboxes title="担当者" items={relatedContacts} selectedIds={form.contactIds} getLabel={(item) => item.name} onToggle={(id) => toggleFormArray('contactIds', id)} />
-          <ProjectCheckboxes title="商品" items={products} selectedIds={form.productIds} getLabel={(item) => item.name} onToggle={(id) => toggleFormArray('productIds', id)} />
+          <ProjectCheckboxes title="商品" items={products} selectedIds={form.productIds} getLabel={(item) => productDisplayName(item)} onToggle={(id) => toggleFormArray('productIds', id)} />
           <ProjectCheckboxes title="在庫" items={relatedInventories} selectedIds={form.inventoryIds} getLabel={(item) => item.inventoryName || item.lot || item.id} onToggle={(id) => toggleFormArray('inventoryIds', id)} />
           <ProjectCheckboxes title="見積" items={relatedQuotes} selectedIds={form.quoteIds} getLabel={(item) => item.quoteNumber || item.projectName || item.id} onToggle={(id) => toggleFormArray('quoteIds', id)} />
           <ProjectCheckboxes title="サンプル" items={relatedSamples} selectedIds={form.sampleIds} getLabel={(item) => item.sampleName || item.id} onToggle={(id) => toggleFormArray('sampleIds', id)} />
@@ -808,7 +809,8 @@ function ProjectProductProposalManager({ products, proposals, onChange }) {
   );
   const proposalColumns = useMemo(
     () => [
-      { key: 'product', label: '商品', minWidth: '220px', render: (proposal) => productMap.get(proposal.productId)?.name || '-' },
+      { key: 'productCode', label: '商品コード', minWidth: '120px', render: (proposal) => productMap.get(proposal.productId)?.productCode || '-' },
+      { key: 'product', label: '商品', minWidth: '220px', render: (proposal) => productDisplayName(productMap.get(proposal.productId), '-') },
       { key: 'status', label: '進捗', minWidth: '100px', render: (proposal) => proposal.status },
       { key: 'monthly', label: '月間', minWidth: '90px', render: (proposal) => proposal.monthlyExpectedQuantity || '-' },
       { key: 'annual', label: '年間', minWidth: '90px', render: (proposal) => proposal.annualExpectedQuantity || calculateProjectProductProposal(proposal).annualQuantity || '-' },
@@ -889,7 +891,7 @@ function ProjectProductProposalManager({ products, proposals, onChange }) {
           <select value={draft.productId} onChange={(event) => updateDraft('productId', event.target.value)}>
             <option value="">商品を選択</option>
             {products.map((product) => (
-              <option value={product.id} key={product.id}>{product.name}</option>
+              <option value={product.id} key={product.id}>{productDisplayName(product)}</option>
             ))}
           </select>
         </label>
@@ -956,7 +958,7 @@ function ProjectProductProposalManager({ products, proposals, onChange }) {
           return (
             <article className="company-card" key={proposal.id}>
               <div className="company-heading">
-                <h3>{productMap.get(proposal.productId)?.name || '商品未選択'}</h3>
+                <h3>{productDisplayName(productMap.get(proposal.productId), '商品未選択')}</h3>
                 <p>{proposal.status}</p>
               </div>
               <p className="inline-helper">年間 {proposal.annualExpectedQuantity || totals.annualQuantity || '-'} {proposal.unit} / 粗利 {formatCurrency(totals.grossProfit)}</p>

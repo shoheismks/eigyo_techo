@@ -1,4 +1,5 @@
 import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
+import { productDisplayName } from '../modules/products/hooks/useProducts.js';
 
 const LABELS = {
   unset: '\u672a\u8a2d\u5b9a',
@@ -54,7 +55,7 @@ function getCustomerName(customerId, customerMap) {
 }
 
 function getProductName(productId, productMap) {
-  return productMap.get(productId)?.name || LABELS.unset;
+  return productDisplayName(productMap.get(productId), LABELS.unset);
 }
 
 function getSupplierName(supplierId, supplierMap) {

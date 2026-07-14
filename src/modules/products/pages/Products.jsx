@@ -38,6 +38,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
         !normalizedKeyword ||
         [
           product.name,
+          product.productCode,
           product.category,
           product.manufacturerName,
           product.origin,
@@ -65,10 +66,11 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
       {
         key: 'name',
         label: '商品名',
-        width: '24%',
+        width: '22%',
         minWidth: '260px',
         render: (product) => <strong>{product.name}</strong>,
       },
+      { key: 'productCode', label: '商品コード', minWidth: '130px', render: (product) => product.productCode || '-' },
       { key: 'category', label: 'カテゴリー', minWidth: '100px', render: (product) => product.category || '-' },
       { key: 'manufacturerName', label: 'メーカー', width: '16%', minWidth: '180px', render: (product) => product.manufacturerName || '-' },
       { key: 'origin', label: '産地', minWidth: '90px', render: (product) => product.origin || '-' },
@@ -191,7 +193,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
               )}
               className="products-common-table"
               columns={desktopColumns}
-              minWidth={1120}
+              minWidth={1250}
               onRowClick={(product) => setSelectedPreviewId(product.id)}
               rows={visibleProducts}
               selectedRowId={selectedPreviewProduct?.id}
@@ -244,11 +246,16 @@ function ProductCard({ product, removeProduct, onOpenProductDetail }) {
 
         <div className="company-heading">
           <h3>{product.name}</h3>
+          {product.productCode && <p>商品コード: {product.productCode}</p>}
           <p>{product.category || 'カテゴリー未設定'} / {product.temperatureZone || '温度帯未設定'}</p>
         </div>
       </div>
 
       <dl className="company-details">
+        <div>
+          <dt>商品コード</dt>
+          <dd>{product.productCode || '未入力'}</dd>
+        </div>
         <div>
           <dt>メーカー</dt>
           <dd>{product.manufacturerName || '未入力'}</dd>

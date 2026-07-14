@@ -1,5 +1,5 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
-import { parsePrice } from '../../products/hooks/useProducts.js';
+import { parsePrice, productDisplayName } from '../../products/hooks/useProducts.js';
 
 export const INVENTORY_STATUSES = [
   'フリー',
@@ -180,7 +180,7 @@ export function calculateInventoryGrossMarginRate(inventories = [], totalAmount 
 
 export function inventoryLabel(inventory, product, supplier) {
   return [
-    product?.name,
+    productDisplayName(product, ''),
     inventory.lot && `LOT ${inventory.lot}`,
     inventory.inventoryStatus,
     inventory.quantity !== '' ? `${inventory.quantity}${inventory.unit}` : '',

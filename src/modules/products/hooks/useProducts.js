@@ -32,6 +32,7 @@ export const PRODUCT_UNITS = ['kg', 'g', 'パック', '箱', 'ケース', '枚',
 
 export const emptyProduct = {
   userId: '',
+  productCode: '',
   name: '',
   category: '',
   manufacturerName: '',
@@ -51,6 +52,22 @@ export const emptyProduct = {
   specSheetFile: null,
   attachments: [],
 };
+
+export function normalizeProductCode(value) {
+  return String(value ?? '').trim();
+}
+
+export function isValidProductCode(value) {
+  const code = normalizeProductCode(value);
+  return !code || /^[\x21-\x7E]+$/.test(code);
+}
+
+export function productDisplayName(product, fallback = '商品') {
+  if (!product) return fallback;
+  const code = normalizeProductCode(product.productCode ?? product.product_code ?? '');
+  const name = product.name ?? '';
+  return [code, name].filter(Boolean).join(' / ') || fallback;
+}
 
 export function parsePrice(value) {
   if (value === null || value === undefined) {
@@ -93,6 +110,7 @@ export function normalizeProduct(product = {}, userId = '') {
     ...product,
     id: product.id ?? crypto.randomUUID(),
     userId: product.userId ?? userId,
+    productCode: normalizeProductCode(product.productCode ?? product.product_code ?? ''),
     category: product.category ?? '',
     manufacturerName: product.manufacturerName ?? '',
     origin: product.origin ?? '',
@@ -157,6 +175,7 @@ function toSupabaseRow(product) {
   return {
     id: product.id,
     user_id: product.userId,
+    product_code: product.productCode || null,
     name: product.name,
     category: product.category,
     manufacturer_name: product.manufacturerName,
@@ -184,6 +203,7 @@ function fromSupabaseRow(row) {
   return normalizeProduct({
     id: row.id,
     userId: row.user_id ?? '',
+    productCode: row.product_code ?? '',
     name: row.name ?? '',
     category: row.category ?? '',
     manufacturerName: row.manufacturer_name ?? '',

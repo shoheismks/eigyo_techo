@@ -1,4 +1,5 @@
 import { calculateQuoteTotals } from '../hooks/useQuotes.js';
+import { productDisplayName } from '../../products/hooks/useProducts.js';
 
 function escapeHtml(value = '') {
   return String(value)
@@ -30,7 +31,7 @@ function money(value, currency = 'JPY') {
 }
 
 function productName(productId, products = []) {
-  return products.find((product) => product.id === productId)?.name || '';
+  return productDisplayName(products.find((product) => product.id === productId), '');
 }
 
 function inventoryLabel(inventoryId, inventories = []) {

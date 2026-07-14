@@ -1,4 +1,5 @@
 import { generateSalesMailDrafts, hasOpenAIConfig } from './openaiService.js';
+import { productDisplayName, normalizeProductCode } from '../modules/products/hooks/useProducts.js';
 
 export const SALES_PURPOSES = [
   '新規営業',
@@ -55,10 +56,15 @@ function buildContext({ customer, productName, purpose, senderName, products }) 
   const proposedProducts = (customer.proposedProducts ?? [])
     .map((productId) => products.find((product) => product.id === productId))
     .filter(Boolean);
+  const normalizedProductName = normalizeProductCode(productName).toLowerCase();
   const selectedProduct =
-    products.find((product) => product.name === productName) ?? proposedProducts[0];
+    products.find((product) =>
+      product.name === productName ||
+      normalizeProductCode(product.productCode).toLowerCase() === normalizedProductName) ??
+    proposedProducts[0];
   const product = productName.trim() || selectedProduct?.name || '貴社向け商材';
   const sender = senderName.trim() || '営業担当';
+  const displayProduct = productName.trim() || productDisplayName(selectedProduct, '') || product;
   const latestHistory = [...(customer.dealHistories ?? [])]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
   const productDetails = buildProductDetails(selectedProduct, proposedProducts);
@@ -85,7 +91,7 @@ function buildContext({ customer, productName, purpose, senderName, products }) 
     tags: customer.tags ?? [],
     dealHistories: customer.dealHistories ?? [],
     proposedProducts,
-    product,
+    product: displayProduct,
     purpose,
     sender,
     companyNote: [companyNote, tagNote, historyNote, productDetails].filter(Boolean).join('\n'),
@@ -102,7 +108,7 @@ function buildProductDetails(selectedProduct, proposedProducts) {
   return `提案商品: ${products
     .map((product) => {
       const details = [
-        product.name,
+        productDisplayName(product, ''),
         product.manufacturerName ? `メーカー: ${product.manufacturerName}` : '',
         product.origin ? `産地: ${product.origin}` : '',
         product.temperatureZone ? `温度帯: ${product.temperatureZone}` : '',

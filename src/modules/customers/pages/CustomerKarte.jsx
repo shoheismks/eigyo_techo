@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../../products/hooks/useAdoptions.js';
 import { normalizeAttachmentRecord } from '../../../shared/hooks/useAttachments.js';
-import { formatPrice, parsePrice } from '../../products/hooks/useProducts.js';
+import { formatPrice, parsePrice, productDisplayName } from '../../products/hooks/useProducts.js';
 import {
   calculateInventoryGrossMarginRate,
   inventoryLabel,
@@ -310,7 +310,7 @@ export default function CustomerKarte({
       if (!keyword) return true;
       const productNames = products
         .filter((product) => (quote.productIds ?? []).includes(product.id))
-        .map((product) => product.name)
+        .map((product) => productDisplayName(product))
         .join(' ');
       const contactNames = contacts
         .filter((contact) => (quote.contactIds ?? []).includes(contact.id))
@@ -440,7 +440,7 @@ export default function CustomerKarte({
           return {
             ...line,
             productId: value,
-            description: product?.name || line.description,
+            description: productDisplayName(product, line.description),
           };
         }
 
@@ -451,7 +451,7 @@ export default function CustomerKarte({
             ...line,
             inventoryId: value,
             productId: inventory?.productId || line.productId,
-            description: product?.name || inventory?.inventoryName || line.description,
+            description: productDisplayName(product, inventory?.inventoryName || line.description),
             unit: inventory?.unit || line.unit,
             costPrice: inventory?.cost || inventory?.costPrice || line.costPrice,
           };
@@ -997,7 +997,7 @@ export default function CustomerKarte({
             {karte.products.length > 0 ? karte.products.map((product) => (
               <article className="product-card" key={product.id}>
                 {product.imageFile?.url && <img className="product-preview-image" loading="lazy" src={product.imageFile.url} alt={product.name} />}
-                <h3>{product.name}</h3>
+                <h3>{productDisplayName(product)}</h3>
                 <dl className="company-details">
                   <div><dt>メーカー</dt><dd>{product.manufacturerName || '-'}</dd></div>
                   <div><dt>産地</dt><dd>{product.origin || '-'}</dd></div>
@@ -1056,7 +1056,7 @@ export default function CustomerKarte({
                 <select value={adoptionForm.productId} onChange={(event) => updateAdoptionField('productId', event.target.value)}>
                   <option value="">選択してください</option>
                   {products.map((product) => (
-                    <option value={product.id} key={product.id}>{product.name || '商品名未設定'}</option>
+                    <option value={product.id} key={product.id}>{productDisplayName(product, '商品名未設定')}</option>
                   ))}
                 </select>
               </label>
@@ -1271,7 +1271,7 @@ export default function CustomerKarte({
                         <select value={line.productId || ''} onChange={(event) => updateQuoteLine(line.id, 'productId', event.target.value)}>
                           <option value="">未選択</option>
                           {products.map((product) => (
-                            <option value={product.id} key={product.id}>{product.name || '商品名未設定'}</option>
+                            <option value={product.id} key={product.id}>{productDisplayName(product, '商品名未設定')}</option>
                           ))}
                         </select>
                       </label>
@@ -1367,7 +1367,7 @@ export default function CustomerKarte({
                       checked={quoteForm.productIds.includes(product.id)}
                       onChange={() => toggleQuoteArrayField('productIds', product.id)}
                     />
-                    {product.name || '商品名未設定'}
+                    {productDisplayName(product, '商品名未設定')}
                   </label>
                 )) : <p className="inline-helper">商品は未登録です。</p>}
               </div>
@@ -1539,7 +1539,7 @@ export default function CustomerKarte({
                       checked={sampleForm.productIds.includes(product.id)}
                       onChange={() => toggleSampleArrayField('productIds', product.id)}
                     />
-                    {product.name || '商品名未設定'}
+                    {productDisplayName(product, '商品名未設定')}
                   </label>
                 )) : <p className="inline-helper">商品は未登録です。</p>}
               </div>
@@ -1742,6 +1742,7 @@ function SampleList({ samples, products, contacts, updateSample }) {
     const matchedProducts = products
       .filter((product) => (sample.productIds ?? []).includes(product.id))
       .map((product) => [
+        product.productCode,
         product.name,
         product.manufacturerName,
         product.origin,
@@ -1834,7 +1835,7 @@ function AdoptionList({ adoptions, products, updateAdoption }) {
   }
 
   function productName(adoption) {
-    return products.find((product) => product.id === adoption.productId)?.name || adoption.productName || '-';
+    return productDisplayName(products.find((product) => product.id === adoption.productId), adoption.productName || '-');
   }
 
   return (
@@ -1892,13 +1893,13 @@ function QuoteListV1({
   function productNames(quote) {
     if ((quote.quoteLines ?? []).length > 0) {
       return quote.quoteLines
-        .map((line) => line.description || products.find((product) => product.id === line.productId)?.name)
+        .map((line) => line.description || productDisplayName(products.find((product) => product.id === line.productId), ''))
         .filter(Boolean)
         .join(', ') || '-';
     }
     return products
       .filter((product) => (quote.productIds ?? []).includes(product.id))
-      .map((product) => [product.name, product.manufacturerName, product.origin].filter(Boolean).join(' / '))
+      .map((product) => [product.productCode, product.name, product.manufacturerName, product.origin].filter(Boolean).join(' / '))
       .filter(Boolean)
       .join(', ') || '-';
   }
@@ -2031,6 +2032,7 @@ function QuoteList({ quotes, products, inventories = [], suppliers = [], contact
     const matchedProducts = products
       .filter((product) => (quote.productIds ?? []).includes(product.id))
       .map((product) => [
+        product.productCode,
         product.name,
         product.manufacturerName,
         product.origin,

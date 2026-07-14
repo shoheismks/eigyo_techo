@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
+import { productDisplayName } from '../../products/hooks/useProducts.js';
 
 const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
 const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];
@@ -503,7 +504,7 @@ export default function CustomerDetail({
                   checked={(customer.proposedProducts ?? []).includes(product.id)}
                   onChange={() => toggleProduct(product.id)}
                 />
-                <span>{product.name}</span>
+                <span>{productDisplayName(product)}</span>
               </label>
             ))}
           </div>

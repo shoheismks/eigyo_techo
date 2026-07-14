@@ -658,6 +658,7 @@ function ActivePage({
     return (
       <ProductDetail
         product={selectedProduct}
+        products={products}
         inventories={inventories}
         adoptions={adoptions}
         samples={samples}

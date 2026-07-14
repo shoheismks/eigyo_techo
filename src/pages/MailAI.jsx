@@ -3,6 +3,7 @@ import { SALES_PURPOSES, createMailDrafts } from '../services/mailDraftService.j
 import { createGmailDraft } from '../services/gmailService.js';
 import { createOutlookDraft } from '../services/outlookService.js';
 import { generateMailSupportNote } from '../services/aiService.js';
+import { productDisplayName } from '../modules/products/hooks/useProducts.js';
 import {
   fetchMailDrafts,
   normalizeGeneratedDrafts,
@@ -245,7 +246,7 @@ export default function MailAI({ customers, products = [], userId = '' }) {
             <option value="">手入力</option>
             {products.map((product) => (
               <option value={product.id} key={product.id}>
-                {product.name}
+                {productDisplayName(product)}
               </option>
             ))}
           </select>

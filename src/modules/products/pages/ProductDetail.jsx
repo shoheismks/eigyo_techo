@@ -6,6 +6,8 @@ import {
   calculateGrossMarginRate,
   emptyProduct,
   formatPrice,
+  isValidProductCode,
+  normalizeProductCode,
   normalizeProduct,
   parsePrice,
 } from '../hooks/useProducts.js';
@@ -76,6 +78,7 @@ function productSnapshot(product) {
 
 export default function ProductDetail({
   product,
+  products = [],
   inventories = [],
   adoptions = [],
   samples = [],
@@ -303,6 +306,14 @@ export default function ProductDetail({
         ],
       }));
     } catch (error) {
+      if (error.code === '23505' || String(error.message || '').includes('products_user_product_code_unique_idx')) {
+        setSaveError('同じ商品コードが既に登録されています。別の商品コードを入力してください。');
+        return;
+      }
+      if (error.code === '23514' || String(error.message || '').includes('products_product_code_ascii_check')) {
+        setSaveError('商品コードは半角英数字と記号のみ使用できます。空白、日本語、全角文字は使えません。');
+        return;
+      }
       setUploadError(error.message || '添付ファイルのアップロードに失敗しました。');
     } finally {
       setUploadingField('');
@@ -329,6 +340,22 @@ export default function ProductDetail({
       return;
     }
 
+    const productCode = normalizeProductCode(form.productCode);
+    if (!isValidProductCode(productCode)) {
+      setSaveError('商品コードは半角英数字と記号のみ使用できます。空白、日本語、全角文字は使えません。');
+      return;
+    }
+
+    if (
+      productCode &&
+      products.some((item) =>
+        item.id !== form.id &&
+        normalizeProductCode(item.productCode).toLowerCase() === productCode.toLowerCase())
+    ) {
+      setSaveError('同じ商品コードが既に登録されています。別の商品コードを入力してください。');
+      return;
+    }
+
     if (!isNew && !isDirty) {
       setSaveMessage('変更なし');
       return;
@@ -337,6 +364,7 @@ export default function ProductDetail({
     const payload = normalizeProduct({
       ...form,
       userId,
+      productCode,
       costPrice: parsePrice(form.costPrice),
       desiredSellingPrice: parsePrice(form.desiredSellingPrice),
       grossMarginRate,
@@ -391,6 +419,17 @@ export default function ProductDetail({
               placeholder="例: 和牛ベーコン"
               onChange={(event) => updateField('name', event.target.value)}
             />
+          </label>
+
+          <label className="field-label">
+            商品コード
+            <input
+              value={form.productCode}
+              placeholder="例: ABC-001"
+              onChange={(event) => updateField('productCode', event.target.value)}
+              onBlur={() => updateField('productCode', normalizeProductCode(form.productCode))}
+            />
+            <span className="inline-helper">任意入力。半角英数字と記号のみ、空白・日本語・全角文字は使用不可。</span>
           </label>
 
           <div className="date-grid">

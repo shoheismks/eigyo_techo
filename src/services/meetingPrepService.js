@@ -1,3 +1,5 @@
+import { productDisplayName } from '../modules/products/hooks/useProducts.js';
+
 function compact(items, fallback) {
   const values = items.filter(Boolean);
   return values.length > 0 ? values : [fallback];
@@ -12,7 +14,7 @@ function latest(records = [], dateFields = ['date', 'submittedDate', 'shippedDat
 }
 
 function productNames(products = []) {
-  return products.map((product) => product.name).filter(Boolean);
+  return products.map((product) => productDisplayName(product, '')).filter(Boolean);
 }
 
 export async function generateMeetingPrep(karte) {

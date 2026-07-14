@@ -1,3 +1,5 @@
+import { productDisplayName } from '../../products/hooks/useProducts.js';
+
 function sameCustomer(record, customer) {
   return (
     record.customerId === customer.id ||
@@ -385,7 +387,7 @@ export function getCustomerKarte({
       ...sample,
       productNames: products
         .filter((product) => (sample.productIds ?? []).includes(product.id))
-        .map((product) => product.name)
+        .map((product) => productDisplayName(product))
         .filter(Boolean),
     }))
     .sort(byDateDesc);
@@ -395,7 +397,7 @@ export function getCustomerKarte({
       ...quote,
       productNames: products
         .filter((product) => (quote.productIds ?? []).includes(product.id))
-        .map((product) => product.name)
+        .map((product) => productDisplayName(product))
         .filter(Boolean),
     }))
     .sort(byDateDesc);
@@ -403,7 +405,7 @@ export function getCustomerKarte({
     .filter((adoption) => adoption.customerId === customer.id)
     .map((adoption) => ({
       ...adoption,
-      productName: products.find((product) => product.id === adoption.productId)?.name || '',
+      productName: productDisplayName(products.find((product) => product.id === adoption.productId), ''),
     }))
     .sort(byDateDesc);
   const customerEvents = eventRecords
@@ -455,7 +457,7 @@ export function createDummyKarteAnalysis(karte) {
 
   const { customer, contacts, products, complaints, dealHistories, estimates, samples } = karte;
   const hasComplaint = complaints.length > 0;
-  const hotProducts = products.slice(0, 3).map((product) => product.name).filter(Boolean);
+  const hotProducts = products.slice(0, 3).map((product) => productDisplayName(product, '')).filter(Boolean);
   const nextFollowDate = customer.nextFollowUpDate || customer.nextFollowDate;
 
   return {
