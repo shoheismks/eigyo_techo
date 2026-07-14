@@ -93,6 +93,18 @@ export default function Home({
   const topScoredCustomers = [...scoredCustomers]
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
+  const quoteWaiting = quotes.filter((quote) => quote.status === '作成中').length;
+  const quoteExpired = quotes.filter(
+    (quote) =>
+      quote.validUntil &&
+      quote.validUntil < today &&
+      !['採用', '失注'].includes(quote.status),
+  ).length;
+  const quoteDecided = quotes.filter((quote) => ['採用', '失注'].includes(quote.status));
+  const quoteAccepted = quoteDecided.filter((quote) => quote.status === '採用').length;
+  const quoteLost = quoteDecided.filter((quote) => quote.status === '失注').length;
+  const quoteAdoptionRate = quoteDecided.length > 0 ? `${Math.round((quoteAccepted / quoteDecided.length) * 100)}%` : '0%';
+  const quoteLostRate = quoteDecided.length > 0 ? `${Math.round((quoteLost / quoteDecided.length) * 100)}%` : '0%';
 
   const statusCounts = PIPELINE_STATUSES.reduce((summary, status) => {
     summary[status] = scoredCustomers.filter((customer) => customer.status === status).length;
@@ -115,6 +127,10 @@ export default function Home({
       </section>
 
       <section className="dashboard-metrics" aria-label="今日の営業指標">
+        <DashboardMetric label="見積 提出待ち" value={quoteWaiting} tone="blue" />
+        <DashboardMetric label="見積 期限切れ" value={quoteExpired} tone={quoteExpired > 0 ? 'red' : 'blue'} />
+        <DashboardMetric label="見積 採用率" value={quoteAdoptionRate} tone="gold" />
+        <DashboardMetric label="見積 失注率" value={quoteLostRate} tone="red" />
         <DashboardMetric label="通知" value={notifications.length} tone={notifications.some((item) => item.tone === 'danger') ? 'red' : 'blue'} />
         <DashboardMetric label="今日の予定" value={todayEvents.length} tone="blue" />
         <DashboardMetric label="期限切れ予定" value={overdueEvents.length} tone={overdueEvents.length > 0 ? 'red' : 'blue'} />

@@ -422,6 +422,19 @@
   - 担当者別ランキング
   - 月次レポートPDF
 
+---
+
+## Step34 追記: 見積作成・PDF出力
+
+- ステータス: 実装済
+- 目的: 顧客・担当者・案件・商品・在庫を選択し、見積作成からPDF出力、再編集、再PDF出力まで行う。
+- 画面: `CustomerKarte`, `Home`
+- 入力: 顧客、担当者、案件名、商品明細、数量、単位、販売単価、利用在庫、運賃、値引、支払条件、納品条件、有効期限、備考。
+- 出力: 見積番号、小計、消費税、税込合計、原価合計、粗利額、粗利率、PDFプレビュー、PDFファイル、顧客カルテの見積履歴、Homeの提出待ち/期限切れ/採用率/失注率。
+- 保存先: Supabase `quotes`。PDF本体と添付ファイル本体はSupabase Storage。
+- 関連データ: `customers`, `contacts`, `products`, `suppliers`, `inventories`, `attachments`
+- 今後の拡張: 見積版管理、承認フロー、電子署名、Gmail/Outlook下書き添付、サーバー側PDF生成。
+
 ### dashboardService
 
 `dashboardService` は営業データ集約を担当する。画面側では集計済みデータを受け取り、表示に集中する。

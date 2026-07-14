@@ -190,6 +190,31 @@ OpenAI APIは以下のAI機能に利用する。
   - ユーザー確認後にダウンロード、共有、メール添付へ進む。
   - 将来、Edge Functionsでサーバー側PDF生成へ移行可能にする。
 
+### Step34 quotePdfService 追記
+
+`quotePdfService` はVersion1.0の見積PDF生成を担当する内部サービスである。
+
+- 入力:
+  - `quote`
+  - `customer`
+  - `contacts`
+  - `products`
+  - `inventories`
+  - `suppliers`
+  - `financials`
+- 出力:
+  - A4縦相当のHTMLプレビュー
+  - PDF `File`
+  - ダウンロード用ファイル名
+- 保存:
+  - PDF本体はSupabase Storageへ保存する。
+  - `quotes` には `pdf_url`, `pdf_file_name`, `pdf_storage_path`, `pdf_generated_at`, `pdf_history` を保存する。
+- API方針:
+  - UIコンポーネントへPDF生成ロジックを直書きしない。
+  - 自動メール送信はしない。
+  - Google Drive保存はVersion1.0では行わない。
+  - 将来はEdge Functionsや専用PDFエンジンへ差し替え可能にする。
+
 ### dashboardService
 
 `dashboardService` は営業データ集約を担当する内部サービスである。
