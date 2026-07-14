@@ -143,10 +143,10 @@ function calculateQuoteFinancials(quote, selectedInventories = []) {
     : quantity !== '' && manualCost !== ''
       ? quantity * manualCost
       : '';
-  const grossMarginAmount = totalAmount !== '' && costTotal !== '' ? totalAmount - costTotal : '';
+  const grossMarginAmount = subtotal !== '' && costTotal !== '' ? subtotal - costTotal : '';
   const grossMarginRate =
-    totalAmount !== '' && totalAmount > 0 && grossMarginAmount !== ''
-      ? `${((grossMarginAmount / totalAmount) * 100).toFixed(1).replace(/\.0$/, '')}%`
+    subtotal !== '' && subtotal > 0 && grossMarginAmount !== ''
+      ? `${((grossMarginAmount / subtotal) * 100).toFixed(1).replace(/\.0$/, '')}%`
       : '';
 
   return {

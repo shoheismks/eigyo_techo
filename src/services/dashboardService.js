@@ -77,8 +77,6 @@ function getQuoteCost(quote) {
 }
 
 function getQuoteGrossMargin(quote) {
-  const storedGrossMargin = toNumber(quote.grossMarginAmount);
-  if (storedGrossMargin !== 0) return storedGrossMargin;
   const amount = getQuoteAmount(quote);
   const cost = getQuoteCost(quote);
   return amount > 0 ? amount - cost : 0;

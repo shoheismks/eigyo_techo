@@ -138,8 +138,8 @@ export function calculateQuoteTotals(quote = {}) {
   const totalAmount = subtotal + (freight || 0) - (discount || 0);
   const taxAmount = taxRate !== '' ? Math.round(totalAmount * (taxRate / 100)) : 0;
   const grandTotal = totalAmount + taxAmount;
-  const grossMarginAmount = totalAmount - costTotal;
-  const grossMarginRate = totalAmount > 0 ? `${((grossMarginAmount / totalAmount) * 100).toFixed(1).replace(/\.0$/, '')}%` : '';
+  const grossMarginAmount = subtotal - costTotal;
+  const grossMarginRate = subtotal > 0 ? `${((grossMarginAmount / subtotal) * 100).toFixed(1).replace(/\.0$/, '')}%` : '';
 
   return {
     lines,
