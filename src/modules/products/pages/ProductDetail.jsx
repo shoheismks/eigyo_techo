@@ -18,6 +18,7 @@ import {
   inventoryLabel,
   normalizeInventory,
 } from '../../inventory/hooks/useInventory.js';
+import { calculateProjectProductProposal } from '../../deals/services/projectProductProposalService.js';
 
 function fileLabel(file) {
   return file?.name ? `${file.name} (${Math.ceil((file.size ?? 0) / 1024)}KB)` : '未添付';
@@ -69,6 +70,7 @@ export default function ProductDetail({
   adoptions = [],
   samples = [],
   quotes = [],
+  projects = [],
   customers = [],
   suppliers = [],
   addProduct,
@@ -188,6 +190,21 @@ export default function ProductDetail({
           ),
         ),
     [adoptions, form.id],
+  );
+  const relatedProjectProposals = useMemo(
+    () =>
+      projects
+        .flatMap((project) =>
+          (project.productProposals ?? [])
+            .filter((proposal) => proposal.productId === form.id)
+            .map((proposal) => ({ project, proposal })),
+        )
+        .sort((a, b) =>
+          String(b.proposal.updatedAt || b.project.updatedAt || '').localeCompare(
+            String(a.proposal.updatedAt || a.project.updatedAt || ''),
+          ),
+        ),
+    [form.id, projects],
   );
 
   function updateField(field, value) {
@@ -770,6 +787,46 @@ export default function ProductDetail({
               onChange={(event) => updateField('memo', event.target.value)}
             />
           </label>
+        </section>
+
+        <section className="detail-section">
+          <div className="section-heading">
+            <h2>案件別商品提案</h2>
+            <span className="info-badge">{relatedProjectProposals.length}件</span>
+          </div>
+          {relatedProjectProposals.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {relatedProjectProposals.map(({ project, proposal }) => {
+                const customer = customers.find((item) => item.id === project.customerId);
+                const supplier = suppliers.find((item) => item.id === project.supplierId);
+                const totals = calculateProjectProductProposal(proposal);
+                return (
+                  <article className="karte-mini-card adoption-card" key={`${project.id}-${proposal.id}`}>
+                    <div className="history-meta">
+                      <span>{project.title || '案件'}</span>
+                      <small>{proposal.status || '-'}</small>
+                    </div>
+                    <dl className="company-details">
+                      <div><dt>会社</dt><dd>{customer?.companyName || supplier?.name || '-'}</dd></div>
+                      <div><dt>月間見込</dt><dd>{proposal.monthlyExpectedQuantity || '-'} {proposal.unit || ''}</dd></div>
+                      <div><dt>年間見込</dt><dd>{proposal.annualExpectedQuantity || totals.annualQuantity || '-'} {proposal.unit || ''}</dd></div>
+                      <div><dt>想定売価</dt><dd>{proposal.expectedSellingPrice || '-'}</dd></div>
+                      <div><dt>想定原価</dt><dd>{proposal.expectedCost || '-'}</dd></div>
+                      <div><dt>想定粗利</dt><dd>{totals.grossProfit.toLocaleString('ja-JP')}</dd></div>
+                    </dl>
+                    {(proposal.reasonCategory || proposal.adoptionReason || proposal.rejectionReason) && (
+                      <p className="inline-helper">
+                        {proposal.reasonCategory || ''} {proposal.adoptionReason || proposal.rejectionReason || ''}
+                      </p>
+                    )}
+                    {proposal.competitorProduct && <p className="inline-helper">競合: {proposal.competitorProduct}</p>}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="inline-helper">この商品に紐づく案件別の商品提案はまだありません。</p>
+          )}
         </section>
 
         <section className="detail-section">

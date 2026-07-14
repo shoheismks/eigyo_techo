@@ -1,5 +1,6 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
 import { PROJECT_PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../constants.js';
+import { normalizeProjectProductProposal } from '../services/projectProductProposalService.js';
 
 export const emptyProject = {
   userId: '',
@@ -12,6 +13,7 @@ export const emptyProject = {
   priority: '通常',
   ownerUserId: '',
   productIds: [],
+  productProposals: [],
   inventoryIds: [],
   quoteIds: [],
   sampleIds: [],
@@ -49,6 +51,9 @@ export function normalizeProject(project = {}, userId = '') {
     priority: validOption(project.priority, PROJECT_PRIORITIES, '通常'),
     ownerUserId: project.ownerUserId ?? '',
     productIds: asArray(project.productIds),
+    productProposals: asArray(project.productProposals ?? project.product_proposals).map((proposal) =>
+      normalizeProjectProductProposal(proposal),
+    ),
     inventoryIds: asArray(project.inventoryIds),
     quoteIds: asArray(project.quoteIds),
     sampleIds: asArray(project.sampleIds),
@@ -79,6 +84,7 @@ function toRow(project) {
     priority: project.priority,
     owner_user_id: project.ownerUserId,
     product_ids: project.productIds,
+    product_proposals: project.productProposals,
     inventory_ids: project.inventoryIds,
     quote_ids: project.quoteIds,
     sample_ids: project.sampleIds,
@@ -109,6 +115,7 @@ function fromRow(row) {
     priority: row.priority,
     ownerUserId: row.owner_user_id,
     productIds: row.product_ids,
+    productProposals: row.product_proposals,
     inventoryIds: row.inventory_ids,
     quoteIds: row.quote_ids,
     sampleIds: row.sample_ids,

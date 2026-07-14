@@ -1880,6 +1880,23 @@
   border-left: 4px solid var(--gold);
 }
 
+.project-product-manager {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(102, 163, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(20, 32, 58, 0.48);
+  padding: 14px;
+}
+
+.proposal-kpi-grid {
+  margin-top: 0;
+}
+
+.project-product-table {
+  width: 100%;
+}
+
 .sample-status-row {
   max-width: 240px;
 }

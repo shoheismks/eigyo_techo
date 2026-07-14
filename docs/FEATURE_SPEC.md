@@ -504,3 +504,14 @@
 - 保存先: Supabase `projects`。接続失敗時はLocalStorageバックアップ。
 - 関連データ: `customers`, `suppliers`, `contacts`, `products`, `inventories`, `quotes`, `samples`, `claims`, `events`, `attachments`
 - 今後の拡張: 案件別売上実績、失注理由、確度、案件別AI分析、承認フロー。
+
+## Step38 追記 案件単位の商品提案・採用管理
+
+- ステータス: 開発中
+- 目的: 1案件に複数商品を登録し、商品ごとに提案進捗、採用可否、数量見込、利益見込を分けて管理する。
+- 画面: `Pipeline`, `CustomerKarte`, `ProductDetail`
+- 入力: 商品、進捗状態、月間見込数量、年間見込数量、単位、想定売価、想定原価、想定経費、採用/不採用理由、競合商品、メモ。
+- 出力: 案件ダッシュボード合計、案件詳細の商品提案一覧、顧客カルテの案件内表示、商品詳細の案件別提案履歴。
+- 保存先: Supabase `projects.product_proposals`。接続失敗時はLocalStorageバックアップ。
+- 関連データ: `projects`, `products`, `quotes`, `inventories`
+- 今後の拡張: 提案商品ごとの採用確度、商品別売上実績、見積明細との自動同期。

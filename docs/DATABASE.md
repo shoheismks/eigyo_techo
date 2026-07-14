@@ -229,13 +229,20 @@ erDiagram
 
 - 目的: 1つの取引先または仕入先に複数の営業案件・仕入案件を紐付け、商談、見積、サンプル、クレーム、予定、担当者を案件単位で管理する。
 - 主キー: `id`
-- 主要カラム: `user_id`, `title`, `customer_id`, `supplier_id`, `contact_ids`, `type`, `status`, `priority`, `owner_user_id`, `product_ids`, `inventory_ids`, `quote_ids`, `sample_ids`, `complaint_ids`, `start_date`, `expected_close_date`, `next_action_date`, `expected_sales`, `expected_gross_profit`, `expected_operating_profit`, `memo`, `created_by`, `created_at`, `updated_at`
+- 主要カラム: `user_id`, `title`, `customer_id`, `supplier_id`, `contact_ids`, `type`, `status`, `priority`, `owner_user_id`, `product_ids`, `product_proposals`, `inventory_ids`, `quote_ids`, `sample_ids`, `complaint_ids`, `start_date`, `expected_close_date`, `next_action_date`, `expected_sales`, `expected_gross_profit`, `expected_operating_profit`, `memo`, `created_by`, `created_at`, `updated_at`
 - 外部キー: 現時点では既存互換のためID文字列で保持。将来 `customers.id`, `suppliers.id`, `contacts.id`, `products.id`, `inventories.id`, `quotes.id`, `samples.id`, `claims.id` へ外部キー化を検討する。
 - 関連テーブル: `customers`, `suppliers`, `contacts`, `products`, `inventories`, `quotes`, `samples`, `claims`, `events`, `attachments`
 - Storage利用有無: なし。案件添付は `attachments.project_id` または `owner_type = project` でStorage URLのみ保持する。
 - RLS有無: あり。`auth.uid() = user_id`
 - 検索対象項目: `title`, `type`, `status`, `priority`, `memo`, 関連する取引先名、仕入先名
 - 今後追加予定項目: `lost_reason`, `probability`, `actual_sales`, `actual_gross_profit`, `actual_operating_profit`, `closed_at`, `updated_by`, `updated_by_name`
+
+### projects.product_proposals
+
+- 目的: 案件単位で複数商品の提案・採用進捗、見込数量、想定売価、原価、利益、採用/不採用理由、競合商品を管理する。
+- 保存形式: `jsonb` 配列。1要素は `id`, `productId`, `status`, `monthlyExpectedQuantity`, `annualExpectedQuantity`, `unit`, `expectedSellingPrice`, `expectedCost`, `expectedExpense`, `expectedGrossProfit`, `expectedOperatingProfit`, `expectedRealProfit`, `reasonCategory`, `adoptionReason`, `rejectionReason`, `competitorProduct`, `memo`, `createdAt`, `updatedAt` を持つ。
+- 関連テーブル: `projects`, `products`
+- RLS有無: `projects` のRLSに従う。
 
 ## quotes
 

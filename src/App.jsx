@@ -662,6 +662,7 @@ function ActivePage({
         adoptions={adoptions}
         samples={samples}
         quotes={quotes}
+        projects={projects}
         customers={customers}
         suppliers={suppliers}
         addProduct={addProduct}

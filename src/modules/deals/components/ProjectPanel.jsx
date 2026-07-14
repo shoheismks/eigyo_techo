@@ -2,6 +2,15 @@ import { useMemo, useState } from 'react';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import { PROJECT_PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../constants.js';
 import { emptyProject } from '../hooks/useProjects.js';
+import {
+  PROJECT_PRODUCT_REASON_OPTIONS,
+  PROJECT_PRODUCT_STATUSES,
+  PROJECT_PRODUCT_UNITS,
+  calculateProjectProductProposal,
+  emptyProjectProductProposal,
+  normalizeProjectProductProposal,
+  summarizeProjectProductProposals,
+} from '../services/projectProductProposalService.js';
 
 function formatCurrency(value) {
   if (value === '' || value === null || value === undefined) return '-';
@@ -146,6 +155,7 @@ function isQuoteRelatedToProject(quote, project) {
 
 function buildProjectDashboard(project, { quotes = [], events = [], contacts = [] }) {
   const relatedQuotes = quotes.filter((quote) => isQuoteRelatedToProject(quote, project));
+  const proposalTotals = summarizeProjectProductProposals(project.productProposals ?? []);
   const quoteTotals = relatedQuotes.reduce((totals, quote) => {
     const amount = getQuoteAmount(quote);
     const cost = getQuoteCost(quote);
@@ -169,10 +179,11 @@ function buildProjectDashboard(project, { quotes = [], events = [], contacts = [
     realProfit: 0,
   });
 
-  const sales = quoteTotals.sales || toNumber(project.expectedSales);
-  const grossMargin = quoteTotals.grossMargin || toNumber(project.expectedGrossProfit);
-  const operatingProfit = quoteTotals.operatingProfit || toNumber(project.expectedOperatingProfit);
-  const realProfit = relatedQuotes.length > 0 ? quoteTotals.realProfit : operatingProfit;
+  const hasFinancialSource = relatedQuotes.length > 0 || (project.productProposals ?? []).length > 0;
+  const sales = hasFinancialSource ? quoteTotals.sales + proposalTotals.sales : toNumber(project.expectedSales);
+  const grossMargin = hasFinancialSource ? quoteTotals.grossMargin + proposalTotals.grossMargin : toNumber(project.expectedGrossProfit);
+  const operatingProfit = hasFinancialSource ? quoteTotals.operatingProfit + proposalTotals.operatingProfit : toNumber(project.expectedOperatingProfit);
+  const realProfit = hasFinancialSource ? quoteTotals.realProfit + proposalTotals.realProfit : operatingProfit;
   const nextSchedule = events
     .filter((event) => isLinkedByProject(event, project))
     .filter((event) => event.startAt || event.nextFollowDate)
@@ -183,9 +194,9 @@ function buildProjectDashboard(project, { quotes = [], events = [], contacts = [
   return {
     probability: getProbability(project),
     sales,
-    cost: quoteTotals.cost,
+    cost: quoteTotals.cost + proposalTotals.cost,
     grossMargin,
-    expenseTotal: quoteTotals.expenseTotal,
+    expenseTotal: quoteTotals.expenseTotal + proposalTotals.expenseTotal,
     operatingProfit,
     realProfit,
     nextAction: project.nextActionDate || '-',
@@ -196,6 +207,7 @@ function buildProjectDashboard(project, { quotes = [], events = [], contacts = [
     priority: project.priority || '-',
     status: project.status || '-',
     quoteCount: relatedQuotes.length,
+    proposalCount: project.productProposals?.length ?? 0,
     warning: stagnantDays >= 14,
   };
 }
@@ -339,6 +351,25 @@ function buildProjectTimeline({
         writer: project.ownerUserId || project.createdBy || '-',
         action: { label: '商品', type: 'products' },
         hasAttachment: Boolean(product.imageFile?.url || product.productMaterialFile?.url || product.specSheetFile?.url),
+      }));
+    });
+
+  (project.productProposals ?? [])
+    .map((proposal) => ({
+      proposal,
+      product: products.find((product) => product.id === proposal.productId),
+    }))
+    .forEach(({ proposal, product }) => {
+      const totals = calculateProjectProductProposal(proposal);
+      items.push(timelineItem({
+        id: `product-proposal-${proposal.id}`,
+        date: proposal.updatedAt || proposal.createdAt || project.updatedAt || project.createdAt,
+        type: '商品提案',
+        content: `${product?.name || '商品'} / ${proposal.status || '-'} / 見込粗利 ${formatCurrency(totals.grossProfit)}`,
+        owner,
+        writer: project.ownerUserId || project.createdBy || '-',
+        action: { label: '商品', type: 'products' },
+        hasAttachment: Boolean(product?.imageFile?.url || product?.productMaterialFile?.url || product?.specSheetFile?.url),
       }));
     });
 
@@ -551,9 +582,15 @@ export default function ProjectPanel({
       return;
     }
 
+    const productProposals = (form.productProposals ?? []).map((proposal) => normalizeProjectProductProposal(proposal));
+    const proposalTotals = summarizeProjectProductProposals(productProposals);
     const payload = {
       ...form,
       title: form.title.trim(),
+      productProposals,
+      expectedSales: form.expectedSales || proposalTotals.sales || '',
+      expectedGrossProfit: form.expectedGrossProfit || proposalTotals.grossMargin || '',
+      expectedOperatingProfit: form.expectedOperatingProfit || proposalTotals.operatingProfit || '',
     };
 
     if (editingProject) {
@@ -633,6 +670,21 @@ export default function ProjectPanel({
           <ProjectCheckboxes title="見積" items={relatedQuotes} selectedIds={form.quoteIds} getLabel={(item) => item.quoteNumber || item.projectName || item.id} onToggle={(id) => toggleFormArray('quoteIds', id)} />
           <ProjectCheckboxes title="サンプル" items={relatedSamples} selectedIds={form.sampleIds} getLabel={(item) => item.sampleName || item.id} onToggle={(id) => toggleFormArray('sampleIds', id)} />
           <ProjectCheckboxes title="クレーム" items={relatedComplaints} selectedIds={form.complaintIds} getLabel={(item) => item.title || item.memo || item.id} onToggle={(id) => toggleFormArray('complaintIds', id)} />
+
+          <ProjectProductProposalManager
+            products={products}
+            proposals={form.productProposals ?? []}
+            onChange={(nextProposals) => {
+              setForm((current) => ({
+                ...current,
+                productProposals: nextProposals,
+                productIds: Array.from(new Set([
+                  ...(current.productIds ?? []),
+                  ...nextProposals.map((proposal) => proposal.productId).filter(Boolean),
+                ])),
+              }));
+            }}
+          />
 
           {editingProject && editingDashboard && (
             <ProjectDecisionDashboard dashboard={editingDashboard} />
@@ -742,6 +794,182 @@ function ProjectDecisionDashboard({ dashboard }) {
       {dashboard.warning && (
         <p className="form-error-message">14日以上更新がない案件です。次回アクションまたは予定を確認してください。</p>
       )}
+    </section>
+  );
+}
+
+function ProjectProductProposalManager({ products, proposals, onChange }) {
+  const [editingId, setEditingId] = useState('');
+  const [draft, setDraft] = useState(() => emptyProjectProductProposal(products[0]?.id ?? ''));
+  const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const normalizedProposals = useMemo(
+    () => proposals.map((proposal) => normalizeProjectProductProposal(proposal)),
+    [proposals],
+  );
+  const proposalColumns = useMemo(
+    () => [
+      { key: 'product', label: '商品', minWidth: '220px', render: (proposal) => productMap.get(proposal.productId)?.name || '-' },
+      { key: 'status', label: '進捗', minWidth: '100px', render: (proposal) => proposal.status },
+      { key: 'monthly', label: '月間', minWidth: '90px', render: (proposal) => proposal.monthlyExpectedQuantity || '-' },
+      { key: 'annual', label: '年間', minWidth: '90px', render: (proposal) => proposal.annualExpectedQuantity || calculateProjectProductProposal(proposal).annualQuantity || '-' },
+      { key: 'unit', label: '単位', minWidth: '70px', render: (proposal) => proposal.unit || '-' },
+      { key: 'selling', label: '想定売価', minWidth: '120px', render: (proposal) => formatCurrency(proposal.expectedSellingPrice) },
+      { key: 'cost', label: '想定原価', minWidth: '120px', render: (proposal) => formatCurrency(proposal.expectedCost) },
+      { key: 'gross', label: '想定粗利', minWidth: '120px', render: (proposal) => formatCurrency(calculateProjectProductProposal(proposal).grossProfit) },
+      { key: 'operating', label: '営業利益', minWidth: '120px', render: (proposal) => formatCurrency(calculateProjectProductProposal(proposal).operatingProfit) },
+      { key: 'reason', label: '理由', minWidth: '160px', render: (proposal) => proposal.reasonCategory || proposal.adoptionReason || proposal.rejectionReason || '-' },
+    ],
+    [productMap],
+  );
+
+  function startNew() {
+    setEditingId('');
+    setDraft(emptyProjectProductProposal(products[0]?.id ?? ''));
+  }
+
+  function startEdit(proposal) {
+    setEditingId(proposal.id);
+    setDraft(normalizeProjectProductProposal(proposal));
+  }
+
+  function updateDraft(field, value) {
+    setDraft((current) => {
+      const next = normalizeProjectProductProposal({
+        ...current,
+        [field]: value,
+        updatedAt: new Date().toISOString(),
+      });
+      return next;
+    });
+  }
+
+  function saveProposal() {
+    const payload = normalizeProjectProductProposal(draft);
+    const exists = normalizedProposals.some((proposal) => proposal.id === payload.id);
+    const nextProposals = exists
+      ? normalizedProposals.map((proposal) => (proposal.id === payload.id ? payload : proposal))
+      : [...normalizedProposals, payload];
+    onChange(nextProposals);
+    startNew();
+  }
+
+  function removeProposal(id) {
+    onChange(normalizedProposals.filter((proposal) => proposal.id !== id));
+    if (editingId === id) startNew();
+  }
+
+  function duplicateProposal(proposal) {
+    onChange([
+      ...normalizedProposals,
+      normalizeProjectProductProposal({
+        ...proposal,
+        id: crypto.randomUUID(),
+        status: '未提案',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    ]);
+  }
+
+  const draftTotals = calculateProjectProductProposal(draft);
+
+  return (
+    <section className="project-product-manager project-editor-wide">
+      <div className="section-heading">
+        <div>
+          <h3>案件商品提案・採用管理</h3>
+          <span>{normalizedProposals.length}件</span>
+        </div>
+        <button type="button" className="ghost-button" onClick={startNew}>新規入力</button>
+      </div>
+
+      <div className="project-form-grid">
+        <label className="field-label project-editor-wide">
+          商品
+          <select value={draft.productId} onChange={(event) => updateDraft('productId', event.target.value)}>
+            <option value="">商品を選択</option>
+            {products.map((product) => (
+              <option value={product.id} key={product.id}>{product.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          進捗状態
+          <select value={draft.status} onChange={(event) => updateDraft('status', event.target.value)}>
+            {PROJECT_PRODUCT_STATUSES.map((status) => <option key={status}>{status}</option>)}
+          </select>
+        </label>
+        <label className="field-label">月間見込数量<input inputMode="decimal" value={draft.monthlyExpectedQuantity} onChange={(event) => updateDraft('monthlyExpectedQuantity', event.target.value)} /></label>
+        <label className="field-label">年間見込数量<input inputMode="decimal" value={draft.annualExpectedQuantity} onChange={(event) => updateDraft('annualExpectedQuantity', event.target.value)} /></label>
+        <label className="field-label">
+          単位
+          <select value={draft.unit} onChange={(event) => updateDraft('unit', event.target.value)}>
+            {PROJECT_PRODUCT_UNITS.map((unit) => <option key={unit}>{unit}</option>)}
+          </select>
+        </label>
+        <label className="field-label">想定売価<input inputMode="decimal" value={draft.expectedSellingPrice} onChange={(event) => updateDraft('expectedSellingPrice', event.target.value)} /></label>
+        <label className="field-label">想定原価<input inputMode="decimal" value={draft.expectedCost} onChange={(event) => updateDraft('expectedCost', event.target.value)} /></label>
+        <label className="field-label">想定経費<input inputMode="decimal" value={draft.expectedExpense} onChange={(event) => updateDraft('expectedExpense', event.target.value)} /></label>
+        <label className="field-label">
+          採用/不採用理由
+          <select value={draft.reasonCategory} onChange={(event) => updateDraft('reasonCategory', event.target.value)}>
+            <option value="">未選択</option>
+            {PROJECT_PRODUCT_REASON_OPTIONS.map((reason) => <option key={reason}>{reason}</option>)}
+          </select>
+        </label>
+        <label className="field-label">競合商品<input value={draft.competitorProduct} onChange={(event) => updateDraft('competitorProduct', event.target.value)} /></label>
+        <label className="field-label project-editor-wide">採用理由<textarea value={draft.adoptionReason} onChange={(event) => updateDraft('adoptionReason', event.target.value)} /></label>
+        <label className="field-label project-editor-wide">不採用理由<textarea value={draft.rejectionReason} onChange={(event) => updateDraft('rejectionReason', event.target.value)} /></label>
+        <label className="field-label project-editor-wide">メモ<textarea value={draft.memo} onChange={(event) => updateDraft('memo', event.target.value)} /></label>
+      </div>
+
+      <div className="score-panel project-kpi-grid proposal-kpi-grid">
+        <div><span>想定粗利</span><strong>{formatCurrency(draftTotals.grossProfit)}</strong></div>
+        <div><span>想定営業利益</span><strong>{formatCurrency(draftTotals.operatingProfit)}</strong></div>
+        <div><span>想定実質利益</span><strong>{formatCurrency(draftTotals.realProfit)}</strong></div>
+      </div>
+
+      <div className="customer-editor-actions">
+        <button type="button" className="ghost-button" onClick={startNew}>クリア</button>
+        <button type="button" className="primary-button" onClick={saveProposal}>{editingId ? '商品提案を更新' : '商品提案を追加'}</button>
+      </div>
+
+      <DesktopTable
+        actions={(proposal) => (
+          <>
+            <button type="button" className="ghost-button" onClick={() => startEdit(proposal)}>編集</button>
+            <button type="button" className="ghost-button" onClick={() => duplicateProposal(proposal)}>複製</button>
+            <button type="button" className="ghost-button danger" onClick={() => removeProposal(proposal.id)}>削除</button>
+          </>
+        )}
+        actionWidth="220px"
+        className="project-product-table"
+        columns={proposalColumns}
+        minWidth={1280}
+        rows={normalizedProposals}
+        emptyMessage="案件の商品提案はまだありません"
+      />
+
+      <div className="card-grid two-column-grid desktop-card-fallback">
+        {normalizedProposals.map((proposal) => {
+          const totals = calculateProjectProductProposal(proposal);
+          return (
+            <article className="company-card" key={proposal.id}>
+              <div className="company-heading">
+                <h3>{productMap.get(proposal.productId)?.name || '商品未選択'}</h3>
+                <p>{proposal.status}</p>
+              </div>
+              <p className="inline-helper">年間 {proposal.annualExpectedQuantity || totals.annualQuantity || '-'} {proposal.unit} / 粗利 {formatCurrency(totals.grossProfit)}</p>
+              <p>{proposal.memo || proposal.adoptionReason || proposal.rejectionReason || 'メモなし'}</p>
+              <div className="card-actions">
+                <button type="button" className="ghost-button" onClick={() => startEdit(proposal)}>編集</button>
+                <button type="button" className="ghost-button" onClick={() => duplicateProposal(proposal)}>複製</button>
+                <button type="button" className="ghost-button danger" onClick={() => removeProposal(proposal.id)}>削除</button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }
