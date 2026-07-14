@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
+import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 
 const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
 const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];
@@ -103,6 +104,17 @@ function HistoryReplies({ replies, onStartReply, depth = 1 }) {
 export default function CustomerDetail({
   customer,
   products,
+  projects = [],
+  suppliers = [],
+  contacts = [],
+  inventories = [],
+  quotes = [],
+  samples = [],
+  complaints = [],
+  addProject,
+  updateProject,
+  removeProject,
+  onOpenKarte,
   updateCustomer,
   setActivePage,
 }) {
@@ -317,6 +329,25 @@ export default function CustomerDetail({
           <textarea value={customer.memo} onChange={(event) => updateField('memo', event.target.value)} />
         </label>
       </section>
+
+      <ProjectPanel
+        title="案件"
+        projects={projects}
+        customers={customer ? [customer] : []}
+        suppliers={suppliers}
+        contacts={contacts}
+        products={products}
+        inventories={inventories}
+        quotes={quotes}
+        samples={samples}
+        complaints={complaints}
+        addProject={addProject}
+        updateProject={updateProject}
+        removeProject={removeProject}
+        defaultCustomerId={customer.id}
+        setActivePage={setActivePage}
+        onOpenKarte={onOpenKarte}
+      />
 
       <section className={`detail-section ${customer.isDoNotContact ? 'ng-panel' : ''}`}>
         <label className="switch-row">

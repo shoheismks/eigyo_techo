@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
+import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 
 const emptySupplier = {
   name: '',
@@ -24,7 +25,26 @@ function includesText(value, keyword) {
   return String(value ?? '').toLowerCase().includes(keyword);
 }
 
-export default function Suppliers({ suppliers, addSupplier, updateSupplier, removeSupplier, userId }) {
+export default function Suppliers({
+  suppliers,
+  projects = [],
+  customers = [],
+  contacts = [],
+  products = [],
+  inventories = [],
+  quotes = [],
+  samples = [],
+  complaints = [],
+  addSupplier,
+  updateSupplier,
+  removeSupplier,
+  addProject,
+  updateProject,
+  removeProject,
+  setActivePage,
+  onOpenKarte,
+  userId,
+}) {
   const [keyword, setKeyword] = useState('');
   const [form, setForm] = useState(emptySupplier);
   const [historySupplierId, setHistorySupplierId] = useState('');
@@ -188,6 +208,24 @@ export default function Suppliers({ suppliers, addSupplier, updateSupplier, remo
           <button className="primary-button" type="submit">商談メモを追加</button>
         </form>
       </section>
+
+      <ProjectPanel
+        title="仕入先案件"
+        projects={projects}
+        customers={customers}
+        suppliers={suppliers}
+        contacts={contacts}
+        products={products}
+        inventories={inventories}
+        quotes={quotes}
+        samples={samples}
+        complaints={complaints}
+        addProject={addProject}
+        updateProject={updateProject}
+        removeProject={removeProject}
+        setActivePage={setActivePage}
+        onOpenKarte={onOpenKarte}
+      />
 
       <section className="result-stack suppliers-list-section">
         <div className="section-heading">

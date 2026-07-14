@@ -7,6 +7,7 @@ import { useBusinessCards } from './modules/businessCards/hooks/useBusinessCards
 import { useComplaints } from './modules/claims/hooks/useComplaints.js';
 import { useContacts } from './modules/contacts/hooks/useContacts.js';
 import { useCustomers } from './modules/customers/hooks/useCustomers.js';
+import { useProjects } from './modules/deals/hooks/useProjects.js';
 import { useEvents } from './modules/calendar/hooks/useEvents.js';
 import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
@@ -119,6 +120,12 @@ function AuthenticatedApp() {
     updateRecord: updateQuote,
     removeRecord: removeQuote,
   } = useQuotes(userId);
+  const {
+    records: projects,
+    addRecord: addProject,
+    updateRecord: updateProject,
+    removeRecord: removeProject,
+  } = useProjects(userId);
   const {
     records: contacts,
     addRecord: addContact,
@@ -515,10 +522,14 @@ function ActivePage({
           samples={samples}
           quotes={quotes}
           suppliers={suppliers}
+          projects={projects}
           complaints={complaints}
           events={events}
           attachments={attachments}
           updateCustomer={updateCustomer}
+          addProject={addProject}
+          updateProject={updateProject}
+          removeProject={removeProject}
           addContact={addContact}
           addBusinessCard={addBusinessCard}
           addComplaint={addComplaint}
@@ -545,6 +556,16 @@ function ActivePage({
         customer={selectedCustomer}
         products={products}
         contacts={contacts}
+        projects={projects}
+        suppliers={suppliers}
+        inventories={inventories}
+        quotes={quotes}
+        samples={samples}
+        complaints={complaints}
+        addProject={addProject}
+        updateProject={updateProject}
+        removeProject={removeProject}
+        onOpenKarte={openCustomerKarte}
         updateCustomer={updateCustomer}
         setActivePage={setActivePage}
         user={user}
@@ -553,7 +574,25 @@ function ActivePage({
   }
 
   if (activePage === 'Pipeline') {
-    return <Pipeline customers={customers} updateCustomer={updateCustomer} />;
+    return (
+      <Pipeline
+        customers={customers}
+        suppliers={suppliers}
+        contacts={contacts}
+        products={products}
+        inventories={inventories}
+        quotes={quotes}
+        samples={samples}
+        complaints={complaints}
+        projects={projects}
+        addProject={addProject}
+        updateProject={updateProject}
+        removeProject={removeProject}
+        updateCustomer={updateCustomer}
+        setActivePage={setActivePage}
+        onOpenKarte={openCustomerKarte}
+      />
+    );
   }
 
   if (activePage === 'Products') {
@@ -606,9 +645,22 @@ function ActivePage({
     return (
       <Suppliers
         suppliers={suppliers}
+        projects={projects}
+        customers={customers}
         addSupplier={addSupplier}
         updateSupplier={updateSupplier}
         removeSupplier={removeSupplier}
+        contacts={contacts}
+        products={products}
+        inventories={inventories}
+        quotes={quotes}
+        samples={samples}
+        complaints={complaints}
+        addProject={addProject}
+        updateProject={updateProject}
+        removeProject={removeProject}
+        setActivePage={setActivePage}
+        onOpenKarte={openCustomerKarte}
         userId={userId}
       />
     );
@@ -667,6 +719,7 @@ function ActivePage({
         contacts={contacts}
         events={events}
         samples={samples}
+        projects={projects}
         quotes={quotes}
         complaints={complaints}
         addEvent={addEvent}
@@ -695,6 +748,7 @@ function ActivePage({
           contacts,
           businessCards,
           suppliers,
+          projects,
           complaints,
           samples,
           quotes,
@@ -709,6 +763,7 @@ function ActivePage({
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },
           suppliers: { records: suppliers, add: addSupplier, update: updateSupplier },
+          projects: { records: projects, add: addProject, update: updateProject },
           complaints: { records: complaints, add: addComplaint, update: updateComplaint },
           samples: { records: samples, add: addSample, update: updateSample },
           quotes: { records: quotes, add: addQuote, update: updateQuote },

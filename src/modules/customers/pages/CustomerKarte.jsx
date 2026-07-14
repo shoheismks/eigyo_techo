@@ -31,6 +31,7 @@ import { createEmptyMeetingMinutes, generateMeetingMinutesDraft } from '../../..
 import { createLineFollowNote } from '../../../services/lineIntegrationService.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
+import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 
 function googleSearchUrl(companyName) {
   return `https://www.google.com/search?q=${encodeURIComponent(companyName)}`;
@@ -217,12 +218,16 @@ export default function CustomerKarte({
   inventories = [],
   adoptions = [],
   suppliers = [],
+  projects = [],
   complaints,
   events = [],
   attachments,
   samples = [],
   quotes = [],
   updateCustomer,
+  addProject,
+  updateProject,
+  removeProject,
   addAttachment,
   addSample,
   updateSample,
@@ -934,6 +939,24 @@ export default function CustomerKarte({
             )) : <p className="inline-helper">活動履歴はまだありません。</p>}
           </div>
         </Section>
+
+        <ProjectPanel
+          title="案件"
+          projects={projects}
+          customers={customers}
+          suppliers={suppliers}
+          contacts={contacts}
+          products={products}
+          inventories={inventories}
+          quotes={quotes}
+          samples={samples}
+          complaints={complaints}
+          addProject={addProject}
+          updateProject={updateProject}
+          removeProject={removeProject}
+          defaultCustomerId={customer.id}
+          setActivePage={setActivePage}
+        />
 
         <Section title="商談履歴" count={karte.dealHistories.length}>
           <div className="timeline-list">

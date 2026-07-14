@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DesktopTable from '../shared/components/DesktopTable.jsx';
 import { PIPELINE_STATUSES } from '../modules/deals/constants.js';
+import ProjectPanel from '../modules/deals/components/ProjectPanel.jsx';
 
 const ALL = 'すべて';
 
@@ -18,7 +19,23 @@ function followDate(customer) {
   return customer.nextFollowUpDate || customer.nextFollowDate || '';
 }
 
-export default function Pipeline({ customers, updateCustomer }) {
+export default function Pipeline({
+  customers,
+  suppliers = [],
+  contacts = [],
+  products = [],
+  inventories = [],
+  quotes = [],
+  samples = [],
+  complaints = [],
+  projects = [],
+  addProject,
+  updateProject,
+  removeProject,
+  updateCustomer,
+  setActivePage,
+  onOpenKarte,
+}) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '');
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [keyword, setKeyword] = useState('');
@@ -99,6 +116,24 @@ export default function Pipeline({ customers, updateCustomer }) {
           </select>
         </label>
       </section>
+
+      <ProjectPanel
+        title="案件一覧"
+        projects={projects}
+        customers={customers}
+        suppliers={suppliers}
+        contacts={contacts}
+        products={products}
+        inventories={inventories}
+        quotes={quotes}
+        samples={samples}
+        complaints={complaints}
+        addProject={addProject}
+        updateProject={updateProject}
+        removeProject={removeProject}
+        setActivePage={setActivePage}
+        onOpenKarte={onOpenKarte}
+      />
 
       <section className="pipeline-desktop">
         <aside className="pipeline-list-pane">

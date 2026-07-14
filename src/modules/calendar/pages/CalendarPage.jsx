@@ -146,6 +146,7 @@ function eventDate(event) {
 export default function CalendarPage({
   customers,
   contacts = [],
+  projects = [],
   events = [],
   samples = [],
   quotes = [],
@@ -451,6 +452,7 @@ export default function CalendarPage({
         <EventEditor
           contacts={contacts}
           customers={customers}
+          projects={projects}
           editing={Boolean(editingEvent)}
           form={form}
           onClose={closeForm}
@@ -485,6 +487,7 @@ function CalendarEventButton({ event, customers, contacts, compact = false, onCl
 function EventEditor({
   contacts,
   customers,
+  projects = [],
   editing,
   form,
   onClose,
@@ -529,7 +532,12 @@ function EventEditor({
         </label>
         <label className="field-label">
           案件
-          <input value={form.dealId} onChange={(event) => updateForm('dealId', event.target.value)} placeholder="案件名またはID" />
+          <select value={form.dealId} onChange={(event) => updateForm('dealId', event.target.value)}>
+            <option value="">未選択</option>
+            {projects
+              .filter((project) => !form.customerId || project.customerId === form.customerId)
+              .map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}
+          </select>
         </label>
         <label className="field-label">
           場所
