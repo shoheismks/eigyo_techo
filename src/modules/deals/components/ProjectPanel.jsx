@@ -30,6 +30,244 @@ function makeInitialProject(defaultCustomerId = '', defaultSupplierId = '') {
   };
 }
 
+function formatDate(value) {
+  if (!value) return '-';
+  return String(value).slice(0, 10);
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+  return date.toLocaleString('ja-JP');
+}
+
+function hasSameDay(a, b) {
+  return a && b && String(a).slice(0, 10) === String(b).slice(0, 10);
+}
+
+function getContactNames(contactIds = [], contacts = []) {
+  return contactIds
+    .map((id) => contacts.find((contact) => contact.id === id)?.name)
+    .filter(Boolean)
+    .join(', ');
+}
+
+function isLinkedByProject(record, project, linkedIds = []) {
+  if (!record) return false;
+  return (
+    record.projectId === project.id ||
+    record.project_id === project.id ||
+    record.dealId === project.id ||
+    record.deal_id === project.id ||
+    linkedIds.includes(record.id)
+  );
+}
+
+function isOwnerRelated(record, project) {
+  return (
+    (project.customerId && record.customerId === project.customerId) ||
+    (project.customerId && record.customer_id === project.customerId) ||
+    (project.supplierId && record.supplierId === project.supplierId) ||
+    (project.supplierId && record.supplier_id === project.supplierId)
+  );
+}
+
+function timelineItem({ id, date, type, content, owner = '', writer = '', contacts = '', action = null, hasAttachment = false }) {
+  return {
+    id,
+    date: date || '',
+    type,
+    content,
+    owner,
+    writer,
+    contacts,
+    action,
+    hasAttachment,
+  };
+}
+
+function buildProjectTimeline({
+  project,
+  customer,
+  supplier,
+  contacts = [],
+  products = [],
+  inventories = [],
+  quotes = [],
+  samples = [],
+  complaints = [],
+  events = [],
+  attachments = [],
+}) {
+  const items = [];
+  const owner = customer?.companyName || supplier?.name || '';
+
+  items.push(timelineItem({
+    id: `project-created-${project.id}`,
+    date: project.createdAt || project.startDate,
+    type: '案件作成',
+    content: `${project.title || '案件'}を作成`,
+    owner,
+    writer: project.createdBy || project.ownerUserId || '-',
+    contacts: getContactNames(project.contactIds, contacts),
+    action: project.customerId ? { label: '顧客カルテ', type: 'customer', id: project.customerId } : project.supplierId ? { label: '仕入先', type: 'supplier', id: project.supplierId } : null,
+  }));
+
+  if (project.updatedAt && !hasSameDay(project.updatedAt, project.createdAt)) {
+    items.push(timelineItem({
+      id: `project-updated-${project.id}`,
+      date: project.updatedAt,
+      type: '案件更新',
+      content: `ステータス: ${project.status || '-'} / 次回: ${project.nextActionDate || '-'}`,
+      owner,
+      writer: project.createdBy || project.ownerUserId || '-',
+      contacts: getContactNames(project.contactIds, contacts),
+    }));
+  }
+
+  if (project.status) {
+    items.push(timelineItem({
+      id: `project-status-${project.id}`,
+      date: project.updatedAt || project.createdAt,
+      type: 'ステータス変更',
+      content: `現在のステータス: ${project.status}`,
+      owner,
+      writer: project.ownerUserId || project.createdBy || '-',
+      contacts: getContactNames(project.contactIds, contacts),
+    }));
+  }
+
+  (customer?.dealHistories ?? [])
+    .filter((history) => isLinkedByProject(history, project) || isOwnerRelated(history, project))
+    .forEach((history) => {
+      items.push(timelineItem({
+        id: `deal-${history.id}`,
+        date: history.date || history.createdAt,
+        type: '商談',
+        content: history.summary || history.type || '商談履歴',
+        owner,
+        writer: history.createdByName || history.createdBy || '-',
+        contacts: (history.contactNames ?? []).join(', ') || getContactNames(history.contactIds, contacts),
+        action: project.customerId ? { label: '顧客カルテ', type: 'customer', id: project.customerId } : null,
+        hasAttachment: Boolean(history.attachments?.length),
+      }));
+    });
+
+  events
+    .filter((event) => isLinkedByProject(event, project) || isOwnerRelated(event, project))
+    .forEach((event) => {
+      items.push(timelineItem({
+        id: `event-${event.id}`,
+        date: event.startAt || event.nextFollowDate || event.createdAt,
+        type: '予定',
+        content: `${event.title || event.eventType || '予定'} / ${event.status || '-'}`,
+        owner,
+        writer: event.createdByName || event.createdBy || '-',
+        contacts: getContactNames(event.contactIds, contacts),
+        action: { label: 'カレンダー', type: 'calendar' },
+      }));
+    });
+
+  quotes
+    .filter((quote) => isLinkedByProject(quote, project, project.quoteIds) || quote.projectName === project.title)
+    .forEach((quote) => {
+      items.push(timelineItem({
+        id: `quote-${quote.id}`,
+        date: quote.submittedDate || quote.issueDate || quote.createdAt,
+        type: '見積',
+        content: `${quote.quoteNumber || '見積'} / ${quote.status || '-'} / ${formatCurrency(quote.grandTotal || quote.totalAmount)}`,
+        owner,
+        writer: quote.createdByName || quote.createdBy || '-',
+        contacts: getContactNames(quote.contactIds, contacts),
+        action: project.customerId ? { label: '顧客カルテ', type: 'customer', id: project.customerId } : null,
+        hasAttachment: Boolean(quote.pdfUrl || quote.fileUrl || quote.attachments?.length),
+      }));
+    });
+
+  samples
+    .filter((sample) => isLinkedByProject(sample, project, project.sampleIds))
+    .forEach((sample) => {
+      items.push(timelineItem({
+        id: `sample-${sample.id}`,
+        date: sample.shippedDate || sample.arrivalDate || sample.followUpDate || sample.createdAt,
+        type: 'サンプル',
+        content: `${sample.sampleName || 'サンプル'} / ${sample.status || '-'}`,
+        owner,
+        writer: sample.createdByName || sample.createdBy || '-',
+        contacts: getContactNames(sample.contactIds, contacts),
+        action: project.customerId ? { label: '顧客カルテ', type: 'customer', id: project.customerId } : null,
+      }));
+    });
+
+  products
+    .filter((product) => project.productIds?.includes(product.id))
+    .forEach((product) => {
+      items.push(timelineItem({
+        id: `product-${product.id}`,
+        date: project.updatedAt || project.createdAt,
+        type: '商品提案',
+        content: `${product.name || '商品'}を案件に紐付け`,
+        owner,
+        writer: project.ownerUserId || project.createdBy || '-',
+        action: { label: '商品', type: 'products' },
+        hasAttachment: Boolean(product.imageFile?.url || product.productMaterialFile?.url || product.specSheetFile?.url),
+      }));
+    });
+
+  inventories
+    .filter((inventory) => project.inventoryIds?.includes(inventory.id))
+    .forEach((inventory) => {
+      items.push(timelineItem({
+        id: `inventory-${inventory.id}`,
+        date: project.updatedAt || inventory.updatedAt || inventory.createdAt,
+        type: '在庫選択',
+        content: `${inventory.inventoryName || inventory.lot || inventory.id} / ${inventory.inventoryStatus || '-'} / ${inventory.quantity || '-'} ${inventory.unit || ''}`,
+        owner,
+        writer: project.ownerUserId || project.createdBy || '-',
+        action: { label: '商品', type: 'products' },
+      }));
+    });
+
+  complaints
+    .filter((complaint) => isLinkedByProject(complaint, project, project.complaintIds))
+    .forEach((complaint) => {
+      items.push(timelineItem({
+        id: `complaint-${complaint.id}`,
+        date: complaint.createdAt || complaint.updatedAt,
+        type: 'クレーム',
+        content: `${complaint.title || 'クレーム'} / ${complaint.status || '-'}`,
+        owner,
+        writer: complaint.createdByName || complaint.createdBy || '-',
+        action: project.customerId ? { label: '顧客カルテ', type: 'customer', id: project.customerId } : null,
+        hasAttachment: Boolean(complaint.attachments?.length),
+      }));
+    });
+
+  attachments
+    .filter((attachment) =>
+      attachment.projectId === project.id ||
+      attachment.project_id === project.id ||
+      attachment.ownerType === 'project' && attachment.ownerId === project.id ||
+      attachment.owner_type === 'project' && attachment.owner_id === project.id ||
+      attachment.metadata?.projectId === project.id)
+    .forEach((attachment) => {
+      items.push(timelineItem({
+        id: `attachment-${attachment.id}`,
+        date: attachment.createdAt || attachment.uploadedAt || attachment.updatedAt,
+        type: '添付ファイル',
+        content: attachment.fileName || attachment.name || '添付ファイル',
+        owner,
+        writer: attachment.uploadedByName || attachment.uploadedBy || '-',
+        hasAttachment: true,
+      }));
+    });
+
+  return items
+    .filter((item) => item.date)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
 export default function ProjectPanel({
   title = '案件',
   projects = [],
@@ -41,6 +279,8 @@ export default function ProjectPanel({
   quotes = [],
   samples = [],
   complaints = [],
+  events = [],
+  attachments = [],
   addProject,
   updateProject,
   removeProject,
@@ -54,6 +294,7 @@ export default function ProjectPanel({
   const [form, setForm] = useState(() => makeInitialProject(defaultCustomerId, defaultSupplierId));
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState('');
+  const [timelineOrder, setTimelineOrder] = useState('desc');
 
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const supplierMap = useMemo(() => new Map(suppliers.map((supplier) => [supplier.id, supplier])), [suppliers]);
@@ -103,6 +344,30 @@ export default function ProjectPanel({
     () => complaints.filter((complaint) => !form.customerId || complaint.customerId === form.customerId),
     [complaints, form.customerId],
   );
+
+  const projectTimeline = useMemo(
+    () => editingProject
+      ? buildProjectTimeline({
+        project: editingProject,
+        customer: customerMap.get(editingProject.customerId),
+        supplier: supplierMap.get(editingProject.supplierId),
+        contacts,
+        products,
+        inventories,
+        quotes,
+        samples,
+        complaints,
+        events,
+        attachments,
+      })
+      : [],
+    [attachments, complaints, contacts, customerMap, editingProject, events, inventories, products, quotes, samples, supplierMap],
+  );
+
+  const orderedTimeline = useMemo(() => {
+    const nextTimeline = [...projectTimeline];
+    return timelineOrder === 'asc' ? nextTimeline.reverse() : nextTimeline;
+  }, [projectTimeline, timelineOrder]);
 
   const columns = useMemo(
     () => [
@@ -229,6 +494,15 @@ export default function ProjectPanel({
           <ProjectCheckboxes title="サンプル" items={relatedSamples} selectedIds={form.sampleIds} getLabel={(item) => item.sampleName || item.id} onToggle={(id) => toggleFormArray('sampleIds', id)} />
           <ProjectCheckboxes title="クレーム" items={relatedComplaints} selectedIds={form.complaintIds} getLabel={(item) => item.title || item.memo || item.id} onToggle={(id) => toggleFormArray('complaintIds', id)} />
 
+          {editingProject && (
+            <ProjectActivityTimeline
+              onNavigate={(activity) => navigateActivity(activity, { onOpenKarte, setActivePage })}
+              order={timelineOrder}
+              setOrder={setTimelineOrder}
+              timeline={orderedTimeline}
+            />
+          )}
+
           <div className="customer-editor-actions">
             <button type="button" className="ghost-button" onClick={() => setFormOpen(false)}>キャンセル</button>
             <button type="submit" className="primary-button">保存</button>
@@ -296,4 +570,86 @@ function ProjectCheckboxes({ title, items, selectedIds, getLabel, onToggle }) {
       </div>
     </fieldset>
   );
+}
+
+function ProjectActivityTimeline({ timeline, order, setOrder, onNavigate }) {
+  return (
+    <section className="project-timeline project-editor-wide">
+      <div className="section-heading">
+        <div>
+          <h3>活動タイムライン</h3>
+          <span>{timeline.length}件</span>
+        </div>
+        <div className="segmented-control compact-segmented" aria-label="案件タイムライン表示順">
+          <button type="button" className={order === 'desc' ? 'selected' : ''} onClick={() => setOrder('desc')}>
+            新しい順
+          </button>
+          <button type="button" className={order === 'asc' ? 'selected' : ''} onClick={() => setOrder('asc')}>
+            古い順
+          </button>
+        </div>
+      </div>
+
+      {timeline.length > 0 ? (
+        <div className="timeline-list">
+          {timeline.map((activity) => (
+            <article className={`history-card timeline-card project-timeline-card ${activity.type === 'クレーム' ? 'ng-card' : ''}`} key={activity.id}>
+              <div className="history-meta timeline-event-heading">
+                <span>{formatDateTime(activity.date)} / {activity.type}</span>
+                <small>{activity.writer || '-'}</small>
+              </div>
+              <p>{activity.content}</p>
+              <div className="timeline-event-grid">
+                <div>
+                  <span>担当者</span>
+                  <strong>{activity.contacts || '-'}</strong>
+                </div>
+                <div>
+                  <span>記載者</span>
+                  <strong>{activity.writer || '-'}</strong>
+                </div>
+                <div>
+                  <span>添付</span>
+                  <strong>{activity.hasAttachment ? 'あり' : 'なし'}</strong>
+                </div>
+              </div>
+              {activity.action && (
+                <div className="card-actions compact-actions">
+                  <button type="button" className="ghost-button" onClick={() => onNavigate(activity)}>
+                    {activity.action.label}へ
+                  </button>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="inline-helper">この案件の活動履歴はまだありません。</p>
+      )}
+    </section>
+  );
+}
+
+function navigateActivity(activity, { onOpenKarte, setActivePage }) {
+  const action = activity.action;
+  if (!action) return;
+
+  if (action.type === 'customer' && action.id) {
+    onOpenKarte?.(action.id);
+    return;
+  }
+
+  if (action.type === 'supplier') {
+    setActivePage?.('Suppliers');
+    return;
+  }
+
+  if (action.type === 'calendar') {
+    setActivePage?.('Calendar');
+    return;
+  }
+
+  if (action.type === 'products') {
+    setActivePage?.('Products');
+  }
 }

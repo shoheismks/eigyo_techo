@@ -111,6 +111,8 @@ export default function CustomerDetail({
   quotes = [],
   samples = [],
   complaints = [],
+  events = [],
+  attachments = [],
   addProject,
   updateProject,
   removeProject,
@@ -341,6 +343,8 @@ export default function CustomerDetail({
         quotes={quotes}
         samples={samples}
         complaints={complaints}
+        events={events}
+        attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}
         removeProject={removeProject}

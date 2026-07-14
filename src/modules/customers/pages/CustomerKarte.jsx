@@ -951,6 +951,8 @@ export default function CustomerKarte({
           quotes={quotes}
           samples={samples}
           complaints={complaints}
+          events={events}
+          attachments={attachments}
           addProject={addProject}
           updateProject={updateProject}
           removeProject={removeProject}

@@ -562,6 +562,8 @@ function ActivePage({
         quotes={quotes}
         samples={samples}
         complaints={complaints}
+        events={events}
+        attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}
         removeProject={removeProject}
@@ -584,6 +586,8 @@ function ActivePage({
         quotes={quotes}
         samples={samples}
         complaints={complaints}
+        events={events}
+        attachments={attachments}
         projects={projects}
         addProject={addProject}
         updateProject={updateProject}
@@ -656,6 +660,8 @@ function ActivePage({
         quotes={quotes}
         samples={samples}
         complaints={complaints}
+        events={events}
+        attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}
         removeProject={removeProject}

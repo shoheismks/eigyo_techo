@@ -35,6 +35,8 @@ export default function Suppliers({
   quotes = [],
   samples = [],
   complaints = [],
+  events = [],
+  attachments = [],
   addSupplier,
   updateSupplier,
   removeSupplier,
@@ -220,6 +222,8 @@ export default function Suppliers({
         quotes={quotes}
         samples={samples}
         complaints={complaints}
+        events={events}
+        attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}
         removeProject={removeProject}
