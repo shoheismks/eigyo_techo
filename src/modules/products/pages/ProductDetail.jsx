@@ -64,6 +64,16 @@ function searchText(values) {
   return values.filter(Boolean).join(' ').toLowerCase();
 }
 
+function productSnapshot(product) {
+  if (!product) return '';
+  const {
+    updatedAt: _updatedAt,
+    createdAt: _createdAt,
+    ...rest
+  } = normalizeProduct(product);
+  return JSON.stringify(rest);
+}
+
 export default function ProductDetail({
   product,
   inventories = [],
@@ -95,10 +105,20 @@ export default function ProductDetail({
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState('all');
   const [uploadingField, setUploadingField] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [savedSnapshot, setSavedSnapshot] = useState(() =>
+    productSnapshot(normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId)),
+  );
   const isNew = !product;
 
   useEffect(() => {
-    setForm(normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId));
+    const nextForm = normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId);
+    setForm(nextForm);
+    setSavedSnapshot(productSnapshot(nextForm));
+    setSaveMessage('');
+    setSaveError('');
   }, [product, userId]);
 
   useEffect(() => {
@@ -113,6 +133,10 @@ export default function ProductDetail({
     () => calculateGrossMarginRate(form.costPrice, form.desiredSellingPrice),
     [form.costPrice, form.desiredSellingPrice],
   );
+  const isDirty = useMemo(() => {
+    if (isNew) return true;
+    return productSnapshot(form) !== savedSnapshot;
+  }, [form, isNew, savedSnapshot]);
   const relatedInventories = useMemo(
     () =>
       inventories
@@ -208,6 +232,8 @@ export default function ProductDetail({
   );
 
   function updateField(field, value) {
+    setSaveMessage('');
+    setSaveError('');
     setForm((current) => {
       const nextForm = { ...current, [field]: value };
       if (field === 'costPrice' || field === 'desiredSellingPrice') {
@@ -255,6 +281,8 @@ export default function ProductDetail({
 
     setUploadingField(field);
     setUploadError('');
+    setSaveMessage('');
+    setSaveError('');
 
     try {
       const ownerId = form.id || crypto.randomUUID();
@@ -282,6 +310,8 @@ export default function ProductDetail({
   }
 
   function removeFile(field) {
+    setSaveMessage('');
+    setSaveError('');
     setForm((current) => ({
       ...current,
       [field]: null,
@@ -289,10 +319,18 @@ export default function ProductDetail({
     }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setSaveMessage('');
+    setSaveError('');
 
     if (!form.name.trim()) {
+      setSaveError('商品名は必須です。');
+      return;
+    }
+
+    if (!isNew && !isDirty) {
+      setSaveMessage('変更なし');
       return;
     }
 
@@ -304,13 +342,22 @@ export default function ProductDetail({
       grossMarginRate,
     }, userId);
 
-    if (isNew) {
-      addProduct(payload);
-    } else {
-      updateProduct(product.id, payload);
+    setSaving(true);
+    try {
+      if (isNew) {
+        addProduct(payload);
+        setActivePage('Products');
+      } else {
+        await updateProduct(product.id, payload);
+        setForm(payload);
+        setSavedSnapshot(productSnapshot(payload));
+        setSaveMessage('商品情報を更新しました。');
+      }
+    } catch (error) {
+      setSaveError(error.message || '商品情報の更新に失敗しました。');
+    } finally {
+      setSaving(false);
     }
-
-    setActivePage('Products');
   }
 
   return (
@@ -322,6 +369,13 @@ export default function ProductDetail({
       </section>
 
       <form onSubmit={handleSubmit}>
+        {(saveMessage || saveError) && (
+          <section className="detail-section save-status-section">
+            {saveMessage && <p className="notice-text">{saveMessage}</p>}
+            {saveError && <p className="error-text">{saveError}</p>}
+          </section>
+        )}
+
         <section className="detail-section">
           <div className="section-heading">
             <h2>基本情報</h2>
@@ -957,8 +1011,8 @@ export default function ProductDetail({
           )}
         </section>
 
-        <button className="primary-button sticky-submit" type="submit">
-          {isNew ? '商品を追加' : '商品を保存'}
+        <button className="primary-button sticky-submit" type="submit" disabled={saving || Boolean(uploadingField) || (!isNew && !isDirty)}>
+          {saving ? '保存中...' : isNew ? '登録' : isDirty ? '更新' : '変更なし'}
         </button>
       </form>
     </main>

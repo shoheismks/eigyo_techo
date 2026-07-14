@@ -298,13 +298,14 @@ export function useProducts(userId = '') {
     }
   }
 
-  function syncProducts(nextProducts, changedProduct = null) {
+  function syncProducts(nextProducts, changedProduct = null, options = {}) {
+    const { rejectOnError = false } = options;
     saveLocalProducts(nextProducts);
 
     if (!canUseCloud()) {
       setSyncState('local');
       setSyncError(getLocalSyncReason());
-      return;
+      return Promise.resolve();
     }
 
     const writeSequence = ++writeSequenceRef.current;
@@ -314,7 +315,7 @@ export function useProducts(userId = '') {
       ? upsertRecords(TABLE_NAME, [changedProduct], toSupabaseRow)
       : upsertRecords(TABLE_NAME, nextProducts, toSupabaseRow);
 
-    writePromise
+    return writePromise
       .then(() => reloadProducts(writeSequence))
       .catch((error) => {
         if (writeSequence !== writeSequenceRef.current) {
@@ -323,6 +324,9 @@ export function useProducts(userId = '') {
 
         setSyncState('local');
         setSyncError(getLocalSyncReason(error.message));
+        if (rejectOnError) {
+          throw error;
+        }
       });
   }
 
@@ -346,16 +350,21 @@ export function useProducts(userId = '') {
   }
 
   function updateProduct(id, updates) {
-    setProducts((current) => {
-      const nextProducts = current.map((product) =>
-        product.id === id
-          ? normalizeProduct({ ...product, ...updates, userId, updatedAt: new Date().toISOString() }, userId)
-          : product,
-      );
-      const changedProduct = nextProducts.find((product) => product.id === id);
-      syncProducts(nextProducts, changedProduct);
-      return nextProducts;
-    });
+    const currentProduct = products.find((product) => product.id === id);
+    if (!currentProduct) {
+      return Promise.reject(new Error('更新対象の商品が見つかりません。'));
+    }
+
+    const changedProduct = normalizeProduct({
+      ...currentProduct,
+      ...updates,
+      userId,
+      updatedAt: new Date().toISOString(),
+    }, userId);
+    const nextProducts = products.map((product) => (product.id === id ? changedProduct : product));
+
+    setProducts(nextProducts);
+    return syncProducts(nextProducts, changedProduct, { rejectOnError: true });
   }
 
   function removeProduct(id) {
