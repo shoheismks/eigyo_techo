@@ -9,6 +9,67 @@ function formatCurrency(value) {
   return Number.isFinite(number) ? `${number.toLocaleString('ja-JP')}円` : String(value);
 }
 
+function toNumber(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  const parsed = Number(String(value).replace(/,/g, '').replace(/%/g, '').trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getQuoteAmount(quote) {
+  return toNumber(quote.subtotal) || toNumber(quote.totalAmount) || toNumber(quote.grandTotal) || toNumber(quote.quantity) * toNumber(quote.unitPrice);
+}
+
+function getQuoteCost(quote) {
+  return toNumber(quote.inventoryCostTotal) || toNumber(quote.costAmount) || toNumber(quote.quantity) * toNumber(quote.costPrice);
+}
+
+function getQuoteGrossMargin(quote) {
+  const explicit = toNumber(quote.grossMarginAmount);
+  if (explicit !== 0) return explicit;
+  return getQuoteAmount(quote) - getQuoteCost(quote);
+}
+
+function getQuoteExpenses(quote) {
+  const expenseTotal =
+    toNumber(quote.freight) +
+    toNumber(quote.storageFee) +
+    toNumber(quote.customsFee) +
+    toNumber(quote.inspectionFee) +
+    toNumber(quote.processingFee) +
+    toNumber(quote.salesCommission) +
+    toNumber(quote.otherExpense) +
+    toNumber(quote.commonExpenseAmount);
+  const operatingProfit = getQuoteGrossMargin(quote) - expenseTotal;
+  const realProfit =
+    operatingProfit +
+    toNumber(quote.fxGainLoss) -
+    toNumber(quote.discount) -
+    toNumber(quote.disposalLoss);
+
+  return {
+    expenseTotal,
+    operatingProfit,
+    realProfit,
+  };
+}
+
+function getDaysSince(value) {
+  if (!value) return 0;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((today.getTime() - date.getTime()) / 86400000));
+}
+
+function getProbability(project) {
+  const statusIndex = PROJECT_STATUSES.indexOf(project.status);
+  const probabilities = [10, 20, 35, 50, 65, 80, 85, 90, 45, 0, 100];
+  if (statusIndex >= 0) return probabilities[statusIndex] ?? 30;
+  return toNumber(project.winProbability || project.probability) || 30;
+}
+
 function includesText(value, keyword) {
   return String(value ?? '').toLowerCase().includes(keyword);
 }
@@ -71,6 +132,72 @@ function isOwnerRelated(record, project) {
     (project.supplierId && record.supplierId === project.supplierId) ||
     (project.supplierId && record.supplier_id === project.supplierId)
   );
+}
+
+function isQuoteRelatedToProject(quote, project) {
+  const explicitlyLinked = isLinkedByProject(quote, project, project.quoteIds);
+  const titleLinked =
+    quote.projectName &&
+    quote.projectName === project.title &&
+    (!project.customerId || quote.customerId === project.customerId) &&
+    (!project.supplierId || quote.supplierId === project.supplierId);
+  return explicitlyLinked || titleLinked;
+}
+
+function buildProjectDashboard(project, { quotes = [], events = [], contacts = [] }) {
+  const relatedQuotes = quotes.filter((quote) => isQuoteRelatedToProject(quote, project));
+  const quoteTotals = relatedQuotes.reduce((totals, quote) => {
+    const amount = getQuoteAmount(quote);
+    const cost = getQuoteCost(quote);
+    const grossMargin = getQuoteGrossMargin(quote);
+    const expenses = getQuoteExpenses(quote);
+
+    return {
+      sales: totals.sales + amount,
+      cost: totals.cost + cost,
+      grossMargin: totals.grossMargin + grossMargin,
+      expenseTotal: totals.expenseTotal + expenses.expenseTotal,
+      operatingProfit: totals.operatingProfit + expenses.operatingProfit,
+      realProfit: totals.realProfit + expenses.realProfit,
+    };
+  }, {
+    sales: 0,
+    cost: 0,
+    grossMargin: 0,
+    expenseTotal: 0,
+    operatingProfit: 0,
+    realProfit: 0,
+  });
+
+  const sales = quoteTotals.sales || toNumber(project.expectedSales);
+  const grossMargin = quoteTotals.grossMargin || toNumber(project.expectedGrossProfit);
+  const operatingProfit = quoteTotals.operatingProfit || toNumber(project.expectedOperatingProfit);
+  const realProfit = relatedQuotes.length > 0 ? quoteTotals.realProfit : operatingProfit;
+  const nextSchedule = events
+    .filter((event) => isLinkedByProject(event, project))
+    .filter((event) => event.startAt || event.nextFollowDate)
+    .sort((a, b) => String(a.startAt || a.nextFollowDate).localeCompare(String(b.startAt || b.nextFollowDate)))[0];
+  const lastUpdatedAt = project.updatedAt || project.createdAt || project.startDate;
+  const stagnantDays = getDaysSince(lastUpdatedAt);
+
+  return {
+    probability: getProbability(project),
+    sales,
+    cost: quoteTotals.cost,
+    grossMargin,
+    expenseTotal: quoteTotals.expenseTotal,
+    operatingProfit,
+    realProfit,
+    nextAction: project.nextActionDate || '-',
+    nextSchedule: nextSchedule?.startAt || nextSchedule?.nextFollowDate || '',
+    lastUpdatedAt,
+    stagnantDays,
+    owner: getContactNames(project.contactIds, contacts) || project.ownerUserId || '-',
+    priority: project.priority || '-',
+    status: project.status || '-',
+    quoteCount: relatedQuotes.length,
+    warning: stagnantDays >= 14,
+  };
 }
 
 function timelineItem({ id, date, type, content, owner = '', writer = '', contacts = '', action = null, hasAttachment = false }) {
@@ -170,7 +297,7 @@ function buildProjectTimeline({
     });
 
   quotes
-    .filter((quote) => isLinkedByProject(quote, project, project.quoteIds) || quote.projectName === project.title)
+    .filter((quote) => isQuoteRelatedToProject(quote, project))
     .forEach((quote) => {
       items.push(timelineItem({
         id: `quote-${quote.id}`,
@@ -369,17 +496,30 @@ export default function ProjectPanel({
     return timelineOrder === 'asc' ? nextTimeline.reverse() : nextTimeline;
   }, [projectTimeline, timelineOrder]);
 
+  const projectDashboards = useMemo(() => {
+    return new Map(projects.map((project) => [
+      project.id,
+      buildProjectDashboard(project, { quotes, events, contacts }),
+    ]));
+  }, [contacts, events, projects, quotes]);
+
+  const editingDashboard = editingProject ? projectDashboards.get(editingProject.id) : null;
+
   const columns = useMemo(
     () => [
       { key: 'title', label: '件名', minWidth: '220px', render: (project) => <strong>{project.title}</strong> },
       { key: 'owner', label: '会社', minWidth: '190px', render: (project) => customerMap.get(project.customerId)?.companyName || supplierMap.get(project.supplierId)?.name || '-' },
       { key: 'type', label: '種別', minWidth: '120px', render: (project) => project.type || '-' },
       { key: 'status', label: 'ステータス', minWidth: '120px', render: (project) => project.status || '-' },
+      { key: 'probability', label: '受注確率', minWidth: '100px', render: (project) => `${projectDashboards.get(project.id)?.probability ?? 0}%` },
+      { key: 'sales', label: '想定売上', minWidth: '120px', render: (project) => formatCurrency(projectDashboards.get(project.id)?.sales) },
+      { key: 'grossMargin', label: '想定粗利', minWidth: '120px', render: (project) => formatCurrency(projectDashboards.get(project.id)?.grossMargin) },
+      { key: 'operatingProfit', label: '営業利益', minWidth: '120px', render: (project) => formatCurrency(projectDashboards.get(project.id)?.operatingProfit) },
       { key: 'priority', label: '優先度', minWidth: '90px', render: (project) => project.priority || '-' },
       { key: 'nextActionDate', label: '次回アクション', minWidth: '130px', render: (project) => project.nextActionDate || '-' },
-      { key: 'profit', label: '見込利益', minWidth: '120px', render: (project) => formatCurrency(project.expectedOperatingProfit || project.expectedGrossProfit) },
+      { key: 'stagnantDays', label: '停滞日数', minWidth: '90px', render: (project) => `${projectDashboards.get(project.id)?.stagnantDays ?? 0}日` },
     ],
-    [customerMap, supplierMap],
+    [customerMap, projectDashboards, supplierMap],
   );
 
   function updateForm(field, value) {
@@ -494,6 +634,10 @@ export default function ProjectPanel({
           <ProjectCheckboxes title="サンプル" items={relatedSamples} selectedIds={form.sampleIds} getLabel={(item) => item.sampleName || item.id} onToggle={(id) => toggleFormArray('sampleIds', id)} />
           <ProjectCheckboxes title="クレーム" items={relatedComplaints} selectedIds={form.complaintIds} getLabel={(item) => item.title || item.memo || item.id} onToggle={(id) => toggleFormArray('complaintIds', id)} />
 
+          {editingProject && editingDashboard && (
+            <ProjectDecisionDashboard dashboard={editingDashboard} />
+          )}
+
           {editingProject && (
             <ProjectActivityTimeline
               onNavigate={(activity) => navigateActivity(activity, { onOpenKarte, setActivePage })}
@@ -524,14 +668,16 @@ export default function ProjectPanel({
         actionWidth="360px"
         className="projects-common-table"
         columns={columns}
-        minWidth={1220}
+        minWidth={1680}
         rows={scopedProjects}
         emptyMessage="案件がありません"
       />
 
       <div className="card-grid two-column-grid desktop-card-fallback">
-        {scopedProjects.map((project) => (
-          <article className="company-card" key={project.id}>
+        {scopedProjects.map((project) => {
+          const dashboard = projectDashboards.get(project.id);
+          return (
+          <article className={`company-card ${dashboard?.warning ? 'ng-card' : ''}`} key={project.id}>
             <div className="company-heading">
               <h3>{project.title}</h3>
               <p>{customerMap.get(project.customerId)?.companyName || supplierMap.get(project.supplierId)?.name || '会社未設定'}</p>
@@ -540,8 +686,10 @@ export default function ProjectPanel({
               <span className="info-badge ready">{project.status}</span>
               <span className="info-badge">{project.type}</span>
               <span className="info-badge">{project.priority}</span>
+              {dashboard?.warning && <span className="info-badge failed">停滞 {dashboard.stagnantDays}日</span>}
             </div>
-            <p className="inline-helper">次回: {project.nextActionDate || '-'} / 見込利益: {formatCurrency(project.expectedOperatingProfit || project.expectedGrossProfit)}</p>
+            <p className="inline-helper">受注確率: {dashboard?.probability ?? 0}% / 売上: {formatCurrency(dashboard?.sales)} / 営業利益: {formatCurrency(dashboard?.operatingProfit)}</p>
+            <p className="inline-helper">次回: {dashboard?.nextAction || '-'} / 予定: {formatDate(dashboard?.nextSchedule) || '-'}</p>
             <p>{project.memo || 'メモなし'}</p>
             <div className="card-actions">
               <button type="button" className="ghost-button" onClick={() => startEdit(project)}>編集</button>
@@ -549,8 +697,51 @@ export default function ProjectPanel({
               <button type="button" className="ghost-button" onClick={() => finishProject(project)}>終了</button>
             </div>
           </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ProjectDecisionDashboard({ dashboard }) {
+  const kpis = [
+    { label: '受注確率', value: `${dashboard.probability}%` },
+    { label: '想定売上', value: formatCurrency(dashboard.sales) },
+    { label: '想定粗利', value: formatCurrency(dashboard.grossMargin) },
+    { label: '想定営業利益', value: formatCurrency(dashboard.operatingProfit) },
+    { label: '想定実質利益', value: formatCurrency(dashboard.realProfit) },
+    { label: '経費合計', value: formatCurrency(dashboard.expenseTotal) },
+    { label: '次回アクション', value: dashboard.nextAction || '-' },
+    { label: '次回予定', value: formatDate(dashboard.nextSchedule) || '-' },
+    { label: '最終更新日', value: formatDate(dashboard.lastUpdatedAt) || '-' },
+    { label: '停滞日数', value: `${dashboard.stagnantDays}日` },
+    { label: '担当者', value: dashboard.owner || '-' },
+    { label: '重要度', value: dashboard.priority || '-' },
+    { label: '現在ステータス', value: dashboard.status || '-' },
+    { label: '関連見積', value: `${dashboard.quoteCount}件` },
+  ];
+
+  return (
+    <section className={`project-decision-dashboard project-editor-wide ${dashboard.warning ? 'stagnant' : ''}`}>
+      <div className="section-heading">
+        <div>
+          <h3>営業判断ダッシュボード</h3>
+          <span>案件単位</span>
+        </div>
+        {dashboard.warning && <span className="info-badge failed">更新停滞</span>}
+      </div>
+      <div className="score-panel project-kpi-grid">
+        {kpis.map((kpi) => (
+          <div key={kpi.label}>
+            <span>{kpi.label}</span>
+            <strong>{kpi.value}</strong>
+          </div>
         ))}
       </div>
+      {dashboard.warning && (
+        <p className="form-error-message">14日以上更新がない案件です。次回アクションまたは予定を確認してください。</p>
+      )}
     </section>
   );
 }
