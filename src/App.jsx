@@ -488,6 +488,7 @@ function ActivePage({
   if (activePage === 'Customers') {
     return (
       <Customers
+        addCustomer={addCustomer}
         customers={customers}
         initialSearchQuery={initialSearchQuery}
         updateCustomer={updateCustomer}

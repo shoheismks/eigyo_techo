@@ -7,6 +7,39 @@ import { PIPELINE_STATUSES } from '../../deals/constants.js';
 const ALL = 'すべて';
 const PAGE_SIZE = 40;
 
+const INITIAL_CUSTOMER_FORM = {
+  companyName: '',
+  companyKana: '',
+  industry: '',
+  area: '',
+  address: '',
+  postalCode: '',
+  phone: '',
+  fax: '',
+  email: '',
+  website: '',
+  salesOwner: '',
+  customerRank: 'D',
+  status: '未接触',
+  tagsText: '',
+  nextFollowUpDate: '',
+  referralSource: '',
+  prospectRank: '',
+  paymentTerms: '',
+  closingDay: '',
+  deliveryDestination: '',
+  billingDestination: '',
+  creditMemo: '',
+  memo: '',
+};
+
+function parseTags(value) {
+  return value
+    .split(/[,\n、]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 function followDate(customer) {
   return customer.nextFollowUpDate || customer.nextFollowDate || '';
 }
@@ -28,6 +61,7 @@ function includesText(value, keyword) {
 
 export default function Customers({
   customers,
+  addCustomer,
   updateCustomer,
   removeCustomer,
   initialSearchQuery = '',
@@ -48,6 +82,9 @@ export default function Customers({
   const [selectedPreviewId, setSelectedPreviewId] = useState('');
   const [loadingCustomerId, setLoadingCustomerId] = useState('');
   const [contactErrors, setContactErrors] = useState({});
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [customerForm, setCustomerForm] = useState(INITIAL_CUSTOMER_FORM);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (initialSearchQuery) {
@@ -55,6 +92,19 @@ export default function Customers({
       setVisibleCount(PAGE_SIZE);
     }
   }, [initialSearchQuery]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) return undefined;
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        closeCreateModal();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCreateModalOpen]);
 
   const tagOptions = useMemo(
     () => [ALL, ...new Set(customers.flatMap((customer) => customer.tags ?? []).filter(Boolean))],
@@ -215,6 +265,85 @@ export default function Customers({
     };
   }
 
+  function openCreateModal() {
+    setCustomerForm(INITIAL_CUSTOMER_FORM);
+    setFormError('');
+    setIsCreateModalOpen(true);
+  }
+
+  function closeCreateModal() {
+    setIsCreateModalOpen(false);
+    setFormError('');
+  }
+
+  function updateFormField(field, value) {
+    setCustomerForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleFormKeyDown(event) {
+    if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
+      event.preventDefault();
+    }
+  }
+
+  function handleCreateCustomer() {
+    const companyName = customerForm.companyName.trim();
+
+    if (!companyName) {
+      setFormError('会社名は必須です。');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const customerId = crypto.randomUUID();
+    const tags = parseTags(customerForm.tagsText);
+
+    addCustomer({
+      id: customerId,
+      companyName,
+      companyKana: customerForm.companyKana.trim(),
+      industry: customerForm.industry.trim(),
+      area: customerForm.area.trim(),
+      address: customerForm.address.trim(),
+      postalCode: customerForm.postalCode.trim(),
+      phone: customerForm.phone.trim(),
+      fax: customerForm.fax.trim(),
+      email: customerForm.email.trim(),
+      website: customerForm.website.trim(),
+      salesOwner: customerForm.salesOwner.trim(),
+      importanceRank: customerForm.customerRank,
+      customerRank: customerForm.customerRank,
+      rank: customerForm.customerRank,
+      status: customerForm.status || '未接触',
+      tags,
+      nextFollowUpDate: customerForm.nextFollowUpDate,
+      nextFollowDate: customerForm.nextFollowUpDate,
+      referralSource: customerForm.referralSource.trim(),
+      prospectRank: customerForm.prospectRank.trim(),
+      paymentTerms: customerForm.paymentTerms.trim(),
+      closingDay: customerForm.closingDay.trim(),
+      deliveryDestination: customerForm.deliveryDestination.trim(),
+      billingDestination: customerForm.billingDestination.trim(),
+      creditMemo: customerForm.creditMemo.trim(),
+      memo: customerForm.memo.trim(),
+      source: 'Manual',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    setSelectedPreviewId(customerId);
+    setSearchQuery('');
+    setStatusFilter(ALL);
+    setRankFilter(ALL);
+    setTagFilter(ALL);
+    setAreaFilter(ALL);
+    setComplaintFilter(ALL);
+    setFollowFilter(ALL);
+    setSortMode('created');
+    setVisibleCount((count) => Math.max(count, PAGE_SIZE));
+    closeCreateModal();
+  }
+
   return (
     <main className="page customers-page">
       <section className="page-header">
@@ -295,7 +424,12 @@ export default function Customers({
       <section className="result-stack customers-list-section">
         <div className="section-heading">
           <h2>営業手帳</h2>
-          <span>{filteredCustomers.length}件</span>
+          <div className="section-heading-actions">
+            <span>{filteredCustomers.length}件</span>
+            <button type="button" className="primary-button compact-action-button" onClick={openCreateModal}>
+              ＋ 新規取引先
+            </button>
+          </div>
         </div>
 
         {visibleCustomers.length > 0 ? (
@@ -355,6 +489,147 @@ export default function Customers({
           </div>
         )}
       </section>
+
+      {isCreateModalOpen && (
+        <div className="customer-editor-backdrop" onMouseDown={closeCreateModal}>
+          <div className="customer-editor-modal" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="customer-editor-header">
+              <div>
+                <p className="eyebrow">New Customer</p>
+                <h2 id="customer-editor-title">新規取引先追加</h2>
+              </div>
+              <button type="button" className="ghost-button" onClick={closeCreateModal}>閉じる</button>
+            </div>
+
+            {formError && <p className="form-error-message">{formError}</p>}
+
+            <form className="customer-editor-form" onSubmit={(event) => event.preventDefault()} onKeyDown={handleFormKeyDown}>
+              <section className="customer-editor-section">
+                <h3>基本情報</h3>
+                <div className="customer-editor-grid">
+                  <label className="field-label">
+                    会社名 <span className="required-mark">必須</span>
+                    <input value={customerForm.companyName} onChange={(event) => updateFormField('companyName', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    会社名（カナ）
+                    <input value={customerForm.companyKana} onChange={(event) => updateFormField('companyKana', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    業種
+                    <input value={customerForm.industry} onChange={(event) => updateFormField('industry', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    地域
+                    <input value={customerForm.area} onChange={(event) => updateFormField('area', event.target.value)} />
+                  </label>
+                  <label className="field-label customer-editor-wide">
+                    住所
+                    <input value={customerForm.address} onChange={(event) => updateFormField('address', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    郵便番号
+                    <input value={customerForm.postalCode} onChange={(event) => updateFormField('postalCode', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    代表電話
+                    <input value={customerForm.phone} onChange={(event) => updateFormField('phone', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    FAX
+                    <input value={customerForm.fax} onChange={(event) => updateFormField('fax', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    代表メール
+                    <input type="email" value={customerForm.email} onChange={(event) => updateFormField('email', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    ホームページ
+                    <input value={customerForm.website} onChange={(event) => updateFormField('website', event.target.value)} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="customer-editor-section">
+                <h3>営業情報</h3>
+                <div className="customer-editor-grid">
+                  <label className="field-label">
+                    担当営業
+                    <input value={customerForm.salesOwner} onChange={(event) => updateFormField('salesOwner', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    重要度
+                    <select value={customerForm.customerRank} onChange={(event) => updateFormField('customerRank', event.target.value)}>
+                      {['A', 'B', 'C', 'D'].map((rank) => <option key={rank}>{rank}</option>)}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    ステータス
+                    <select value={customerForm.status} onChange={(event) => updateFormField('status', event.target.value)}>
+                      {PIPELINE_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    フォロー日
+                    <input type="date" value={customerForm.nextFollowUpDate} onChange={(event) => updateFormField('nextFollowUpDate', event.target.value)} />
+                  </label>
+                  <label className="field-label customer-editor-wide">
+                    タグ（カンマ区切り）
+                    <input value={customerForm.tagsText} placeholder="例: 高級, 冷凍, 重点" onChange={(event) => updateFormField('tagsText', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    紹介元
+                    <input value={customerForm.referralSource} onChange={(event) => updateFormField('referralSource', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    見込みランク
+                    <input value={customerForm.prospectRank} onChange={(event) => updateFormField('prospectRank', event.target.value)} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="customer-editor-section">
+                <h3>取引情報</h3>
+                <div className="customer-editor-grid">
+                  <label className="field-label">
+                    支払条件
+                    <input value={customerForm.paymentTerms} onChange={(event) => updateFormField('paymentTerms', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    締日
+                    <input value={customerForm.closingDay} onChange={(event) => updateFormField('closingDay', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    納品先
+                    <input value={customerForm.deliveryDestination} onChange={(event) => updateFormField('deliveryDestination', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    請求先
+                    <input value={customerForm.billingDestination} onChange={(event) => updateFormField('billingDestination', event.target.value)} />
+                  </label>
+                  <label className="field-label customer-editor-wide">
+                    与信メモ
+                    <textarea value={customerForm.creditMemo} onChange={(event) => updateFormField('creditMemo', event.target.value)} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="customer-editor-section">
+                <h3>メモ</h3>
+                <label className="field-label">
+                  自由記述
+                  <textarea value={customerForm.memo} onChange={(event) => updateFormField('memo', event.target.value)} />
+                </label>
+              </section>
+
+              <div className="customer-editor-actions">
+                <button type="button" className="ghost-button" onClick={closeCreateModal}>キャンセル</button>
+                <button type="button" className="primary-button" onClick={handleCreateCustomer}>保存</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
