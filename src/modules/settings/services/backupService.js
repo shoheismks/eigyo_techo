@@ -8,6 +8,7 @@ const DATASET_KEYS = [
   'contacts',
   'businessCards',
   'suppliers',
+  'projects',
   'complaints',
   'samples',
   'quotes',
