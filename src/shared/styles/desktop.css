@@ -1123,6 +1123,19 @@
     min-width: 0;
   }
 
+  .suppliers-list-section {
+    display: block;
+  }
+
+  .suppliers-list-section > .section-heading {
+    grid-column: 1 / -1;
+    margin-bottom: 12px;
+  }
+
+  .suppliers-list-section > .desktop-table-shell {
+    grid-column: 1 / -1;
+  }
+
   .suppliers-common-table {
     overflow-x: auto;
   }
