@@ -51,12 +51,23 @@ export default function Suppliers({ suppliers, addSupplier, updateSupplier, remo
 
   const desktopColumns = useMemo(
     () => [
-      { key: 'name', label: '仕入先名', width: '18%', render: (supplier) => <strong>{supplier.name}</strong> },
-      { key: 'area', label: '地域', minWidth: '110px', render: (supplier) => supplier.area || supplier.country || '-' },
-      { key: 'phone', label: '電話', minWidth: '120px', render: (supplier) => supplier.phone || '-' },
-      { key: 'email', label: 'メール', minWidth: '170px', render: (supplier) => supplier.email || '-' },
-      { key: 'website', label: 'Web', minWidth: '170px', render: (supplier) => supplier.website || '-' },
-      { key: 'tags', label: 'タグ', minWidth: '160px', render: (supplier) => (supplier.tags ?? []).join(', ') || '-' },
+      { key: 'name', label: '仕入先名', minWidth: '240px', width: '18%', render: (supplier) => <strong>{supplier.name}</strong> },
+      { key: 'supplierType', label: '種別', minWidth: '100px', width: '100px', render: (supplier) => supplier.supplierType || '-' },
+      { key: 'area', label: '国/地域', minWidth: '110px', width: '110px', render: (supplier) => supplier.country || supplier.area || '-' },
+      { key: 'contactPerson', label: '担当者', minWidth: '160px', width: '12%', render: (supplier) => supplier.contactPerson || supplier.createdByName || '-' },
+      { key: 'email', label: 'メール', minWidth: '220px', width: '16%', render: (supplier) => supplier.email || '-' },
+      { key: 'phone', label: '電話', minWidth: '130px', width: '130px', render: (supplier) => supplier.phone || '-' },
+      {
+        key: 'products',
+        label: '取扱商品',
+        minWidth: '240px',
+        width: '16%',
+        render: (supplier) => {
+          if (Array.isArray(supplier.products) && supplier.products.length > 0) return supplier.products.join(', ');
+          return (supplier.tags ?? []).join(', ') || '-';
+        },
+      },
+      { key: 'temperatureZone', label: '温度帯', minWidth: '100px', width: '100px', render: (supplier) => supplier.temperatureZone || '-' },
       {
         key: 'histories',
         label: '商談',
@@ -178,7 +189,7 @@ export default function Suppliers({ suppliers, addSupplier, updateSupplier, remo
         </form>
       </section>
 
-      <section className="result-stack">
+      <section className="result-stack suppliers-list-section">
         <div className="section-heading">
           <h2>仕入先一覧</h2>
           <span>{filteredSuppliers.length}件</span>
@@ -189,7 +200,8 @@ export default function Suppliers({ suppliers, addSupplier, updateSupplier, remo
           )}
           className="suppliers-common-table"
           columns={desktopColumns}
-          minWidth={1080}
+          actionWidth={110}
+          minWidth={1460}
           rows={filteredSuppliers}
         />
         <div className="card-grid two-column-grid desktop-card-fallback">

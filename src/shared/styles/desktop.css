@@ -1113,6 +1113,32 @@
     justify-self: stretch;
   }
 
+  .suppliers-list-section,
+  .suppliers-list-section .desktop-table-shell,
+  .suppliers-common-table {
+    width: 100%;
+    max-width: none;
+    justify-self: stretch;
+    align-self: stretch;
+    min-width: 0;
+  }
+
+  .suppliers-common-table {
+    overflow-x: auto;
+  }
+
+  .suppliers-common-table .desktop-data-table {
+    width: 100%;
+    min-width: 1460px;
+    max-width: none;
+  }
+
+  .suppliers-common-table .desktop-data-table th,
+  .suppliers-common-table .desktop-data-table td {
+    min-height: 52px;
+    padding: 12px 12px;
+  }
+
   .desktop-table-shell .desktop-data-table {
     display: table !important;
     width: 100%;
