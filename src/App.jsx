@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Component, Suspense, lazy, useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { useAdoptions } from './modules/products/hooks/useAdoptions.js';
@@ -44,6 +44,41 @@ function isImportPath() {
 function getImportCompanyName() {
   const params = new URLSearchParams(window.location.search);
   return (params.get('companyName') || params.get('importCompany') || '').trim();
+}
+
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <main className="page">
+          <section className="empty-state">
+            <h3>画面の表示に失敗しました</h3>
+            <p>{this.state.error.message || '予期しないエラーが発生しました。'}</p>
+            <button type="button" className="primary-button" onClick={this.props.onReset}>
+              ホームへ戻る
+            </button>
+          </section>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function tutorialStorageKey(userId = '') {
@@ -315,8 +350,9 @@ function AuthenticatedApp() {
         setAddMenuOpen={setAddMenuOpen}
         notice={extensionNotice}
       >
-        <Suspense fallback={<PageLoading />}>
-          <ActivePage
+        <PageErrorBoundary resetKey={activePage} onReset={() => setActivePage('Home')}>
+          <Suspense fallback={<PageLoading />}>
+            <ActivePage
             activePage={activePage}
             importError={importError}
             setActivePage={setActivePage}
@@ -342,6 +378,10 @@ function AuthenticatedApp() {
             addAdoption={addAdoption}
             updateAdoption={updateAdoption}
             removeAdoption={removeAdoption}
+            projects={projects}
+            addProject={addProject}
+            updateProject={updateProject}
+            removeProject={removeProject}
             samples={samples}
             addSample={addSample}
             updateSample={updateSample}
@@ -381,8 +421,9 @@ function AuthenticatedApp() {
             userId={userId}
             signOut={signOut}
             onResetTutorial={resetTutorial}
-          />
-        </Suspense>
+            />
+          </Suspense>
+        </PageErrorBoundary>
       </AppLayout>
       <OnboardingTutorial
         open={tutorialOpen}
@@ -423,6 +464,10 @@ function ActivePage({
   addAdoption,
   updateAdoption,
   removeAdoption,
+  projects = [],
+  addProject,
+  updateProject,
+  removeProject,
   samples,
   addSample,
   updateSample,
