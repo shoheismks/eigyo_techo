@@ -6,6 +6,12 @@ const LABELS = {
   totalQuoteAmount: '\u898b\u7a4d\u91d1\u984d\u5408\u8a08',
   expectedGrossMargin: '\u898b\u8fbc\u7c97\u5229',
   grossMarginRate: '\u7c97\u5229\u7387',
+  productCost: '\u5546\u54c1\u539f\u4fa1',
+  expenseTotal: '\u8af8\u7d4c\u8cbb\u5408\u8a08',
+  operatingProfit: '\u55b6\u696d\u5229\u76ca',
+  operatingProfitRate: '\u55b6\u696d\u5229\u76ca\u7387',
+  realProfit: '\u5b9f\u8cea\u5229\u76ca',
+  realProfitRate: '\u5b9f\u8cea\u5229\u76ca\u7387',
   freeInventory: '\u30d5\u30ea\u30fc\u5728\u5eab',
   firmInventory: '\u30d5\u30a1\u30fc\u30e0\u5728\u5eab',
   waitingShipment: '\u51fa\u5eab\u5f85\u3061',
@@ -57,6 +63,8 @@ function getSupplierName(supplierId, supplierMap) {
 }
 
 function getQuoteAmount(quote) {
+  const subtotal = toNumber(quote.subtotal);
+  if (subtotal > 0) return subtotal;
   const totalAmount = toNumber(quote.totalAmount);
   if (totalAmount > 0) return totalAmount;
   return toNumber(quote.quantity) * toNumber(quote.unitPrice);
@@ -74,6 +82,106 @@ function getQuoteGrossMargin(quote) {
   const amount = getQuoteAmount(quote);
   const cost = getQuoteCost(quote);
   return amount > 0 ? amount - cost : 0;
+}
+
+function getQuoteExpenseBreakdown(quote) {
+  const freight = toNumber(quote.freight);
+  const storageFee = toNumber(quote.storageFee);
+  const customsFee = toNumber(quote.customsFee);
+  const inspectionFee = toNumber(quote.inspectionFee);
+  const processingFee = toNumber(quote.processingFee);
+  const salesCommission = toNumber(quote.salesCommission);
+  const otherExpense = toNumber(quote.otherExpense);
+  const commonExpenseAmount = toNumber(quote.commonExpenseAmount);
+  const discount = toNumber(quote.discount);
+  const disposalLoss = toNumber(quote.disposalLoss);
+  const fxGainLoss = toNumber(quote.fxGainLoss);
+  const expenseTotal =
+    freight +
+    storageFee +
+    customsFee +
+    inspectionFee +
+    processingFee +
+    salesCommission +
+    otherExpense +
+    commonExpenseAmount;
+  const grossMargin = getQuoteGrossMargin(quote);
+  const operatingProfit = grossMargin - expenseTotal;
+  const realProfit = operatingProfit + fxGainLoss - discount - disposalLoss;
+
+  return {
+    freight,
+    storageFee,
+    customsFee,
+    inspectionFee,
+    processingFee,
+    salesCommission,
+    otherExpense,
+    commonExpenseAmount,
+    discount,
+    disposalLoss,
+    fxGainLoss,
+    expenseTotal,
+    operatingProfit,
+    realProfit,
+  };
+}
+
+function getLineAllocationWeight(line = {}, quote = {}) {
+  const basis = quote.allocationBasis || 'sales';
+  if (basis === 'weight') return toNumber(line.weight) || toNumber(line.quantity) || 1;
+  if (basis === 'quantity') return toNumber(line.quantity) || 1;
+  return toNumber(line.amount) || toNumber(line.quantity) * toNumber(line.unitPrice) || 1;
+}
+
+function getQuoteLinesForAllocation(quote = {}) {
+  if (Array.isArray(quote.quoteLines) && quote.quoteLines.length > 0) return quote.quoteLines;
+  return [{
+    productId: Array.isArray(quote.productIds) ? quote.productIds[0] : '',
+    inventoryId: Array.isArray(quote.inventoryIds) ? quote.inventoryIds[0] : '',
+    quantity: quote.quantity,
+    unitPrice: quote.unitPrice,
+    costPrice: quote.costPrice,
+    amount: getQuoteAmount(quote),
+    costAmount: getQuoteCost(quote),
+  }];
+}
+
+function createFinancialRow(extra = {}) {
+  return {
+    ...extra,
+    quoteCount: 0,
+    sales: 0,
+    productCost: 0,
+    grossMarginAmount: 0,
+    expenseTotal: 0,
+    operatingProfit: 0,
+    realProfit: 0,
+  };
+}
+
+function addFinancials(map, key, values, extra = {}) {
+  const current = map.get(key) || createFinancialRow(extra);
+  map.set(key, {
+    ...current,
+    ...extra,
+    quoteCount: current.quoteCount + values.quoteCount,
+    sales: current.sales + values.sales,
+    productCost: current.productCost + values.productCost,
+    grossMarginAmount: current.grossMarginAmount + values.grossMarginAmount,
+    expenseTotal: current.expenseTotal + values.expenseTotal,
+    operatingProfit: current.operatingProfit + values.operatingProfit,
+    realProfit: current.realProfit + values.realProfit,
+  });
+}
+
+function withProfitRates(row) {
+  return {
+    ...row,
+    grossMarginRate: row.sales > 0 ? (row.grossMarginAmount / row.sales) * 100 : 0,
+    operatingProfitRate: row.sales > 0 ? (row.operatingProfit / row.sales) * 100 : 0,
+    realProfitRate: row.sales > 0 ? (row.realProfit / row.sales) * 100 : 0,
+  };
 }
 
 function isOverdue(dateValue) {
@@ -119,7 +227,7 @@ function sortByAmount(rows) {
   return rows
     .map((row) => ({
       ...row,
-      grossMarginRate: row.quoteAmount > 0 ? (row.grossMarginAmount / row.quoteAmount) * 100 : 0,
+      grossMarginRate: row.quoteAmount > 0 ? (row.grossMarginAmount / row.quoteAmount) * 100 : row.grossMarginRate || 0,
     }))
     .sort((a, b) => b.quoteAmount - a.quoteAmount);
 }
@@ -138,15 +246,103 @@ export function buildManagementDashboard({
   const supplierMap = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
   const productQuoteMap = new Map();
   const customerQuoteMap = new Map();
+  const quoteProfitRows = [];
+  const customerProfitMap = new Map();
+  const productProfitMap = new Map();
+  const projectProfitMap = new Map();
+  const inventoryProfitMap = new Map();
+  const supplierProfitMap = new Map();
+  const monthProfitMap = new Map();
 
   const totalQuoteAmount = quotes.reduce((sum, quote) => sum + getQuoteAmount(quote), 0);
+  const totalProductCost = quotes.reduce((sum, quote) => sum + getQuoteCost(quote), 0);
   const totalGrossMargin = quotes.reduce((sum, quote) => sum + getQuoteGrossMargin(quote), 0);
+  const totalExpenses = quotes.reduce((sum, quote) => sum + getQuoteExpenseBreakdown(quote).expenseTotal, 0);
+  const totalOperatingProfit = quotes.reduce((sum, quote) => sum + getQuoteExpenseBreakdown(quote).operatingProfit, 0);
+  const totalRealProfit = quotes.reduce((sum, quote) => sum + getQuoteExpenseBreakdown(quote).realProfit, 0);
   const totalGrossMarginRate = totalQuoteAmount > 0 ? (totalGrossMargin / totalQuoteAmount) * 100 : 0;
+  const totalOperatingProfitRate = totalQuoteAmount > 0 ? (totalOperatingProfit / totalQuoteAmount) * 100 : 0;
+  const totalRealProfitRate = totalQuoteAmount > 0 ? (totalRealProfit / totalQuoteAmount) * 100 : 0;
 
   quotes.forEach((quote) => {
     const amount = getQuoteAmount(quote);
     const grossMargin = getQuoteGrossMargin(quote);
+    const productCost = getQuoteCost(quote);
+    const expenses = getQuoteExpenseBreakdown(quote);
     const productIds = Array.isArray(quote.productIds) && quote.productIds.length ? quote.productIds : [''];
+    const quoteFinancials = {
+      quoteCount: 1,
+      sales: amount,
+      productCost,
+      grossMarginAmount: grossMargin,
+      expenseTotal: expenses.expenseTotal,
+      operatingProfit: expenses.operatingProfit,
+      realProfit: expenses.realProfit,
+    };
+    const quoteNumber = quote.quoteNumber || LABELS.unset;
+    const monthKey = String(quote.submittedDate || quote.issueDate || quote.createdAt || '').slice(0, 7) || LABELS.unset;
+
+    quoteProfitRows.push(withProfitRates({
+      id: quote.id,
+      quoteId: quote.id,
+      quoteNumber,
+      customerName: getCustomerName(quote.customerId, customerMap),
+      projectName: quote.projectName || LABELS.unset,
+      supplierName: getSupplierName(quote.supplierId, supplierMap),
+      expenseBreakdown: expenses,
+      allocationBasis: quote.allocationBasis || 'sales',
+      ...quoteFinancials,
+    }));
+
+    addFinancials(customerProfitMap, quote.customerId || 'unknown', quoteFinancials, {
+      customerId: quote.customerId || '',
+      customerName: getCustomerName(quote.customerId, customerMap),
+    });
+    addFinancials(projectProfitMap, quote.projectName || 'unknown', quoteFinancials, {
+      projectName: quote.projectName || LABELS.unset,
+    });
+    addFinancials(supplierProfitMap, quote.supplierId || 'unknown', quoteFinancials, {
+      supplierId: quote.supplierId || '',
+      supplierName: getSupplierName(quote.supplierId, supplierMap),
+    });
+    addFinancials(monthProfitMap, monthKey, quoteFinancials, {
+      month: monthKey,
+    });
+
+    const lines = getQuoteLinesForAllocation(quote);
+    const totalWeight = lines.reduce((sum, line) => sum + getLineAllocationWeight(line, quote), 0) || 1;
+    lines.forEach((line) => {
+      const weightRatio = getLineAllocationWeight(line, quote) / totalWeight;
+      const lineSales = toNumber(line.amount) || amount * weightRatio;
+      const lineCost = toNumber(line.costAmount) || productCost * weightRatio;
+      const lineGross = lineSales - lineCost;
+      const lineExpenses = expenses.expenseTotal * weightRatio;
+      const lineOperatingProfit = lineGross - lineExpenses;
+      const lineRealProfit =
+        lineOperatingProfit +
+        expenses.fxGainLoss * weightRatio -
+        expenses.discount * weightRatio -
+        expenses.disposalLoss * weightRatio;
+      const lineFinancials = {
+        quoteCount: 1,
+        sales: lineSales,
+        productCost: lineCost,
+        grossMarginAmount: lineGross,
+        expenseTotal: lineExpenses,
+        operatingProfit: lineOperatingProfit,
+        realProfit: lineRealProfit,
+      };
+
+      addFinancials(productProfitMap, line.productId || 'unknown', lineFinancials, {
+        productId: line.productId || '',
+        productName: getProductName(line.productId, productMap),
+      });
+      addFinancials(inventoryProfitMap, line.inventoryId || 'unknown', lineFinancials, {
+        inventoryId: line.inventoryId || '',
+        inventoryName: line.inventoryId || LABELS.unset,
+        productName: getProductName(line.productId, productMap),
+      });
+    });
 
     productIds.forEach((productId) => {
       incrementGroupedAmount(productQuoteMap, productId || 'unknown', amount, grossMargin, {
@@ -215,8 +411,14 @@ export function buildManagementDashboard({
   return {
     kpis: [
       { label: LABELS.totalQuoteAmount, value: formatMoney(totalQuoteAmount), tone: 'blue' },
+      { label: LABELS.productCost, value: formatMoney(totalProductCost), tone: 'blue' },
       { label: LABELS.expectedGrossMargin, value: formatMoney(totalGrossMargin), tone: 'gold' },
       { label: LABELS.grossMarginRate, value: formatPercent(totalGrossMarginRate), tone: 'purple' },
+      { label: LABELS.expenseTotal, value: formatMoney(totalExpenses), tone: 'orange' },
+      { label: LABELS.operatingProfit, value: formatMoney(totalOperatingProfit), tone: 'green' },
+      { label: LABELS.operatingProfitRate, value: formatPercent(totalOperatingProfitRate), tone: 'green' },
+      { label: LABELS.realProfit, value: formatMoney(totalRealProfit), tone: 'gold' },
+      { label: LABELS.realProfitRate, value: formatPercent(totalRealProfitRate), tone: 'gold' },
       { label: LABELS.freeInventory, value: freeInventoryCount, tone: 'green' },
       { label: LABELS.firmInventory, value: firmInventoryCount, tone: 'orange' },
       { label: LABELS.waitingShipment, value: waitingShipmentCount, tone: 'blue' },
@@ -227,14 +429,27 @@ export function buildManagementDashboard({
     statusCounts,
     productQuoteAmounts: sortByAmount([...productQuoteMap.values()]).slice(0, 10),
     customerQuoteAmounts: sortByAmount([...customerQuoteMap.values()]).slice(0, 10),
+    profitByQuote: quoteProfitRows.sort((a, b) => b.sales - a.sales),
+    profitByCustomer: [...customerProfitMap.values()].map(withProfitRates).sort((a, b) => b.sales - a.sales),
+    profitByProduct: [...productProfitMap.values()].map(withProfitRates).sort((a, b) => b.sales - a.sales),
+    profitByProject: [...projectProfitMap.values()].map(withProfitRates).sort((a, b) => b.sales - a.sales),
+    profitByInventory: [...inventoryProfitMap.values()].map(withProfitRates).sort((a, b) => b.sales - a.sales),
+    profitBySupplier: [...supplierProfitMap.values()].map(withProfitRates).sort((a, b) => b.sales - a.sales),
+    profitByMonth: [...monthProfitMap.values()].map(withProfitRates).sort((a, b) => String(b.month).localeCompare(String(a.month))),
     inventoryRows: inventoryRows.sort((a, b) => b.allocatedQuoteAmount - a.allocatedQuoteAmount),
     overdueFollowRows,
     sampleAwaitingRows,
     openComplaintRows,
     totals: {
       quoteAmount: totalQuoteAmount,
+      productCost: totalProductCost,
       grossMargin: totalGrossMargin,
       grossMarginRate: totalGrossMarginRate,
+      expenseTotal: totalExpenses,
+      operatingProfit: totalOperatingProfit,
+      operatingProfitRate: totalOperatingProfitRate,
+      realProfit: totalRealProfit,
+      realProfitRate: totalRealProfitRate,
       freeInventoryCount,
       firmInventoryCount,
       waitingShipmentCount,

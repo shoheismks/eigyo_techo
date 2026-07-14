@@ -1175,6 +1175,56 @@ export default function CustomerKarte({
                 <input inputMode="decimal" value={quoteForm.taxRate} onChange={(event) => updateQuoteField('taxRate', event.target.value)} />
               </label>
             </div>
+            <div className="date-grid">
+              <label className="field-label">
+                保管料
+                <input inputMode="decimal" value={quoteForm.storageFee} onChange={(event) => updateQuoteField('storageFee', event.target.value)} />
+              </label>
+              <label className="field-label">
+                通関費
+                <input inputMode="decimal" value={quoteForm.customsFee} onChange={(event) => updateQuoteField('customsFee', event.target.value)} />
+              </label>
+              <label className="field-label">
+                検品費
+                <input inputMode="decimal" value={quoteForm.inspectionFee} onChange={(event) => updateQuoteField('inspectionFee', event.target.value)} />
+              </label>
+              <label className="field-label">
+                加工費
+                <input inputMode="decimal" value={quoteForm.processingFee} onChange={(event) => updateQuoteField('processingFee', event.target.value)} />
+              </label>
+              <label className="field-label">
+                販売手数料
+                <input inputMode="decimal" value={quoteForm.salesCommission} onChange={(event) => updateQuoteField('salesCommission', event.target.value)} />
+              </label>
+              <label className="field-label">
+                廃棄損
+                <input inputMode="decimal" value={quoteForm.disposalLoss} onChange={(event) => updateQuoteField('disposalLoss', event.target.value)} />
+              </label>
+              <label className="field-label">
+                為替差損益
+                <input inputMode="decimal" value={quoteForm.fxGainLoss} onChange={(event) => updateQuoteField('fxGainLoss', event.target.value)} />
+              </label>
+              <label className="field-label">
+                その他経費
+                <input inputMode="decimal" value={quoteForm.otherExpense} onChange={(event) => updateQuoteField('otherExpense', event.target.value)} />
+              </label>
+              <label className="field-label">
+                共通経費
+                <input inputMode="decimal" value={quoteForm.commonExpenseAmount} onChange={(event) => updateQuoteField('commonExpenseAmount', event.target.value)} />
+              </label>
+              <label className="field-label">
+                共通経費の按分
+                <select value={quoteForm.allocationBasis} onChange={(event) => updateQuoteField('allocationBasis', event.target.value)}>
+                  <option value="sales">売上額比</option>
+                  <option value="quantity">数量比</option>
+                  <option value="weight">重量比</option>
+                </select>
+              </label>
+            </div>
+            <label className="field-label">
+              経費メモ
+              <textarea value={quoteForm.expenseMemo} onChange={(event) => updateQuoteField('expenseMemo', event.target.value)} />
+            </label>
             <div className="sample-form">
               <div className="history-meta">
                 <span>見積明細</span>
@@ -1224,6 +1274,10 @@ export default function CustomerKarte({
                       <label className="field-label">
                         数量
                         <input inputMode="decimal" value={line.quantity || ''} onChange={(event) => updateQuoteLine(line.id, 'quantity', event.target.value)} />
+                      </label>
+                      <label className="field-label">
+                        重量
+                        <input inputMode="decimal" value={line.weight || ''} onChange={(event) => updateQuoteLine(line.id, 'weight', event.target.value)} />
                       </label>
                       <label className="field-label">
                         単位

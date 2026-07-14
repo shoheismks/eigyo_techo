@@ -21,7 +21,7 @@ export default function AnalyticsPage({
       <div className="page-header">
         <p className="eyebrow">Management Dashboard</p>
         <h1>経営判断ダッシュボード</h1>
-        <p>見積、粗利、在庫、フォロー、クレームを既存データから集計します。</p>
+        <p>見積、粗利、諸経費、営業利益、実質利益、在庫、フォロー、クレームを既存データから集計します。</p>
       </div>
 
       <div className="dashboard-metrics">
@@ -46,6 +46,119 @@ export default function AnalyticsPage({
           ))}
         </div>
       </section>
+
+      <DashboardTable
+        title="営業利益・実質利益 見積別"
+        emptyText="見積別の利益データがありません。"
+        rows={dashboard.profitByQuote}
+        columns={[
+          ['quoteNumber', '見積番号'],
+          ['customerName', '顧客'],
+          ['projectName', '案件'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['productCost', '商品原価', dashboardFormatters.money],
+          ['grossMarginAmount', '粗利額', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['operatingProfit', '営業利益', dashboardFormatters.money],
+          ['operatingProfitRate', '営業利益率', dashboardFormatters.percent],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+          ['realProfitRate', '実質利益率', dashboardFormatters.percent],
+          ['allocationBasis', '按分'],
+        ]}
+      />
+
+      <DashboardTable
+        title="営業利益・実質利益 顧客別"
+        emptyText="顧客別の利益データがありません。"
+        rows={dashboard.profitByCustomer}
+        columns={[
+          ['customerName', '顧客'],
+          ['quoteCount', '件数'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['productCost', '商品原価', dashboardFormatters.money],
+          ['grossMarginAmount', '粗利額', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['operatingProfit', '営業利益', dashboardFormatters.money],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+        ]}
+      />
+
+      <DashboardTable
+        title="営業利益・実質利益 商品別"
+        emptyText="商品別の利益データがありません。"
+        rows={dashboard.profitByProduct}
+        columns={[
+          ['productName', '商品'],
+          ['quoteCount', '件数'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['productCost', '商品原価', dashboardFormatters.money],
+          ['grossMarginAmount', '粗利額', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['operatingProfit', '営業利益', dashboardFormatters.money],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+        ]}
+      />
+
+      <DashboardTable
+        title="営業利益・実質利益 案件別"
+        emptyText="案件別の利益データがありません。"
+        rows={dashboard.profitByProject}
+        columns={[
+          ['projectName', '案件'],
+          ['quoteCount', '件数'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['grossMarginAmount', '粗利額', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['operatingProfit', '営業利益', dashboardFormatters.money],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+        ]}
+      />
+
+      <DashboardTable
+        title="営業利益・実質利益 在庫別"
+        emptyText="在庫別の利益データがありません。"
+        rows={dashboard.profitByInventory}
+        columns={[
+          ['productName', '商品'],
+          ['inventoryName', '在庫'],
+          ['quoteCount', '件数'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['productCost', '商品原価', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+        ]}
+      />
+
+      <DashboardTable
+        title="営業利益・実質利益 仕入先別"
+        emptyText="仕入先別の利益データがありません。"
+        rows={dashboard.profitBySupplier}
+        columns={[
+          ['supplierName', '仕入先'],
+          ['quoteCount', '件数'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['grossMarginAmount', '粗利額', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['operatingProfit', '営業利益', dashboardFormatters.money],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+        ]}
+      />
+
+      <DashboardTable
+        title="営業利益・実質利益 月別"
+        emptyText="月別の利益データがありません。"
+        rows={dashboard.profitByMonth}
+        columns={[
+          ['month', '月'],
+          ['quoteCount', '件数'],
+          ['sales', '売上', dashboardFormatters.money],
+          ['productCost', '商品原価', dashboardFormatters.money],
+          ['grossMarginAmount', '粗利額', dashboardFormatters.money],
+          ['expenseTotal', '諸経費', dashboardFormatters.money],
+          ['operatingProfit', '営業利益', dashboardFormatters.money],
+          ['realProfit', '実質利益', dashboardFormatters.money],
+        ]}
+      />
 
       <DashboardTable
         title="商品別見積額"
@@ -135,7 +248,7 @@ function DashboardTable({ title, emptyText, rows, columns }) {
             {rows.map((row) => (
               <div
                 className="desktop-table-row"
-                key={row.id || row.productId || row.customerId || row.productName}
+                key={row.id || row.quoteId || row.productId || row.customerId || row.supplierId || row.inventoryId || row.month || row.productName}
                 style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
               >
                 {columns.map(([key, label, formatter]) => (
@@ -146,8 +259,8 @@ function DashboardTable({ title, emptyText, rows, columns }) {
           </div>
           <div className="management-card-list">
             {rows.map((row) => (
-              <article className="management-card" key={`card-${row.id || row.productId || row.customerId || row.productName}`}>
-                <strong>{row.productName || row.customerName || row.sampleName || row.title || '未設定'}</strong>
+              <article className="management-card" key={`card-${row.id || row.quoteId || row.productId || row.customerId || row.supplierId || row.inventoryId || row.month || row.productName}`}>
+                <strong>{row.quoteNumber || row.productName || row.customerName || row.supplierName || row.projectName || row.month || row.sampleName || row.title || '未設定'}</strong>
                 <dl>
                   {columns.slice(1).map(([key, label, formatter]) => (
                     <div key={`${label}-${key}`}>
