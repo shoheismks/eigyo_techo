@@ -1429,6 +1429,35 @@
   gap: 8px;
 }
 
+.calendar-navigation {
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px;
+}
+
+.calendar-stepper,
+.calendar-date-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-current-title {
+  color: var(--white);
+  font-size: 1.05rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.calendar-stepper .ghost-button {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
 .calendar-day-schedule {
   display: grid;
   gap: 8px;
@@ -1543,6 +1572,21 @@
 
   .calendar-toolbar > * {
     flex: 1 1 100%;
+  }
+
+  .calendar-stepper,
+  .calendar-date-actions {
+    width: 100%;
+  }
+
+  .calendar-stepper .ghost-button {
+    flex: 1 1 0;
+    padding: 0 8px;
+  }
+
+  .calendar-current-title {
+    width: 100%;
+    order: -1;
   }
 
   .calendar-editor {

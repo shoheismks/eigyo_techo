@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   EVENT_PRIORITIES,
   EVENT_STATUSES,
@@ -15,6 +15,8 @@ const VIEW_LABELS = {
 };
 
 const DEFAULT_COLORS = ['#2878ff', '#5ee2a0', '#ffd36a', '#af87ff', '#ff8a3d', '#ff6b7b'];
+const CALENDAR_VIEW_STORAGE_KEY = 'eigyo-techo-calendar-view-mode';
+const CALENDAR_DATE_STORAGE_KEY = 'eigyo-techo-calendar-base-date';
 
 function toDateKey(value) {
   const date = new Date(value);
@@ -49,6 +51,41 @@ function addDaysString(baseDateKey, days) {
   const date = new Date(`${baseDateKey}T00:00:00`);
   date.setDate(date.getDate() + days);
   return toDateKey(date);
+}
+
+function addMonthsString(baseDateKey, months) {
+  const date = new Date(`${baseDateKey}T00:00:00`);
+  date.setMonth(date.getMonth() + months, 1);
+  return toDateKey(date);
+}
+
+function readStoredViewMode() {
+  if (typeof window === 'undefined') return 'month';
+  const value = window.localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+  return Object.keys(VIEW_LABELS).includes(value) ? value : 'month';
+}
+
+function readStoredBaseDate(fallback) {
+  if (typeof window === 'undefined') return fallback;
+  const value = window.localStorage.getItem(CALENDAR_DATE_STORAGE_KEY);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? value : fallback;
+}
+
+function formatMonthTitle(dateKey) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+function formatDateLabel(dateKey) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function formatWeekTitle(dateKey) {
+  const days = buildWeekDays(dateKey);
+  return `${formatDateLabel(days[0].dateKey)} ～ ${formatDateLabel(days[6].dateKey)}`;
 }
 
 function buildMonthDays(baseDateKey) {
@@ -121,12 +158,11 @@ export default function CalendarPage({
   user,
 }) {
   const today = toDateKey(new Date());
-  const [viewMode, setViewMode] = useState('month');
-  const [baseDate, setBaseDate] = useState(today);
+  const [viewMode, setViewMode] = useState(() => readStoredViewMode());
+  const [baseDate, setBaseDate] = useState(() => readStoredBaseDate(today));
   const [editingEvent, setEditingEvent] = useState(null);
   const [form, setForm] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [draggingEventId, setDraggingEventId] = useState('');
 
   const systemEvents = useMemo(
     () => buildSystemEvents({ customers, samples, quotes, complaints }),
@@ -143,6 +179,15 @@ export default function CalendarPage({
   const weekDays = useMemo(() => buildWeekDays(baseDate), [baseDate]);
   const visibleDays = viewMode === 'week' ? weekDays : viewMode === 'day' ? [{ dateKey: baseDate, label: baseDate, inCurrentMonth: true }] : monthDays;
   const listEvents = useMemo(() => mergedEvents.filter((event) => event.status !== '中止'), [mergedEvents]);
+  const calendarTitle = viewMode === 'week' ? formatWeekTitle(baseDate) : viewMode === 'day' ? formatDateLabel(baseDate) : formatMonthTitle(baseDate);
+
+  useEffect(() => {
+    window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(CALENDAR_DATE_STORAGE_KEY, baseDate);
+  }, [baseDate]);
 
   function eventsForDay(dateKey) {
     return mergedEvents.filter((event) => (event.date || eventDate(event)) === dateKey);
@@ -259,18 +304,28 @@ export default function CalendarPage({
     closeForm();
   }
 
-  function moveEventToDate(eventId, dateKey) {
-    const target = events.find((event) => event.id === eventId);
-    if (!target) return;
-    const start = new Date(target.startAt || `${dateKey}T09:00:00`);
-    const end = new Date(target.endAt || start);
-    const duration = Math.max(end.getTime() - start.getTime(), 60 * 60 * 1000);
-    const movedStart = new Date(`${dateKey}T${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}:00`);
-    const movedEnd = new Date(movedStart.getTime() + duration);
-    updateEvent(eventId, {
-      startAt: movedStart.toISOString(),
-      endAt: movedEnd.toISOString(),
-    });
+  function movePrevious() {
+    if (viewMode === 'week') setBaseDate((current) => addDaysString(current, -7));
+    else if (viewMode === 'day') setBaseDate((current) => addDaysString(current, -1));
+    else setBaseDate((current) => addMonthsString(current, -1));
+  }
+
+  function moveNext() {
+    if (viewMode === 'week') setBaseDate((current) => addDaysString(current, 7));
+    else if (viewMode === 'day') setBaseDate((current) => addDaysString(current, 1));
+    else setBaseDate((current) => addMonthsString(current, 1));
+  }
+
+  function previousLabel() {
+    if (viewMode === 'week') return '＜ 前週';
+    if (viewMode === 'day') return '＜ 前日';
+    return '＜ 前月';
+  }
+
+  function nextLabel() {
+    if (viewMode === 'week') return '翌週 ＞';
+    if (viewMode === 'day') return '翌日 ＞';
+    return '翌月 ＞';
   }
 
   return (
@@ -281,18 +336,26 @@ export default function CalendarPage({
           <h1>カレンダー</h1>
           <p>予定を登録し、顧客・担当者・案件・フォローへつなげます。</p>
         </div>
-        <div className="calendar-toolbar">
-          <input type="date" value={baseDate} onChange={(event) => setBaseDate(event.target.value || today)} />
-          <button className="primary-button compact-button" type="button" onClick={() => openAdd(baseDate)}>
-            予定追加
-          </button>
-        </div>
         <div className="segmented-control calendar-view-switch" aria-label="カレンダー表示切替">
           {Object.entries(VIEW_LABELS).map(([key, label]) => (
             <button type="button" className={viewMode === key ? 'selected' : ''} key={key} onClick={() => setViewMode(key)}>
               {label}
             </button>
           ))}
+        </div>
+        <div className="calendar-toolbar calendar-navigation">
+          <div className="calendar-stepper">
+            <button className="ghost-button" type="button" onClick={movePrevious}>{previousLabel()}</button>
+            <button className="ghost-button" type="button" onClick={() => setBaseDate(today)}>今日</button>
+            <button className="ghost-button" type="button" onClick={moveNext}>{nextLabel()}</button>
+          </div>
+          <strong className="calendar-current-title">{calendarTitle}</strong>
+          <div className="calendar-date-actions">
+            <input type="date" value={baseDate} onChange={(event) => setBaseDate(event.target.value || today)} />
+            <button className="primary-button compact-button" type="button" onClick={() => openAdd(baseDate)}>
+              予定追加
+            </button>
+          </div>
         </div>
       </div>
 
@@ -316,14 +379,6 @@ export default function CalendarPage({
               className="calendar-time-slot"
               key={hour}
               onClick={() => openAdd(baseDate, hour)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => {
-                if (draggingEventId) {
-                  const times = addHours(baseDate, hour, 1);
-                  updateEvent(draggingEventId, times);
-                  setDraggingEventId('');
-                }
-              }}
             >
               <span>{String(hour).padStart(2, '0')}:00</span>
               <div>
@@ -340,7 +395,6 @@ export default function CalendarPage({
                         clickEvent.stopPropagation();
                         openEdit(event);
                       }}
-                      onDragStart={() => event.source === 'event' && setDraggingEventId(event.id)}
                     />
                   ))}
               </div>
@@ -364,14 +418,6 @@ export default function CalendarPage({
                     if (clickEvent.target instanceof Element && clickEvent.target.closest('.calendar-event')) return;
                     openAdd(day.dateKey);
                   }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (draggingEventId) {
-                      moveEventToDate(draggingEventId, day.dateKey);
-                      setDraggingEventId('');
-                    }
-                  }}
                 >
                   <div className="calendar-day-head">
                     <strong>{day.label}</strong>
@@ -389,7 +435,6 @@ export default function CalendarPage({
                           clickEvent.stopPropagation();
                           openEdit(event);
                         }}
-                        onDragStart={() => event.source === 'event' && setDraggingEventId(event.id)}
                       />
                     ))}
                     {dayEvents.length > limit && <small className="calendar-more">+{dayEvents.length - limit}件</small>}
@@ -420,15 +465,13 @@ export default function CalendarPage({
   );
 }
 
-function CalendarEventButton({ event, customers, contacts, compact = false, onClick, onDragStart }) {
+function CalendarEventButton({ event, customers, contacts, compact = false, onClick }) {
   const names = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
   return (
     <button
       type="button"
       className={`calendar-event ${event.tone || event.eventType || 'event'} ${compact ? 'compact' : ''}`}
-      draggable={event.source === 'event'}
       onClick={onClick}
-      onDragStart={onDragStart}
       style={{ borderLeftColor: event.color || undefined }}
     >
       {!compact && <span>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date}</span>}
