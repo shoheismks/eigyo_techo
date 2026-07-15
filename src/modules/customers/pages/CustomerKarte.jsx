@@ -81,10 +81,174 @@ function formatDateTime(value) {
   return date.toLocaleString('ja-JP');
 }
 
+function formatMonthLabel(index) {
+  return `${index + 1}月`;
+}
+
 function displayText(value, fallback = '-') {
   if (Array.isArray(value)) return value.filter(Boolean).join(', ') || fallback;
   return value || fallback;
 }
+
+function moneyValue(value) {
+  const parsed = parsePrice(value);
+  return parsed === '' ? 0 : parsed;
+}
+
+function percentChange(current, previous) {
+  if (!previous) return current ? '+100%' : '-';
+  const value = ((current - previous) / previous) * 100;
+  return `${value >= 0 ? '+' : ''}${value.toFixed(1).replace(/\.0$/, '')}%`;
+}
+
+function quoteDate(quote) {
+  return String(quote.submittedDate || quote.issueDate || quote.createdAt || '').slice(0, 10);
+}
+
+function quoteTotalsForSummary(quote) {
+  const totals = calculateQuoteTotals(quote);
+  const sales = moneyValue(quote.grandTotal || quote.totalAmount || totals.grandTotal || totals.totalAmount);
+  const cost = moneyValue(quote.inventoryCostTotal || totals.costTotal);
+  const gross = moneyValue(quote.grossMarginAmount || totals.grossMarginAmount || (sales && cost ? sales - cost : 0));
+  const expenses =
+    moneyValue(quote.freight) +
+    moneyValue(quote.storageFee) +
+    moneyValue(quote.customsFee) +
+    moneyValue(quote.inspectionFee) +
+    moneyValue(quote.processingFee) +
+    moneyValue(quote.salesCommission) +
+    moneyValue(quote.otherExpense) +
+    moneyValue(quote.commonExpenseAmount);
+  const operating = moneyValue(quote.operatingProfit) || gross - expenses;
+  const real =
+    moneyValue(quote.realProfit) ||
+    operating +
+      moneyValue(quote.fxGainLoss) -
+      moneyValue(quote.discount) -
+      moneyValue(quote.disposalLoss);
+
+  return { sales, cost, gross, expenses, operating, real };
+}
+
+function buildPrintSummary({ karte, projects = [], products = [], inventories = [], suppliers = [] }) {
+  const year = new Date().getFullYear();
+  const previousYear = year - 1;
+  const customerId = karte.customer.id;
+  const yearQuotes = karte.estimates.filter((quote) => quoteDate(quote).startsWith(String(year)));
+  const previousQuotes = karte.estimates.filter((quote) => quoteDate(quote).startsWith(String(previousYear)));
+  const currentTotals = yearQuotes.reduce(
+    (sum, quote) => {
+      const totals = quoteTotalsForSummary(quote);
+      return {
+        sales: sum.sales + totals.sales,
+        gross: sum.gross + totals.gross,
+        operating: sum.operating + totals.operating,
+        real: sum.real + totals.real,
+      };
+    },
+    { sales: 0, gross: 0, operating: 0, real: 0 },
+  );
+  const previousSales = previousQuotes.reduce((sum, quote) => sum + quoteTotalsForSummary(quote).sales, 0);
+  const activeProjects = projects
+    .filter((project) => project.customerId === customerId)
+    .filter((project) => !['終了', '失注', '定番化'].includes(project.status))
+    .slice(0, 3);
+  const monthlySales = Array.from({ length: 12 }, (_, index) => ({
+    label: formatMonthLabel(index),
+    value: 0,
+  }));
+  yearQuotes.forEach((quote) => {
+    const month = Number(quoteDate(quote).slice(5, 7));
+    if (month >= 1 && month <= 12) {
+      monthlySales[month - 1].value += quoteTotalsForSummary(quote).sales;
+    }
+  });
+  const maxMonthlySales = Math.max(...monthlySales.map((month) => month.value), 1);
+  const productMap = new Map();
+
+  function addProductRow(productId, fallbackName, quantity, sales, gross, real) {
+    const product = products.find((item) => item.id === productId);
+    const name = productDisplayName(product, fallbackName || '未設定商品');
+    const current = productMap.get(name) || { name, quantity: 0, sales: 0, gross: 0, real: 0 };
+    productMap.set(name, {
+      name,
+      quantity: current.quantity + moneyValue(quantity),
+      sales: current.sales + sales,
+      gross: current.gross + gross,
+      real: current.real + real,
+    });
+  }
+
+  yearQuotes.forEach((quote) => {
+    const totals = quoteTotalsForSummary(quote);
+    const lines = quote.quoteLines?.length ? quote.quoteLines : [];
+    if (lines.length > 0) {
+      lines.forEach((line) => {
+        const lineTotals = calculateQuoteTotals({ quoteLines: [line] }).lines?.[0] || {};
+        addProductRow(
+          line.productId,
+          line.description,
+          line.quantity,
+          moneyValue(lineTotals.amount),
+          moneyValue(lineTotals.grossMarginAmount),
+          moneyValue(lineTotals.grossMarginAmount) - totals.expenses / Math.max(lines.length, 1),
+        );
+      });
+      return;
+    }
+
+    const productIds = quote.productIds?.length ? quote.productIds : [''];
+    productIds.forEach((productId) => {
+      addProductRow(productId, quote.projectName, quote.quantity, totals.sales / productIds.length, totals.gross / productIds.length, totals.real / productIds.length);
+    });
+  });
+
+  karte.adoptions.slice(0, 5).forEach((adoption) => {
+    addProductRow(adoption.productId, adoption.productName, adoption.monthlyVolume, 0, 0, 0);
+  });
+
+  const risks = [
+    ...karte.complaints.slice(0, 2).map((complaint) => `クレーム: ${complaint.title || complaint.memo || '内容未設定'}`),
+    karte.customer.creditMemo && `与信: ${karte.customer.creditMemo}`,
+    karte.customer.companyNote && `注意: ${karte.customer.companyNote}`,
+    ...karte.estimates.filter((quote) => quote.status === '失注' && quote.lostReason).slice(0, 1).map((quote) => `失注: ${quote.lostReason}`),
+    ...inventories
+      .filter((inventory) => (karte.products ?? []).some((product) => product.id === inventory.productId))
+      .filter((inventory) => ['欠品', '入港待ち'].includes(inventory.inventoryStatus))
+      .slice(0, 2)
+      .map((inventory) => {
+        const product = products.find((item) => item.id === inventory.productId);
+        const supplier = suppliers.find((item) => item.id === inventory.supplierId);
+        return `在庫: ${inventoryLabel(inventory, product, supplier)}`;
+      }),
+  ].filter(Boolean);
+
+  return {
+    year,
+    printedAt: new Date().toLocaleString('ja-JP'),
+    kpis: {
+      sales: currentTotals.sales,
+      previousChange: percentChange(currentTotals.sales, previousSales),
+      gross: currentTotals.gross,
+      operating: currentTotals.operating,
+      real: currentTotals.real,
+      activeProjects: activeProjects.length,
+    },
+    monthlySales: monthlySales.map((month) => ({
+      ...month,
+      rate: Math.max(4, Math.round((month.value / maxMonthlySales) * 100)),
+    })),
+    products: [...productMap.values()].sort((a, b) => b.sales - a.sales).slice(0, 5),
+    opportunities: activeProjects,
+    contacts: [...karte.contacts].sort((a, b) => (b.importanceScore ?? 0) - (a.importanceScore ?? 0)).slice(0, 3),
+    activities: karte.dealHistories.slice(0, 3),
+    adoptions: karte.adoptions.slice(0, 4),
+    proposalProducts: karte.products.slice(0, 4),
+    samples: karte.samples.filter((sample) => ['評価待ち', '発送済', '到着済'].includes(sample.status)).slice(0, 3),
+    risks: risks.slice(0, 5),
+  };
+}
+
 
 function daysUntil(value) {
   if (!value) return null;
@@ -385,6 +549,7 @@ export default function CustomerKarte({
   const [historyForm, setHistoryForm] = useState(emptyHistoryForm);
   const [replyTarget, setReplyTarget] = useState(null);
   const [replyForm, setReplyForm] = useState(emptyReplyForm);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
@@ -459,6 +624,10 @@ export default function CustomerKarte({
       return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     });
   }, [contacts, karte, products, quoteSearch, quoteSort]);
+  const printSummary = useMemo(
+    () => (karte ? buildPrintSummary({ karte, projects, products, inventories, suppliers }) : null),
+    [inventories, karte, products, projects, suppliers],
+  );
 
   useEffect(() => {
     setSampleForm(createSampleForm(customerId, user));
@@ -1205,6 +1374,14 @@ export default function CustomerKarte({
     }
   }
 
+  function handleOpenPrintPreview() {
+    setPrintPreviewOpen(true);
+  }
+
+  function handlePrintSummary() {
+    window.print();
+  }
+
   return (
     <main className="page karte-page">
       <header className={`karte-header ${isHighRank ? 'high-rank' : ''} ${hasComplaints ? 'has-complaint' : ''}`}>
@@ -1225,9 +1402,19 @@ export default function CustomerKarte({
         <div className="karte-header-actions">
           <a className="ghost-button external-button" href={googleSearchUrl(customer.companyName)} target="_blank" rel="noreferrer">Google検索</a>
           {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
+          <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
           {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
         </div>
       </header>
+
+      {printPreviewOpen && printSummary && (
+        <A4SummaryPreview
+          karte={karte}
+          summary={printSummary}
+          onClose={() => setPrintPreviewOpen(false)}
+          onPrint={handlePrintSummary}
+        />
+      )}
 
       <div className="karte-grid">
         <Section title="会社基本情報">
@@ -2338,6 +2525,210 @@ export default function CustomerKarte({
         </Section>
       </div>
     </main>
+  );
+}
+
+function A4SummaryPreview({ karte, summary, onClose, onPrint }) {
+  const { customer } = karte;
+  const nextFollowDate = customer.nextFollowUpDate || customer.nextFollowDate;
+  const kpiItems = [
+    ['今年売上', `${formatPrice(summary.kpis.sales) || '0'}円`],
+    ['前年比', summary.kpis.previousChange],
+    ['粗利', `${formatPrice(summary.kpis.gross) || '0'}円`],
+    ['営業利益', `${formatPrice(summary.kpis.operating) || '0'}円`],
+    ['実質利益', `${formatPrice(summary.kpis.real) || '0'}円`],
+    ['進行中案件', `${summary.kpis.activeProjects}件`],
+  ];
+
+  return (
+    <div className="a4-print-root" role="dialog" aria-modal="true" aria-label="A4サマリー印刷プレビュー">
+      <div className="a4-preview-toolbar no-print">
+        <strong>A4エグゼクティブサマリー</strong>
+        <div>
+          <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+          <button className="primary-button" type="button" onClick={onPrint}>印刷 / PDF保存</button>
+        </div>
+      </div>
+
+      <article className="a4-summary-sheet">
+        <header className="a4-summary-header">
+          <div>
+            <p>Customer Executive Summary</p>
+            <h1>{customer.companyName}</h1>
+            <dl>
+              <div><dt>顧客コード</dt><dd>{customer.customerCode || '-'}</dd></div>
+              <div><dt>業種</dt><dd>{customer.industry || '-'}</dd></div>
+              <div><dt>地域</dt><dd>{customer.area || '-'}</dd></div>
+              <div><dt>重要度</dt><dd>{customer.customerRank || customer.rank || 'D'}</dd></div>
+              <div><dt>ステータス</dt><dd>{customer.status || '-'}</dd></div>
+              <div><dt>担当営業</dt><dd>{customer.ownerName || customer.salesOwner || '-'}</dd></div>
+            </dl>
+          </div>
+          <aside>
+            <span>Printed</span>
+            <strong>{summary.printedAt}</strong>
+            <small>{summary.year}年度</small>
+          </aside>
+        </header>
+
+        <section className="a4-kpi-grid">
+          {kpiItems.map(([label, value]) => (
+            <div className="a4-kpi-card" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </section>
+
+        <div className="a4-summary-grid">
+          <section className="a4-summary-section a4-section-large">
+            <div className="a4-section-heading">
+              <h2>Sales Performance</h2>
+              <span>月別売上 / 商品TOP5</span>
+            </div>
+            <div className="a4-bar-chart">
+              {summary.monthlySales.map((month) => (
+                <div className="a4-bar-item" key={month.label}>
+                  <span>{month.label}</span>
+                  <div><i style={{ width: `${month.rate}%` }} /></div>
+                  <strong>{formatPrice(month.value) || '0'}</strong>
+                </div>
+              ))}
+            </div>
+            <table className="a4-table">
+              <thead>
+                <tr>
+                  <th>商品名</th>
+                  <th>数量</th>
+                  <th>売上</th>
+                  <th>粗利</th>
+                  <th>実質利益</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.products.length > 0 ? summary.products.map((product) => (
+                  <tr key={product.name}>
+                    <td>{product.name}</td>
+                    <td>{product.quantity || '-'}</td>
+                    <td>{formatPrice(product.sales) || '-'}</td>
+                    <td>{formatPrice(product.gross) || '-'}</td>
+                    <td>{formatPrice(product.real) || '-'}</td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="5">販売実績はまだありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="a4-summary-section">
+            <div className="a4-section-heading">
+              <h2>Current Opportunities</h2>
+              <span>進行中TOP3</span>
+            </div>
+            <table className="a4-table compact">
+              <thead>
+                <tr>
+                  <th>案件名</th>
+                  <th>状態</th>
+                  <th>確度</th>
+                  <th>想定売上</th>
+                  <th>次回</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.opportunities.length > 0 ? summary.opportunities.map((project) => (
+                  <tr key={project.id}>
+                    <td>{project.title || '-'}</td>
+                    <td>{project.status || '-'}</td>
+                    <td>{project.probability || project.winProbability || '-'}</td>
+                    <td>{formatPrice(project.expectedSales) || '-'}</td>
+                    <td>{project.nextActionDate || project.nextAction || '-'}</td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="5">進行中案件はありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="a4-summary-section">
+            <div className="a4-section-heading">
+              <h2>Product & Proposal</h2>
+              <span>採用 / 提案 / サンプル</span>
+            </div>
+            <ul className="a4-bullet-list">
+              {summary.adoptions.map((adoption) => (
+                <li key={`adoption-${adoption.id}`}>採用: {productDisplayName(karte.products.find((product) => product.id === adoption.productId), adoption.productName || '-')} / 年間見込 {adoption.annualVolume || adoption.monthlyVolume || '-'}</li>
+              ))}
+              {summary.proposalProducts.map((product) => (
+                <li key={`proposal-${product.id}`}>提案中: {productDisplayName(product)}</li>
+              ))}
+              {summary.samples.map((sample) => (
+                <li key={`sample-${sample.id}`}>サンプル: {sample.sampleName || '-'} / {sample.status || '-'}</li>
+              ))}
+              {summary.adoptions.length + summary.proposalProducts.length + summary.samples.length === 0 && <li>提案・採用品はまだありません</li>}
+            </ul>
+          </section>
+
+          <section className="a4-summary-section">
+            <div className="a4-section-heading">
+              <h2>Key Contacts</h2>
+              <span>主要担当者</span>
+            </div>
+            <table className="a4-table compact">
+              <thead>
+                <tr>
+                  <th>氏名</th>
+                  <th>役職</th>
+                  <th>決裁権</th>
+                  <th>連絡先</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.contacts.length > 0 ? summary.contacts.map((contact) => (
+                  <tr key={contact.id}>
+                    <td>{contact.name || '-'}</td>
+                    <td>{contact.role || '-'}</td>
+                    <td>{contact.decisionPower || '-'}</td>
+                    <td>{contact.mobile || contact.phone || contact.email || '-'}</td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="4">担当者は未登録です</td></tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="a4-summary-section">
+            <div className="a4-section-heading">
+              <h2>Recent Activity</h2>
+              <span>直近商談3件</span>
+            </div>
+            <ul className="a4-activity-list">
+              {summary.activities.length > 0 ? summary.activities.map((history) => (
+                <li key={history.id}>
+                  <strong>{formatDate(history.date)}</strong>
+                  <span>{history.summary || '-'}</span>
+                  <small>次回: {history.nextAction || '-'}</small>
+                </li>
+              )) : <li><span>商談履歴はまだありません</span></li>}
+            </ul>
+          </section>
+
+          <section className="a4-summary-section">
+            <div className="a4-section-heading">
+              <h2>Risks & Attention</h2>
+              <span>注意事項 / 次回アクション</span>
+            </div>
+            <ul className="a4-bullet-list risk">
+              <li>次回フォロー: {nextFollowDate || '-'}</li>
+              {summary.risks.length > 0 ? summary.risks.map((risk) => <li key={risk}>{risk}</li>) : <li>大きなリスクは未登録です</li>}
+            </ul>
+          </section>
+        </div>
+      </article>
+    </div>
   );
 }
 

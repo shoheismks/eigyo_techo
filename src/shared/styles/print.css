@@ -1,0 +1,357 @@
+.a4-print-root {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: start center;
+  overflow: auto;
+  background: rgba(3, 7, 15, 0.82);
+  padding: 22px;
+}
+
+.a4-preview-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  width: min(210mm, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(9, 14, 24, 0.96);
+  padding: 10px 12px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.a4-preview-toolbar > div {
+  display: flex;
+  gap: 8px;
+}
+
+.a4-summary-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  max-width: 100%;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 6mm;
+  background: #ffffff;
+  color: #111827;
+  padding: 11mm;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
+  font-family: Arial, "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+
+.a4-summary-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42mm;
+  gap: 8mm;
+  border-bottom: 1px solid #d8dee8;
+  padding-bottom: 5mm;
+}
+
+.a4-summary-header p,
+.a4-summary-header h1,
+.a4-summary-header dl,
+.a4-summary-header dd,
+.a4-summary-header dt {
+  margin: 0;
+}
+
+.a4-summary-header p {
+  color: #2563eb;
+  font-size: 8.5pt;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.a4-summary-header h1 {
+  margin-top: 1.5mm;
+  color: #0f172a;
+  font-size: 20pt;
+  line-height: 1.15;
+}
+
+.a4-summary-header dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2mm 4mm;
+  margin-top: 4mm;
+}
+
+.a4-summary-header dl div {
+  min-width: 0;
+}
+
+.a4-summary-header dt,
+.a4-kpi-card span,
+.a4-section-heading span {
+  color: #64748b;
+  font-size: 7.5pt;
+  font-weight: 700;
+}
+
+.a4-summary-header dd {
+  overflow: hidden;
+  color: #111827;
+  font-size: 9pt;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.a4-summary-header aside {
+  align-self: start;
+  display: grid;
+  gap: 1mm;
+  border-left: 3px solid #2563eb;
+  background: #f8fafc;
+  padding: 4mm;
+}
+
+.a4-summary-header aside span,
+.a4-summary-header aside small {
+  color: #64748b;
+  font-size: 8pt;
+}
+
+.a4-summary-header aside strong {
+  color: #0f172a;
+  font-size: 9pt;
+}
+
+.a4-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3mm;
+}
+
+.a4-kpi-card {
+  display: grid;
+  gap: 1mm;
+  border-top: 3px solid #2563eb;
+  background: #f8fafc;
+  padding: 3mm;
+}
+
+.a4-kpi-card strong {
+  color: #0f172a;
+  font-size: 12pt;
+  line-height: 1.2;
+}
+
+.a4-summary-grid {
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  grid-auto-rows: minmax(0, auto);
+  gap: 4mm;
+  min-height: 0;
+}
+
+.a4-summary-section {
+  min-width: 0;
+  display: grid;
+  gap: 2.5mm;
+  border-top: 1px solid #d8dee8;
+  padding-top: 3mm;
+}
+
+.a4-section-large {
+  grid-row: span 2;
+}
+
+.a4-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3mm;
+}
+
+.a4-section-heading h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 10.5pt;
+  line-height: 1.2;
+}
+
+.a4-bar-chart {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2mm 4mm;
+}
+
+.a4-bar-item {
+  display: grid;
+  grid-template-columns: 10mm minmax(0, 1fr) 17mm;
+  align-items: center;
+  gap: 2mm;
+  font-size: 7.2pt;
+}
+
+.a4-bar-item div {
+  height: 3mm;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e5e7eb;
+}
+
+.a4-bar-item i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+}
+
+.a4-bar-item strong {
+  color: #334155;
+  font-size: 7.2pt;
+  text-align: right;
+}
+
+.a4-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.a4-table th,
+.a4-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1.6mm 1mm;
+  color: #1f2937;
+  font-size: 7.5pt;
+  line-height: 1.25;
+  text-align: left;
+  vertical-align: top;
+}
+
+.a4-table th {
+  color: #475569;
+  font-size: 7pt;
+  font-weight: 800;
+}
+
+.a4-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a4-table.compact th,
+.a4-table.compact td {
+  padding: 1.3mm 1mm;
+  font-size: 7.2pt;
+}
+
+.a4-bullet-list,
+.a4-activity-list {
+  display: grid;
+  gap: 1.4mm;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.a4-bullet-list li,
+.a4-activity-list li {
+  color: #1f2937;
+  font-size: 7.8pt;
+  line-height: 1.35;
+}
+
+.a4-bullet-list li::before {
+  content: "";
+  display: inline-block;
+  width: 1.8mm;
+  height: 1.8mm;
+  margin-right: 1.5mm;
+  border-radius: 50%;
+  background: #2563eb;
+  vertical-align: middle;
+}
+
+.a4-bullet-list.risk li::before {
+  background: #b45309;
+}
+
+.a4-activity-list li {
+  display: grid;
+  grid-template-columns: 18mm minmax(0, 1fr);
+  gap: 2mm;
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 1.3mm;
+}
+
+.a4-activity-list strong {
+  color: #2563eb;
+  font-size: 7.5pt;
+}
+
+.a4-activity-list span,
+.a4-activity-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a4-activity-list small {
+  grid-column: 2;
+  color: #64748b;
+}
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    width: 210mm;
+    min-height: 297mm;
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .a4-print-root,
+  .a4-print-root * {
+    visibility: visible !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .a4-print-root {
+    position: absolute;
+    inset: 0;
+    display: block;
+    overflow: visible;
+    background: #ffffff !important;
+    padding: 0;
+  }
+
+  .a4-summary-sheet {
+    width: auto;
+    min-height: auto;
+    max-height: none;
+    box-shadow: none;
+    padding: 0;
+    gap: 5mm;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .a4-summary-section,
+  .a4-kpi-card,
+  .a4-summary-header {
+    break-inside: avoid;
+  }
+}
