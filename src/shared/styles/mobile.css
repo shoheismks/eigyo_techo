@@ -99,6 +99,13 @@
   overflow: hidden;
 }
 
+.karte-section-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  background: rgba(255, 255, 255, 0.035);
+}
+
 .karte-section-toggle {
   width: 100%;
   min-height: 54px;
@@ -111,6 +118,17 @@
   color: var(--text);
   padding: 0 14px;
   text-align: left;
+}
+
+.karte-section-header .karte-section-toggle {
+  background: transparent;
+}
+
+.compact-action-button {
+  align-self: center;
+  min-height: 36px;
+  margin: 8px 10px 8px 0;
+  white-space: nowrap;
 }
 
 .karte-section-toggle span {
@@ -180,6 +198,38 @@
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   padding: 12px;
+}
+
+.clickable-card {
+  cursor: pointer;
+}
+
+.clickable-card:hover {
+  border-color: rgba(102, 163, 255, 0.55);
+  background: rgba(102, 163, 255, 0.08);
+}
+
+.karte-add-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-height: 86px;
+  border: 1px dashed rgba(102, 163, 255, 0.55);
+  border-radius: 8px;
+  background: rgba(102, 163, 255, 0.08);
+  color: var(--text);
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.karte-add-card strong {
+  color: var(--white);
+}
+
+.karte-add-card span {
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .karte-mini-card p,

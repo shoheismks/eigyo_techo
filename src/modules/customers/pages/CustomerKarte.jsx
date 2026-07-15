@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
+import { emptyContact, normalizeContact } from '../../contacts/hooks/useContacts.js';
+import { normalizeBusinessCard } from '../../businessCards/hooks/useBusinessCards.js';
+import { normalizeComplaint } from '../../claims/hooks/useComplaints.js';
 import { ADOPTION_STATUSES, emptyAdoption, normalizeAdoption } from '../../products/hooks/useAdoptions.js';
 import { normalizeAttachmentRecord } from '../../../shared/hooks/useAttachments.js';
 import { formatPrice, parsePrice, productDisplayName } from '../../products/hooks/useProducts.js';
 import {
+  INVENTORY_STATUSES,
+  INVENTORY_TYPES,
+  INVENTORY_UNITS,
+  emptyInventory,
   calculateInventoryGrossMarginRate,
   inventoryLabel,
   inventoryQuoteCostTotal,
+  normalizeInventory,
 } from '../../inventory/hooks/useInventory.js';
 import {
   QUOTE_STATUSES,
@@ -39,6 +47,23 @@ import {
 } from '../../../shared/utils/businessCode.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
+
+const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
+const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];
+
+const emptyHistoryForm = {
+  date: '',
+  type: '商談',
+  summary: '',
+  nextAction: '',
+  createdBy: '',
+};
+
+const emptyReplyForm = {
+  type: '訂正',
+  summary: '',
+  createdBy: '',
+};
 
 function googleSearchUrl(companyName) {
   return `https://www.google.com/search?q=${encodeURIComponent(companyName)}`;
@@ -113,6 +138,71 @@ function createSampleForm(customerId = '', user) {
   }, user?.id ?? '');
 }
 
+function createContactForm(customer = {}, user) {
+  return normalizeContact({
+    ...emptyContact,
+    customerId: customer.id ?? '',
+    companyName: customer.companyName ?? '',
+    userId: user?.id ?? customer.userId ?? '',
+  }, user?.id ?? customer.userId ?? '');
+}
+
+function createBusinessCardForm(customerId = '', user) {
+  return normalizeBusinessCard({
+    customerId,
+    userId: user?.id ?? '',
+    extracted: {},
+  }, user?.id ?? '');
+}
+
+function createComplaintForm(customer = {}, user) {
+  return normalizeComplaint({
+    customerId: customer.id ?? '',
+    customerName: customer.companyName ?? '',
+    createdBy: user?.id ?? customer.userId ?? '',
+    createdByName: user?.email ?? '',
+  }, user?.id ?? customer.userId ?? '');
+}
+
+function createInventoryForm(customer = {}, user, productId = '') {
+  return normalizeInventory({
+    ...emptyInventory,
+    productId,
+    owner: customer.companyName ?? '',
+    userId: user?.id ?? customer.userId ?? '',
+    createdBy: user?.id ?? customer.userId ?? '',
+    createdByName: user?.email ?? '',
+  }, user?.id ?? customer.userId ?? '');
+}
+
+function createReply(reply, userId = '') {
+  return {
+    id: crypto.randomUUID(),
+    type: reply.type,
+    summary: reply.summary,
+    createdAt: new Date().toISOString(),
+    createdBy: reply.createdBy,
+    userId,
+    replies: [],
+  };
+}
+
+function addReplyToTree(items, targetId, reply) {
+  return items.map((item) => {
+    if (item.id === targetId) {
+      return {
+        ...item,
+        replies: [...(item.replies ?? []), reply],
+      };
+    }
+
+    return {
+      ...item,
+      replies: addReplyToTree(item.replies ?? [], targetId, reply),
+    };
+  });
+}
+
 function createQuoteForm(customerId = '', user, quotes = []) {
   return normalizeQuote({
     ...emptyQuote,
@@ -173,18 +263,30 @@ function createAdoptionForm(customerId = '', user) {
   }, user?.id ?? '');
 }
 
-function Section({ title, count, defaultOpen = true, children }) {
+function Section({ title, count, defaultOpen = true, action, children }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
     <section className="karte-section">
-      <button className="karte-section-toggle" type="button" onClick={() => setOpen((value) => !value)}>
+      <div className="karte-section-header">
+        <button className="karte-section-toggle" type="button" onClick={() => setOpen((value) => !value)}>
         <span>{title}</span>
         <small>{count !== undefined ? `${count}件` : ''}</small>
         <strong>{open ? '-' : '+'}</strong>
-      </button>
+        </button>
+        {action}
+      </div>
       {open && <div className="karte-section-body">{children}</div>}
     </section>
+  );
+}
+
+function AddCard({ title, description, onClick }) {
+  return (
+    <button className="karte-add-card" type="button" onClick={onClick}>
+      <strong>＋ {title}</strong>
+      {description && <span>{description}</span>}
+    </button>
   );
 }
 
@@ -242,6 +344,14 @@ export default function CustomerKarte({
   updateQuote,
   addAdoption,
   updateAdoption,
+  addContact,
+  updateContact,
+  addBusinessCard,
+  updateBusinessCard,
+  addComplaint,
+  updateComplaint,
+  addInventory,
+  updateInventory,
   setActivePage,
   user,
 }) {
@@ -268,6 +378,13 @@ export default function CustomerKarte({
   const [quoteSearch, setQuoteSearch] = useState('');
   const [quoteSort, setQuoteSort] = useState('createdAt-desc');
   const [adoptionForm, setAdoptionForm] = useState(() => createAdoptionForm(customerId, user));
+  const [contactForm, setContactForm] = useState(() => createContactForm({ id: customerId }, user));
+  const [businessCardForm, setBusinessCardForm] = useState(() => createBusinessCardForm(customerId, user));
+  const [complaintForm, setComplaintForm] = useState(() => createComplaintForm({ id: customerId }, user));
+  const [inventoryForm, setInventoryForm] = useState(() => createInventoryForm({ id: customerId }, user));
+  const [historyForm, setHistoryForm] = useState(emptyHistoryForm);
+  const [replyTarget, setReplyTarget] = useState(null);
+  const [replyForm, setReplyForm] = useState(emptyReplyForm);
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
@@ -347,6 +464,13 @@ export default function CustomerKarte({
     setSampleForm(createSampleForm(customerId, user));
     setQuoteForm(createQuoteForm(customerId, user, quotes));
     setAdoptionForm(createAdoptionForm(customerId, user));
+    setContactForm(createContactForm({ id: customerId }, user));
+    setBusinessCardForm(createBusinessCardForm(customerId, user));
+    setComplaintForm(createComplaintForm({ id: customerId }, user));
+    setInventoryForm(createInventoryForm({ id: customerId }, user));
+    setHistoryForm(emptyHistoryForm);
+    setReplyTarget(null);
+    setReplyForm(emptyReplyForm);
     setQuoteFile(null);
     setQuotePreviewHtml('');
     setQuoteError('');
@@ -400,8 +524,192 @@ export default function CustomerKarte({
     );
   }
 
+  function updateContactField(field, value) {
+    setContactForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function startAddContact() {
+    setContactForm(createContactForm(customer, user));
+  }
+
+  function startEditContact(contact) {
+    setContactForm(normalizeContact(contact, user?.id ?? customer.userId));
+  }
+
+  function handleSaveContact(event) {
+    event.preventDefault();
+    if (!contactForm.name.trim()) return;
+
+    const payload = normalizeContact({
+      ...contactForm,
+      customerId: customer.id,
+      companyName: customer.companyName,
+      userId: user?.id ?? customer.userId,
+    }, user?.id ?? customer.userId);
+    const exists = karte.contacts.some((contact) => contact.id === payload.id);
+    if (exists && updateContact) {
+      updateContact(payload.id, payload);
+    } else if (addContact) {
+      addContact(payload);
+    }
+    setContactForm(createContactForm(customer, user));
+  }
+
+  function updateBusinessCardField(field, value) {
+    setBusinessCardForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateBusinessCardExtracted(field, value) {
+    setBusinessCardForm((current) => ({
+      ...current,
+      extracted: { ...(current.extracted ?? {}), [field]: value },
+    }));
+  }
+
+  function startAddBusinessCard() {
+    setBusinessCardForm(createBusinessCardForm(customer.id, user));
+  }
+
+  function startEditBusinessCard(card) {
+    setBusinessCardForm(normalizeBusinessCard(card, user?.id ?? customer.userId));
+  }
+
+  function handleSaveBusinessCard(event) {
+    event.preventDefault();
+    const payload = normalizeBusinessCard({
+      ...businessCardForm,
+      customerId: customer.id,
+      userId: user?.id ?? customer.userId,
+    }, user?.id ?? customer.userId);
+    const exists = karte.businessCards.some((card) => card.id === payload.id);
+    if (exists && updateBusinessCard) {
+      updateBusinessCard(payload.id, payload);
+    } else if (addBusinessCard) {
+      addBusinessCard(payload);
+    }
+    setBusinessCardForm(createBusinessCardForm(customer.id, user));
+  }
+
+  function updateComplaintField(field, value) {
+    setComplaintForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function startAddComplaint() {
+    setComplaintForm(createComplaintForm(customer, user));
+  }
+
+  function startEditComplaint(complaint) {
+    setComplaintForm(normalizeComplaint(complaint, user?.id ?? customer.userId));
+  }
+
+  function handleSaveComplaint(event) {
+    event.preventDefault();
+    if (!complaintForm.title.trim()) return;
+
+    const payload = normalizeComplaint({
+      ...complaintForm,
+      customerId: customer.id,
+      customerName: customer.companyName,
+      userId: user?.id ?? customer.userId,
+      createdBy: complaintForm.createdBy || user?.id || customer.userId,
+      createdByName: complaintForm.createdByName || user?.email || '',
+    }, user?.id ?? customer.userId);
+    const exists = karte.complaints.some((complaint) => complaint.id === payload.id);
+    if (exists && updateComplaint) {
+      updateComplaint(payload.id, payload);
+    } else if (addComplaint) {
+      addComplaint(payload);
+    }
+    setComplaintForm(createComplaintForm(customer, user));
+  }
+
+  function updateInventoryField(field, value) {
+    setInventoryForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function startAddInventory(productId = '') {
+    setInventoryForm(createInventoryForm(customer, user, productId));
+  }
+
+  function startEditInventory(inventory) {
+    setInventoryForm(normalizeInventory(inventory, user?.id ?? customer.userId));
+  }
+
+  function handleSaveInventory(event) {
+    event.preventDefault();
+    if (!inventoryForm.productId) return;
+
+    const payload = normalizeInventory({
+      ...inventoryForm,
+      userId: user?.id ?? customer.userId,
+      createdBy: inventoryForm.createdBy || user?.id || customer.userId,
+      createdByName: inventoryForm.createdByName || user?.email || '',
+    }, user?.id ?? customer.userId);
+    const exists = inventories.some((inventory) => inventory.id === payload.id);
+    if (exists && updateInventory) {
+      updateInventory(payload.id, payload);
+    } else if (addInventory) {
+      addInventory(payload);
+    }
+    setInventoryForm(createInventoryForm(customer, user, payload.productId));
+  }
+
+  function updateHistoryForm(field, value) {
+    setHistoryForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleAddHistory(event) {
+    event.preventDefault();
+    if (!historyForm.summary.trim()) return;
+
+    const now = new Date().toISOString();
+    updateCustomerField('dealHistories', [
+      {
+        ...historyForm,
+        id: crypto.randomUUID(),
+        userId: user?.id ?? customer.userId,
+        date: historyForm.date || todayString(),
+        createdAt: now,
+        createdBy: historyForm.createdBy || user?.id || customer.userId,
+        createdByName: user?.email || '',
+        replies: [],
+      },
+      ...(customer.dealHistories ?? []),
+    ]);
+    setHistoryForm(emptyHistoryForm);
+  }
+
+  function startReply(history, type = '訂正') {
+    setReplyTarget(history.id);
+    setReplyForm({ ...emptyReplyForm, type, createdBy: user?.email || user?.id || '' });
+  }
+
+  function updateReplyForm(field, value) {
+    setReplyForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleAddReply(event) {
+    event.preventDefault();
+    if (!replyTarget || !replyForm.summary.trim()) return;
+
+    updateCustomerField(
+      'dealHistories',
+      addReplyToTree(customer.dealHistories ?? [], replyTarget, createReply(replyForm, user?.id ?? customer.userId)),
+    );
+    setReplyTarget(null);
+    setReplyForm(emptyReplyForm);
+  }
+
   function updateSampleField(field, value) {
     setSampleForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function startAddSample() {
+    setSampleForm(createSampleForm(customer.id, user));
+  }
+
+  function startEditSample(sample) {
+    setSampleForm(normalizeSample(sample, user?.id ?? customer.userId));
   }
 
   function toggleSampleArrayField(field, id) {
@@ -443,6 +751,14 @@ export default function CustomerKarte({
 
   function updateAdoptionField(field, value) {
     setAdoptionForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function startAddAdoption() {
+    setAdoptionForm(createAdoptionForm(customer.id, user));
+  }
+
+  function startEditAdoption(adoption) {
+    setAdoptionForm(normalizeAdoption(adoption, user?.id ?? customer.userId));
   }
 
   function toggleQuoteArrayField(field, id) {
@@ -584,16 +900,22 @@ export default function CustomerKarte({
 
   function handleAddSample(event) {
     event.preventDefault();
-    if (!addSample || !sampleForm.sampleName.trim()) {
+    if (!sampleForm.sampleName.trim()) {
       return;
     }
 
-    addSample(normalizeSample({
+    const payload = normalizeSample({
       ...sampleForm,
       customerId: customer.id,
       createdBy: user?.id ?? customer.userId,
       createdByName: user?.email ?? '',
-    }, user?.id ?? customer.userId));
+    }, user?.id ?? customer.userId);
+    const exists = karte.samples.some((sample) => sample.id === payload.id);
+    if (exists && updateSample) {
+      updateSample(payload.id, payload);
+    } else if (addSample) {
+      addSample(payload);
+    }
     setSampleForm(createSampleForm(customer.id, user));
   }
 
@@ -784,15 +1106,21 @@ export default function CustomerKarte({
 
   function handleAddAdoption(event) {
     event.preventDefault();
-    if (!addAdoption || !adoptionForm.productId) {
+    if (!adoptionForm.productId) {
       return;
     }
 
-    addAdoption(normalizeAdoption({
+    const payload = normalizeAdoption({
       ...adoptionForm,
       customerId: customer.id,
       userId: user?.id ?? customer.userId,
-    }, user?.id ?? customer.userId));
+    }, user?.id ?? customer.userId);
+    const exists = karte.adoptions.some((adoption) => adoption.id === payload.id);
+    if (exists && updateAdoption) {
+      updateAdoption(payload.id, payload);
+    } else if (addAdoption) {
+      addAdoption(payload);
+    }
     setAdoptionForm(createAdoptionForm(customer.id, user));
   }
 
@@ -944,10 +1272,47 @@ export default function CustomerKarte({
           </label>
         </Section>
 
-        <Section title="担当者一覧" count={karte.contacts.length}>
+        <Section title="担当者一覧" count={karte.contacts.length} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddContact}>＋追加</button>}>
+          <form className="sample-form" onSubmit={handleSaveContact}>
+            <div className="date-grid">
+              <label className="field-label">
+                氏名
+                <input value={contactForm.name} onChange={(event) => updateContactField('name', event.target.value)} />
+              </label>
+              <label className="field-label">
+                部署
+                <input value={contactForm.department} onChange={(event) => updateContactField('department', event.target.value)} />
+              </label>
+              <label className="field-label">
+                役職
+                <input value={contactForm.role} onChange={(event) => updateContactField('role', event.target.value)} />
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                メール
+                <input value={contactForm.email} onChange={(event) => updateContactField('email', event.target.value)} />
+              </label>
+              <label className="field-label">
+                電話
+                <input value={contactForm.phone} onChange={(event) => updateContactField('phone', event.target.value)} />
+              </label>
+              <label className="field-label">
+                携帯
+                <input value={contactForm.mobile} onChange={(event) => updateContactField('mobile', event.target.value)} />
+              </label>
+            </div>
+            <label className="field-label">
+              人物メモ
+              <textarea value={contactForm.memo} onChange={(event) => updateContactField('memo', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit" disabled={!contactForm.name.trim()}>
+              {karte.contacts.some((contact) => contact.id === contactForm.id) ? '担当者を更新' : '担当者を追加'}
+            </button>
+          </form>
           <div className="karte-card-list">
             {karte.contacts.length > 0 ? karte.contacts.map((contact) => (
-              <article className="karte-mini-card" key={contact.id}>
+              <article className="karte-mini-card clickable-card" key={contact.id} onClick={() => startEditContact(contact)}>
                 <h3>{contact.name || '氏名未入力'}</h3>
                 <p>{displayText([contact.department, contact.role])}</p>
                 <p>{displayText([contact.email, contact.mobile || contact.phone])}</p>
@@ -958,14 +1323,40 @@ export default function CustomerKarte({
                 </div>
                 <p className="inline-helper">{contact.memo || '人物メモなし'}</p>
               </article>
-            )) : <p className="inline-helper">担当者はまだ登録されていません。</p>}
+            )) : <AddCard title="担当者を追加" description="この顧客の担当者を登録します" onClick={startAddContact} />}
           </div>
         </Section>
 
-        <Section title="名刺情報" count={karte.businessCards.length} defaultOpen={karte.businessCards.length > 0}>
+        <Section title="名刺情報" count={karte.businessCards.length} defaultOpen={karte.businessCards.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddBusinessCard}>＋追加</button>}>
+          <form className="sample-form" onSubmit={handleSaveBusinessCard}>
+            <div className="date-grid">
+              <label className="field-label">
+                氏名
+                <input value={businessCardForm.extracted?.name || ''} onChange={(event) => updateBusinessCardExtracted('name', event.target.value)} />
+              </label>
+              <label className="field-label">
+                会社名
+                <input value={businessCardForm.extracted?.companyName || customer.companyName} onChange={(event) => updateBusinessCardExtracted('companyName', event.target.value)} />
+              </label>
+              <label className="field-label">
+                担当者
+                <select value={businessCardForm.contactId || ''} onChange={(event) => updateBusinessCardField('contactId', event.target.value)}>
+                  <option value="">未選択</option>
+                  {karte.contacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name || '名称未設定'}</option>)}
+                </select>
+              </label>
+            </div>
+            <label className="field-label">
+              OCRテキスト
+              <textarea value={businessCardForm.rawText || ''} onChange={(event) => updateBusinessCardField('rawText', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit">
+              {karte.businessCards.some((card) => card.id === businessCardForm.id) ? '名刺を更新' : '名刺を追加'}
+            </button>
+          </form>
           <div className="karte-card-list">
             {karte.businessCards.length > 0 ? karte.businessCards.map((card) => (
-              <article className="karte-mini-card" key={card.id}>
+              <article className="karte-mini-card clickable-card" key={card.id} onClick={() => startEditBusinessCard(card)}>
                 <h3>{card.extracted?.name || '氏名未取得'}</h3>
                 <p>{card.extracted?.companyName || customer.companyName}</p>
                 {card.imageFile?.url && (
@@ -973,7 +1364,7 @@ export default function CustomerKarte({
                 )}
                 <p className="inline-helper">{card.rawText?.slice(0, 180) || 'OCRテキストなし'}</p>
               </article>
-            )) : <p className="inline-helper">名刺はまだ登録されていません。</p>}
+            )) : <AddCard title="名刺を追加" description="OCR結果を確認しながら保存します" onClick={startAddBusinessCard} />}
           </div>
         </Section>
 
@@ -1044,10 +1435,59 @@ export default function CustomerKarte({
           setActivePage={setActivePage}
         />
 
-        <Section title="商談履歴" count={karte.dealHistories.length}>
+        <Section title="商談履歴" count={karte.dealHistories.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setHistoryForm(emptyHistoryForm)}>＋追加</button>}>
+          <form className="sample-form" onSubmit={handleAddHistory}>
+            <div className="date-grid">
+              <label className="field-label">
+                商談日
+                <input type="date" value={historyForm.date} onChange={(event) => updateHistoryForm('date', event.target.value)} />
+              </label>
+              <label className="field-label">
+                種別
+                <select value={historyForm.type} onChange={(event) => updateHistoryForm('type', event.target.value)}>
+                  {DEAL_TYPES.map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </label>
+            </div>
+            <label className="field-label">
+              商談内容
+              <textarea value={historyForm.summary} onChange={(event) => updateHistoryForm('summary', event.target.value)} />
+            </label>
+            <label className="field-label">
+              次回アクション
+              <input value={historyForm.nextAction} onChange={(event) => updateHistoryForm('nextAction', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit" disabled={!historyForm.summary.trim()}>
+              商談履歴を追加
+            </button>
+          </form>
+          {replyTarget && (
+            <form className="sample-form" onSubmit={handleAddReply}>
+              <div className="date-grid">
+                <label className="field-label">
+                  追記種別
+                  <select value={replyForm.type} onChange={(event) => updateReplyForm('type', event.target.value)}>
+                    {REPLY_TYPES.map((type) => <option key={type}>{type}</option>)}
+                  </select>
+                </label>
+                <label className="field-label">
+                  記載者
+                  <input value={replyForm.createdBy} onChange={(event) => updateReplyForm('createdBy', event.target.value)} />
+                </label>
+              </div>
+              <label className="field-label">
+                返信/訂正内容
+                <textarea value={replyForm.summary} onChange={(event) => updateReplyForm('summary', event.target.value)} />
+              </label>
+              <div className="mail-action-row">
+                <button className="primary-button" type="submit" disabled={!replyForm.summary.trim()}>追記する</button>
+                <button className="ghost-button" type="button" onClick={() => setReplyTarget(null)}>キャンセル</button>
+              </div>
+            </form>
+          )}
           <div className="timeline-list">
             {karte.dealHistories.length > 0 ? karte.dealHistories.map((history) => (
-              <article className={`history-card timeline-card ${history.hasComplaint ? 'ng-card' : ''}`} key={history.id}>
+              <article className={`history-card timeline-card clickable-card ${history.hasComplaint ? 'ng-card' : ''}`} key={history.id} onClick={() => startReply(history, '訂正')}>
                 <div className="history-meta">
                   <span>{formatDate(history.date)} / {history.type || '商談'}</span>
                   <small>{history.createdByName || history.createdBy || '-'}</small>
@@ -1059,27 +1499,50 @@ export default function CustomerKarte({
                 {history.hasComplaint && <p className="ng-banner">クレームフラグあり</p>}
                 <ReplyTree replies={history.replies ?? []} />
               </article>
-            )) : <p className="inline-helper">商談履歴はまだありません。</p>}
+            )) : <AddCard title="商談履歴を追加" description="初回接触や商談内容を記録します" onClick={() => setHistoryForm(emptyHistoryForm)} />}
           </div>
         </Section>
 
-        <Section title="クレーム履歴" count={karte.complaints.length} defaultOpen={hasComplaints}>
+        <Section title="クレーム履歴" count={karte.complaints.length} defaultOpen={hasComplaints} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddComplaint}>＋追加</button>}>
+          <form className="sample-form" onSubmit={handleSaveComplaint}>
+            <div className="date-grid">
+              <label className="field-label">
+                件名
+                <input value={complaintForm.title} onChange={(event) => updateComplaintField('title', event.target.value)} />
+              </label>
+              <label className="field-label">
+                状況
+                <input value={complaintForm.status} onChange={(event) => updateComplaintField('status', event.target.value)} />
+              </label>
+              <label className="field-label">
+                重要度
+                <input value={complaintForm.severity} onChange={(event) => updateComplaintField('severity', event.target.value)} />
+              </label>
+            </div>
+            <label className="field-label">
+              内容
+              <textarea value={complaintForm.memo} onChange={(event) => updateComplaintField('memo', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit" disabled={!complaintForm.title.trim()}>
+              {karte.complaints.some((complaint) => complaint.id === complaintForm.id) ? 'クレームを更新' : 'クレームを追加'}
+            </button>
+          </form>
           <div className="karte-card-list">
             {karte.complaints.length > 0 ? karte.complaints.map((complaint) => (
-              <article className="karte-mini-card ng-panel" key={complaint.id}>
+              <article className="karte-mini-card ng-panel clickable-card" key={complaint.id} onClick={() => startEditComplaint(complaint)}>
                 <h3>{complaint.title || '件名未入力'}</h3>
                 <p>{complaint.status || '-'} / {complaint.severity || '-'}</p>
                 <p>{complaint.memo || '-'}</p>
                 <small>{complaint.createdByName || complaint.createdBy || '-'}</small>
               </article>
-            )) : <p className="inline-helper">クレーム履歴はありません。</p>}
+            )) : <AddCard title="クレームを追加" description="対応期限や原因メモを記録します" onClick={startAddComplaint} />}
           </div>
         </Section>
 
-        <Section title="提案商品" count={karte.products.length}>
+        <Section title="提案商品" count={karte.products.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setActivePage('Products')}>＋追加</button>}>
           <div className="karte-card-list">
             {karte.products.length > 0 ? karte.products.map((product) => (
-              <article className="product-card" key={product.id}>
+              <article className="product-card clickable-card" key={product.id} onClick={() => setActivePage('Products')}>
                 {product.imageFile?.url && <img className="product-preview-image" loading="lazy" src={product.imageFile.url} alt={product.name} />}
                 <h3>{productDisplayName(product)}</h3>
                 <dl className="company-details">
@@ -1092,18 +1555,95 @@ export default function CustomerKarte({
                   <div><dt>粗利率</dt><dd>{product.grossMarginRate || '-'}</dd></div>
                 </dl>
               </article>
-            )) : <p className="inline-helper">提案商品はまだ登録されていません。</p>}
+            )) : <AddCard title="商品提案を追加" description="商品マスターから提案商品を選びます" onClick={() => setActivePage('Products')} />}
           </div>
         </Section>
 
-        <Section title="在庫・仕入参照" count={karteInventories.length} defaultOpen={karteInventories.length > 0}>
+        <Section title="在庫・仕入参照" count={karteInventories.length} defaultOpen={karteInventories.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={() => startAddInventory(karte.products[0]?.id || products[0]?.id || '')}>＋追加</button>}>
+          <form className="sample-form" onSubmit={handleSaveInventory}>
+            <div className="date-grid">
+              <label className="field-label">
+                商品
+                <select value={inventoryForm.productId} onChange={(event) => updateInventoryField('productId', event.target.value)}>
+                  <option value="">未選択</option>
+                  {products.map((product) => <option value={product.id} key={product.id}>{productDisplayName(product, '商品名未設定')}</option>)}
+                </select>
+              </label>
+              <label className="field-label">
+                仕入先
+                <select value={inventoryForm.supplierId} onChange={(event) => updateInventoryField('supplierId', event.target.value)}>
+                  <option value="">未選択</option>
+                  {suppliers.map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name || supplier.companyName || '名称未設定'}</option>)}
+                </select>
+              </label>
+              <label className="field-label">
+                在庫コード
+                <input value={inventoryForm.inventoryCode} onChange={(event) => updateInventoryField('inventoryCode', event.target.value)} />
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                コスト
+                <input inputMode="decimal" value={inventoryForm.cost} onChange={(event) => updateInventoryField('cost', event.target.value)} />
+              </label>
+              <label className="field-label">
+                数量
+                <input inputMode="decimal" value={inventoryForm.quantity} onChange={(event) => updateInventoryField('quantity', event.target.value)} />
+              </label>
+              <label className="field-label">
+                単位
+                <select value={inventoryForm.unit} onChange={(event) => updateInventoryField('unit', event.target.value)}>
+                  {INVENTORY_UNITS.map((unit) => <option key={unit}>{unit}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                現物/先物
+                <select value={inventoryForm.stockType} onChange={(event) => updateInventoryField('stockType', event.target.value)}>
+                  {INVENTORY_TYPES.map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </label>
+              <label className="field-label">
+                ステータス
+                <select value={inventoryForm.inventoryStatus} onChange={(event) => updateInventoryField('inventoryStatus', event.target.value)}>
+                  {INVENTORY_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+              <label className="field-label">
+                所有者
+                <input value={inventoryForm.owner} onChange={(event) => updateInventoryField('owner', event.target.value)} />
+              </label>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">
+                ファーム期限
+                <input type="date" value={inventoryForm.firmDeadline} onChange={(event) => updateInventoryField('firmDeadline', event.target.value)} />
+              </label>
+              <label className="field-label">
+                ETA
+                <input type="date" value={inventoryForm.eta} onChange={(event) => updateInventoryField('eta', event.target.value)} />
+              </label>
+              <label className="field-label">
+                賞味期限
+                <input type="date" value={inventoryForm.expiryDate} onChange={(event) => updateInventoryField('expiryDate', event.target.value)} />
+              </label>
+            </div>
+            <label className="field-label">
+              メモ
+              <textarea value={inventoryForm.memo} onChange={(event) => updateInventoryField('memo', event.target.value)} />
+            </label>
+            <button className="primary-button" type="submit" disabled={!inventoryForm.productId}>
+              {inventories.some((inventory) => inventory.id === inventoryForm.id) ? '在庫を更新' : '在庫を追加'}
+            </button>
+          </form>
           {karteInventories.length > 0 ? (
             <div className="karte-card-list sample-card-list">
               {karteInventories.map((inventory) => {
                 const product = products.find((item) => item.id === inventory.productId);
                 const supplier = suppliers.find((item) => item.id === inventory.supplierId);
                 return (
-                  <article className="karte-mini-card" key={inventory.id}>
+                  <article className="karte-mini-card clickable-card" key={inventory.id} onClick={() => startEditInventory(inventory)}>
                     <div className="history-meta">
                       <span>{inventoryLabel(inventory, product, supplier)}</span>
                       <small>{inventory.stockType || '-'}</small>
@@ -1128,11 +1668,11 @@ export default function CustomerKarte({
               })}
             </div>
           ) : (
-            <p className="inline-helper">この顧客に関連する商品の在庫はまだ登録されていません。</p>
+            <AddCard title="在庫を追加" description="商品に紐づく在庫を登録します" onClick={() => startAddInventory(karte.products[0]?.id || products[0]?.id || '')} />
           )}
         </Section>
 
-        <Section title="採用品一覧" count={karte.adoptions.length} defaultOpen={karte.adoptions.length > 0}>
+        <Section title="採用品一覧" count={karte.adoptions.length} defaultOpen={karte.adoptions.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddAdoption}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleAddAdoption}>
             <div className="date-grid">
               <label className="field-label">
@@ -1187,11 +1727,12 @@ export default function CustomerKarte({
             adoptions={karte.adoptions}
             products={products}
             updateAdoption={updateAdoption}
+            onEditAdoption={startEditAdoption}
           />
-          {karte.adoptions.length === 0 && <p className="inline-helper">採用品はまだ登録されていません。</p>}
+          {karte.adoptions.length === 0 && <AddCard title="採用品を追加" description="この顧客で採用された商品を記録します" onClick={startAddAdoption} />}
         </Section>
 
-        <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0}>
+        <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setQuoteForm(createQuoteForm(customer.id, user, quotes))}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleAddQuote}>
             <div className="date-grid">
               <label className="field-label">
@@ -1556,10 +2097,10 @@ export default function CustomerKarte({
             onDuplicateQuote={handleDuplicateQuote}
             onRegenerateQuote={handleRegenerateQuote}
           />
-          {karte.estimates.length === 0 && <p className="inline-helper">見積履歴はまだありません。</p>}
+          {karte.estimates.length === 0 && <AddCard title="見積を追加" description="見積PDFまで作成して履歴に保存します" onClick={() => setQuoteForm(createQuoteForm(customer.id, user, quotes))} />}
         </Section>
 
-        <Section title="サンプル管理" count={karte.samples.length} defaultOpen={karte.samples.length > 0}>
+        <Section title="サンプル管理" count={karte.samples.length} defaultOpen={karte.samples.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddSample}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleAddSample}>
             <div className="date-grid">
               <label className="field-label">
@@ -1650,8 +2191,9 @@ export default function CustomerKarte({
             products={products}
             contacts={karte.contacts}
             updateSample={updateSample}
+            onEditSample={startEditSample}
           />
-          {karte.samples.length === 0 && <p className="inline-helper">サンプル履歴はまだありません。</p>}
+          {karte.samples.length === 0 && <AddCard title="サンプルを追加" description="発送日やフォロー日を登録します" onClick={startAddSample} />}
         </Section>
 
         <Section title="添付ファイル" count={karte.attachments.length}>
@@ -1818,7 +2360,7 @@ function RecordList({ records, emptyText }) {
   );
 }
 
-function SampleList({ samples, products, contacts, updateSample }) {
+function SampleList({ samples, products, contacts, updateSample, onEditSample }) {
   if (!samples.length) {
     return null;
   }
@@ -1853,7 +2395,7 @@ function SampleList({ samples, products, contacts, updateSample }) {
         const followLabel = dueLabel(sample.followUpDate, ['採用', '不採用'].includes(sample.status));
 
         return (
-        <article className="karte-mini-card sample-card" key={sample.id}>
+        <article className="karte-mini-card sample-card clickable-card" key={sample.id} onClick={() => onEditSample?.(sample)}>
           <div className="history-meta">
             <span>{sample.sampleName || sample.title || sample.name || sample.type || 'サンプル'}</span>
             <small>{sample.status || '-'}</small>
@@ -1870,6 +2412,7 @@ function SampleList({ samples, products, contacts, updateSample }) {
                 ステータス
                 <select
                   value={sample.status || '発送前'}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={(event) => updateSample?.(sample.id, { status: event.target.value })}
                 >
                   {SAMPLE_STATUSES.map((status) => <option key={status}>{status}</option>)}
@@ -1892,6 +2435,7 @@ function SampleList({ samples, products, contacts, updateSample }) {
                 フィードバック
                 <textarea
                   value={sample.feedback || ''}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={(event) => updateSample?.(sample.id, { feedback: event.target.value })}
                 />
               </label>
@@ -1899,6 +2443,7 @@ function SampleList({ samples, products, contacts, updateSample }) {
                 次アクション
                 <textarea
                   value={sample.nextAction || ''}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={(event) => updateSample?.(sample.id, { nextAction: event.target.value })}
                 />
               </label>
@@ -1914,7 +2459,7 @@ function SampleList({ samples, products, contacts, updateSample }) {
   );
 }
 
-function AdoptionList({ adoptions, products, updateAdoption }) {
+function AdoptionList({ adoptions, products, updateAdoption, onEditAdoption }) {
   if (!adoptions.length) {
     return null;
   }
@@ -1926,7 +2471,7 @@ function AdoptionList({ adoptions, products, updateAdoption }) {
   return (
     <div className="karte-card-list sample-card-list">
       {adoptions.map((adoption) => (
-        <article className="karte-mini-card adoption-card" key={adoption.id}>
+        <article className="karte-mini-card adoption-card clickable-card" key={adoption.id} onClick={() => onEditAdoption?.(adoption)}>
           <div className="history-meta">
             <span>{productName(adoption)}</span>
             <small>{adoption.status || '-'}</small>
@@ -1936,6 +2481,7 @@ function AdoptionList({ adoptions, products, updateAdoption }) {
               ステータス
               <select
                 value={adoption.status || '採用中'}
+                onClick={(event) => event.stopPropagation()}
                 onChange={(event) => updateAdoption?.(adoption.id, { status: event.target.value })}
               >
                 {ADOPTION_STATUSES.map((status) => <option key={status}>{status}</option>)}
@@ -1953,6 +2499,7 @@ function AdoptionList({ adoptions, products, updateAdoption }) {
             メモ
             <textarea
               value={adoption.memo || ''}
+              onClick={(event) => event.stopPropagation()}
               onChange={(event) => updateAdoption?.(adoption.id, { memo: event.target.value })}
             />
           </label>
@@ -2017,7 +2564,7 @@ function QuoteListV1({
         const totals = calculateQuoteTotals(quote);
 
         return (
-          <article className="karte-mini-card quote-card" key={quote.id}>
+          <article className="karte-mini-card quote-card clickable-card" key={quote.id} onClick={() => onEditQuote?.(quote)}>
             <div className="history-meta">
               <span>{quote.quoteNumber || '見積番号未設定'}</span>
               <small>{quote.status || '-'}</small>
@@ -2033,6 +2580,7 @@ function QuoteListV1({
                 ステータス
                 <select
                   value={quote.status || '作成中'}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={(event) => {
                     const nextStatus = event.target.value;
                     const now = new Date().toISOString();
@@ -2068,6 +2616,7 @@ function QuoteListV1({
               メモ
               <textarea
                 value={quote.memo || ''}
+                onClick={(event) => event.stopPropagation()}
                 onChange={(event) => updateQuote?.(quote.id, { memo: event.target.value })}
               />
             </label>
@@ -2076,28 +2625,29 @@ function QuoteListV1({
                 失注理由
                 <textarea
                   value={quote.lostReason || ''}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={(event) => updateQuote?.(quote.id, { lostReason: event.target.value })}
                 />
               </label>
             )}
             <div className="mail-action-row">
               {quote.fileUrl && (
-                <a className="ghost-button external-button" href={quote.fileUrl} target="_blank" rel="noreferrer">
+                <a className="ghost-button external-button" href={quote.fileUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
                   添付を開く
                 </a>
               )}
               {quote.pdfUrl && (
-                <a className="ghost-button external-button" href={quote.pdfUrl} target="_blank" rel="noreferrer">
+                <a className="ghost-button external-button" href={quote.pdfUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
                   PDFを開く
                 </a>
               )}
-              <button className="ghost-button" type="button" onClick={() => onEditQuote?.(quote)}>
+              <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); onEditQuote?.(quote); }}>
                 編集
               </button>
-              <button className="ghost-button" type="button" onClick={() => onDuplicateQuote?.(quote)}>
+              <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); onDuplicateQuote?.(quote); }}>
                 複製
               </button>
-              <button className="ghost-button" type="button" onClick={() => onRegenerateQuote?.(quote)}>
+              <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); onRegenerateQuote?.(quote); }}>
                 PDF再出力
               </button>
             </div>

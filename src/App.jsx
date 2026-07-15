@@ -576,8 +576,11 @@ function ActivePage({
           updateProject={updateProject}
           removeProject={removeProject}
           addContact={addContact}
+          updateContact={updateContact}
           addBusinessCard={addBusinessCard}
+          updateBusinessCard={updateBusinessCard}
           addComplaint={addComplaint}
+          updateComplaint={updateComplaint}
           addAttachment={addAttachment}
           addSample={addSample}
           updateSample={updateSample}
