@@ -338,7 +338,7 @@ export function buildManagementDashboard({
       });
       addFinancials(inventoryProfitMap, line.inventoryId || 'unknown', lineFinancials, {
         inventoryId: line.inventoryId || '',
-        inventoryName: line.inventoryId || LABELS.unset,
+        inventoryName: line.inventoryCode || line.inventoryId || LABELS.unset,
         productName: getProductName(line.productId, productMap),
       });
     });
@@ -390,7 +390,7 @@ export function buildManagementDashboard({
       supplierName: getSupplierName(inventory.supplierId, supplierMap),
       status: inventory.inventoryStatus || inventory.status || '-',
       quantity: inventory.quantity !== '' && inventory.quantity !== undefined ? `${inventory.quantity}${inventory.unit || ''}` : '-',
-      lot: inventory.lot || '-',
+      lot: inventory.inventoryCode || inventory.lot || '-',
       eta: inventory.eta || '-',
       expiryDate: inventory.expiryDate || '-',
       allocatedQuoteCount: relatedQuotes.length,

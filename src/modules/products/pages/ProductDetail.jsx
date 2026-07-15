@@ -18,6 +18,8 @@ import {
   INVENTORY_UNITS,
   emptyInventory,
   inventoryLabel,
+  isValidInventoryCode,
+  normalizeInventoryCode,
   normalizeInventory,
 } from '../../inventory/hooks/useInventory.js';
 import { calculateProjectProductProposal } from '../../deals/services/projectProductProposalService.js';
@@ -160,6 +162,9 @@ export default function ProductDetail({
         searchText([
           inventory.inventoryStatus,
           inventory.stockType,
+          inventory.inventoryCode,
+          form.name,
+          form.productCode,
           inventory.owner,
           inventory.lot,
           inventory.memo,
@@ -176,7 +181,7 @@ export default function ProductDetail({
 
       return matchesStatus && matchesType && matchesQuery;
     });
-  }, [inventorySearch, inventoryStatusFilter, inventoryTypeFilter, relatedInventories, suppliers]);
+  }, [form.name, form.productCode, inventorySearch, inventoryStatusFilter, inventoryTypeFilter, relatedInventories, suppliers]);
   const relatedInventoryIds = useMemo(
     () => new Set(relatedInventories.map((inventory) => inventory.id)),
     [relatedInventories],
@@ -263,14 +268,56 @@ export default function ProductDetail({
     setInventoryForm((current) => ({ ...current, [field]: value }));
   }
 
+  function validateInventoryCode(value, currentId = '') {
+    const inventoryCode = normalizeInventoryCode(value);
+    if (!isValidInventoryCode(inventoryCode)) {
+      setSaveError('在庫コードは半角英数字と記号のみ使用できます。空白、日本語、全角文字は使えません。');
+      return null;
+    }
+
+    if (
+      inventoryCode &&
+      inventories.some((inventory) =>
+        inventory.id !== currentId &&
+        normalizeInventoryCode(inventory.inventoryCode).toLowerCase() === inventoryCode.toLowerCase())
+    ) {
+      setSaveError('同じ在庫コードが既に登録されています。別の在庫コードを入力してください。');
+      return null;
+    }
+
+    return inventoryCode;
+  }
+
+  function updateInventoryRecord(inventory, updates) {
+    setSaveMessage('');
+    setSaveError('');
+
+    if (Object.hasOwn(updates, 'inventoryCode')) {
+      const inventoryCode = validateInventoryCode(updates.inventoryCode, inventory.id);
+      if (inventoryCode === null) {
+        return;
+      }
+      updateInventory?.(inventory.id, { ...updates, inventoryCode });
+      return;
+    }
+
+    updateInventory?.(inventory.id, updates);
+  }
+
   function handleAddInventory(event) {
     event.preventDefault();
     if (!addInventory || isNew) {
       return;
     }
 
+    const inventoryCode = validateInventoryCode(inventoryForm.inventoryCode);
+    if (inventoryCode === null) {
+      return;
+    }
+
     addInventory(normalizeInventory({
       ...inventoryForm,
+      inventoryCode,
       productId: form.id,
       userId,
     }, userId));
@@ -587,6 +634,16 @@ export default function ProductDetail({
             <p className="inline-helper">商品を保存すると、この商品に複数の在庫を登録できます。</p>
           ) : (
             <form className="sample-form" onSubmit={handleAddInventory}>
+              <label className="field-label">
+                在庫コード
+                <input
+                  value={inventoryForm.inventoryCode}
+                  placeholder="例: LOT-2026-001"
+                  onChange={(event) => updateInventoryField('inventoryCode', event.target.value)}
+                  onBlur={() => updateInventoryField('inventoryCode', normalizeInventoryCode(inventoryForm.inventoryCode))}
+                />
+                <span className="inline-helper">任意入力。半角英数字と記号のみ、空白・日本語・全角文字は使用不可。</span>
+              </label>
               <div className="date-grid">
                 <label className="field-label">
                   コスト
@@ -719,14 +776,24 @@ export default function ProductDetail({
                       ))}
                     </div>
                     <dl className="company-details">
+                      <div><dt>在庫コード</dt><dd>{inventory.inventoryCode || '-'}</dd></div>
                       <div><dt>コスト</dt><dd>{formatPrice(inventory.cost) || '-'} {inventory.currency}/{inventory.unit}</dd></div>
                       <div><dt>数量</dt><dd>{inventory.quantity || '-'} {inventory.unit}</dd></div>
                       <div><dt>所有者</dt><dd>{inventory.owner || '-'}</dd></div>
                       <div><dt>LOT</dt><dd>{inventory.lot || '-'}</dd></div>
                     </dl>
                     <label className="field-label">
+                      在庫コード
+                      <input
+                        value={inventory.inventoryCode || ''}
+                        placeholder="例: LOT-2026-001"
+                        onChange={(event) => updateInventoryRecord(inventory, { inventoryCode: event.target.value })}
+                        onBlur={(event) => updateInventoryRecord(inventory, { inventoryCode: normalizeInventoryCode(event.target.value) })}
+                      />
+                    </label>
+                    <label className="field-label">
                       在庫ステータス
-                      <select value={inventory.inventoryStatus} onChange={(event) => updateInventory?.(inventory.id, { inventoryStatus: event.target.value })}>
+                      <select value={inventory.inventoryStatus} onChange={(event) => updateInventoryRecord(inventory, { inventoryStatus: event.target.value })}>
                         {INVENTORY_STATUSES.map((status) => <option key={status}>{status}</option>)}
                       </select>
                     </label>

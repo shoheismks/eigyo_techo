@@ -12,6 +12,7 @@ import {
   summarizeProjectProductProposals,
 } from '../services/projectProductProposalService.js';
 import { productDisplayName } from '../../products/hooks/useProducts.js';
+import { inventoryLabel } from '../../inventory/hooks/useInventory.js';
 
 function formatCurrency(value) {
   if (value === '' || value === null || value === undefined) return '-';
@@ -381,7 +382,7 @@ function buildProjectTimeline({
         id: `inventory-${inventory.id}`,
         date: project.updatedAt || inventory.updatedAt || inventory.createdAt,
         type: '在庫選択',
-        content: `${inventory.inventoryName || inventory.lot || inventory.id} / ${inventory.inventoryStatus || '-'} / ${inventory.quantity || '-'} ${inventory.unit || ''}`,
+        content: `${inventory.inventoryCode || inventory.inventoryName || inventory.lot || inventory.id} / ${inventory.inventoryStatus || '-'} / ${inventory.quantity || '-'} ${inventory.unit || ''}`,
         owner,
         writer: project.ownerUserId || project.createdBy || '-',
         action: { label: '商品', type: 'products' },
@@ -667,7 +668,7 @@ export default function ProjectPanel({
 
           <ProjectCheckboxes title="担当者" items={relatedContacts} selectedIds={form.contactIds} getLabel={(item) => item.name} onToggle={(id) => toggleFormArray('contactIds', id)} />
           <ProjectCheckboxes title="商品" items={products} selectedIds={form.productIds} getLabel={(item) => productDisplayName(item)} onToggle={(id) => toggleFormArray('productIds', id)} />
-          <ProjectCheckboxes title="在庫" items={relatedInventories} selectedIds={form.inventoryIds} getLabel={(item) => item.inventoryName || item.lot || item.id} onToggle={(id) => toggleFormArray('inventoryIds', id)} />
+          <ProjectCheckboxes title="在庫" items={relatedInventories} selectedIds={form.inventoryIds} getLabel={(item) => inventoryLabel(item, products.find((product) => product.id === item.productId), suppliers.find((supplier) => supplier.id === item.supplierId)) || item.id} onToggle={(id) => toggleFormArray('inventoryIds', id)} />
           <ProjectCheckboxes title="見積" items={relatedQuotes} selectedIds={form.quoteIds} getLabel={(item) => item.quoteNumber || item.projectName || item.id} onToggle={(id) => toggleFormArray('quoteIds', id)} />
           <ProjectCheckboxes title="サンプル" items={relatedSamples} selectedIds={form.sampleIds} getLabel={(item) => item.sampleName || item.id} onToggle={(id) => toggleFormArray('sampleIds', id)} />
           <ProjectCheckboxes title="クレーム" items={relatedComplaints} selectedIds={form.complaintIds} getLabel={(item) => item.title || item.memo || item.id} onToggle={(id) => toggleFormArray('complaintIds', id)} />

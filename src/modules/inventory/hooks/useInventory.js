@@ -18,6 +18,7 @@ export const INVENTORY_UNITS = ['kg', 'g', 'パック', '箱', 'ケース', '枚
 
 export const emptyInventory = {
   userId: '',
+  inventoryCode: '',
   productId: '',
   supplierId: '',
   cost: '',
@@ -36,6 +37,15 @@ export const emptyInventory = {
   createdByName: '',
 };
 
+export function normalizeInventoryCode(value) {
+  return String(value ?? '').trim();
+}
+
+export function isValidInventoryCode(value) {
+  const code = normalizeInventoryCode(value);
+  return !code || /^[\x21-\x7E]+$/.test(code);
+}
+
 function normalizeNumber(value) {
   const parsed = parsePrice(value);
   return parsed === '' ? '' : parsed;
@@ -47,6 +57,7 @@ export function normalizeInventory(inventory = {}, userId = '') {
     ...inventory,
     id: inventory.id ?? crypto.randomUUID(),
     userId: inventory.userId ?? userId,
+    inventoryCode: normalizeInventoryCode(inventory.inventoryCode ?? inventory.inventory_code ?? ''),
     productId: inventory.productId ?? '',
     supplierId: inventory.supplierId ?? '',
     cost: normalizeNumber(inventory.cost ?? inventory.costPrice ?? ''),
@@ -76,6 +87,7 @@ function toRow(inventory) {
   return {
     id: inventory.id,
     user_id: inventory.userId,
+    inventory_code: inventory.inventoryCode || null,
     product_id: inventory.productId,
     supplier_id: inventory.supplierId || null,
     cost: inventory.cost === '' ? null : inventory.cost,
@@ -101,6 +113,7 @@ function fromRow(row) {
   return normalizeInventory({
     id: row.id,
     userId: row.user_id,
+    inventoryCode: row.inventory_code ?? '',
     productId: row.product_id,
     supplierId: row.supplier_id ?? '',
     cost: row.cost ?? '',
@@ -180,6 +193,7 @@ export function calculateInventoryGrossMarginRate(inventories = [], totalAmount 
 
 export function inventoryLabel(inventory, product, supplier) {
   return [
+    inventory.inventoryCode,
     productDisplayName(product, ''),
     inventory.lot && `LOT ${inventory.lot}`,
     inventory.inventoryStatus,

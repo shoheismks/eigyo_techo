@@ -38,6 +38,7 @@ function inventoryLabel(inventoryId, inventories = []) {
   const inventory = inventories.find((item) => item.id === inventoryId);
   if (!inventory) return '';
   return [
+    inventory.inventoryCode || inventory.inventory_code,
     inventory.inventoryName || inventory.name,
     inventory.stockType,
     inventory.owner,
