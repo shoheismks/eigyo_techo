@@ -17,6 +17,8 @@ import {
 } from '../../inventory/hooks/useInventory.js';
 import {
   QUOTE_STATUSES,
+  ROUNDING_MODES,
+  TAX_DISPLAY_MODES,
   calculateQuoteTotals,
   emptyQuote,
   emptyQuoteLine,
@@ -376,6 +378,9 @@ function createQuoteForm(customerId = '', user, quotes = []) {
     submittedDate: todayString(),
     validUntil: addDaysString(todayString(), 14),
     taxRate: '10',
+    defaultTaxRate: '10',
+    taxDisplayMode: 'tax_excluded',
+    roundingMode: 'round',
     quoteLines: [emptyQuoteLine()],
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
@@ -405,6 +410,7 @@ function calculateQuoteFinancials(quote, selectedInventories = []) {
     : quantity !== '' && manualCost !== ''
       ? quantity * manualCost
       : '';
+  const subtotal = totalAmount;
   const grossMarginAmount = subtotal !== '' && costTotal !== '' ? subtotal - costTotal : '';
   const grossMarginRate =
     subtotal !== '' && subtotal > 0 && grossMarginAmount !== ''
@@ -540,6 +546,7 @@ export default function CustomerKarte({
   const [quoteUploading, setQuoteUploading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
   const [quoteSearch, setQuoteSearch] = useState('');
+  const [quoteProductSearch, setQuoteProductSearch] = useState('');
   const [quoteSort, setQuoteSort] = useState('createdAt-desc');
   const [adoptionForm, setAdoptionForm] = useState(() => createAdoptionForm(customerId, user));
   const [contactForm, setContactForm] = useState(() => createContactForm({ id: customerId }, user));
@@ -576,6 +583,20 @@ export default function CustomerKarte({
     () => calculateQuoteFinancials(quoteForm, selectedQuoteInventories),
     [quoteForm, selectedQuoteInventories],
   );
+  const quoteLinesReady = useMemo(() => {
+    const lines = quoteForm.quoteLines ?? [];
+    return lines.length > 0 && lines.every((line) => line.productId);
+  }, [quoteForm.quoteLines]);
+  const quoteProductOptions = useMemo(() => {
+    const keyword = quoteProductSearch.trim().toLowerCase();
+    if (!keyword) return products;
+    return products.filter((product) => [
+      product.productCode,
+      product.name,
+      product.manufacturerName,
+      product.category,
+    ].filter(Boolean).join(' ').toLowerCase().includes(keyword));
+  }, [products, quoteProductSearch]);
   const karteInventories = useMemo(() => {
     if (!karte) return [];
 
@@ -960,6 +981,58 @@ export default function CustomerKarte({
     });
   }
 
+  function buildQuoteLineSnapshot(line = {}, product, inventory) {
+    const productName = productDisplayName(product, line.productName || line.description || '');
+    return {
+      ...line,
+      productId: product?.id || line.productId || '',
+      inventoryId: inventory?.id || line.inventoryId || '',
+      productCode: product?.productCode || line.productCode || '',
+      productName,
+      description: productName,
+      category: product?.category || line.category || '',
+      manufacturerName: product?.manufacturerName || line.manufacturerName || '',
+      origin: product?.origin || line.origin || '',
+      packageStyle: product?.packageStyle || line.packageStyle || '',
+      temperatureZone: product?.temperatureZone || line.temperatureZone || '',
+      shelfLife: product?.shelfLife || product?.expirationText || line.shelfLife || '',
+      expirationText: inventory?.expiryDate || inventory?.expirationDate || line.expirationText || product?.shelfLife || '',
+      inventoryCode: inventory?.inventoryCode || inventory?.inventory_code || line.inventoryCode || '',
+      inventoryOwner: inventory?.owner || line.inventoryOwner || '',
+      inventoryStockType: inventory?.stockType || line.inventoryStockType || '',
+      inventoryLot: inventory?.lot || line.inventoryLot || '',
+      inventoryExpiryDate: inventory?.expiryDate || inventory?.expirationDate || line.inventoryExpiryDate || '',
+      unit: product?.sellingPriceUnit || product?.costUnit || inventory?.unit || line.unit || 'kg',
+      unitPrice: line.unitPrice || product?.desiredSellingPrice || '',
+      costPrice: inventory?.cost || inventory?.costPrice || line.costPrice || product?.costPrice || '',
+      taxRate: line.taxRate || quoteForm.defaultTaxRate || quoteForm.taxRate || '10',
+      snapshotCreatedAt: line.snapshotCreatedAt || new Date().toISOString(),
+      sourceProductUpdatedAt: product?.updatedAt || line.sourceProductUpdatedAt || '',
+      sourceInventoryUpdatedAt: inventory?.updatedAt || line.sourceInventoryUpdatedAt || '',
+    };
+  }
+
+  function normalizeQuoteLinesForSave(lines = []) {
+    return lines
+      .filter((line) => line.productId || line.productName || line.description)
+      .map((line) => {
+        const product = products.find((item) => item.id === line.productId);
+        const inventory = inventories.find((item) => item.id === line.inventoryId);
+        return line.productId ? buildQuoteLineSnapshot(line, product, inventory) : line;
+      });
+  }
+
+  function validateQuoteLines(lines = quoteForm.quoteLines ?? []) {
+    const normalizedLines = normalizeQuoteLinesForSave(lines);
+    if (normalizedLines.length === 0) {
+      return { ok: false, message: '見積明細を1件以上追加してください。' };
+    }
+    if (normalizedLines.some((line) => !line.productId)) {
+      return { ok: false, message: '通常明細は商品マスターから商品を選択してください。' };
+    }
+    return { ok: true, lines: normalizedLines };
+  }
+
   function updateQuoteLine(lineId, field, value) {
     setQuoteForm((current) => {
       const quoteLines = (current.quoteLines?.length ? current.quoteLines : [emptyQuoteLine()]).map((line) => {
@@ -967,24 +1040,13 @@ export default function CustomerKarte({
 
         if (field === 'productId') {
           const product = products.find((item) => item.id === value);
-          return {
-            ...line,
-            productId: value,
-            description: productDisplayName(product, line.description),
-          };
+          return buildQuoteLineSnapshot({ ...line, productId: value, inventoryId: '' }, product);
         }
 
         if (field === 'inventoryId') {
           const inventory = inventories.find((item) => item.id === value);
           const product = products.find((item) => item.id === inventory?.productId);
-          return {
-            ...line,
-            inventoryId: value,
-            productId: inventory?.productId || line.productId,
-            description: productDisplayName(product, inventory?.inventoryName || line.description),
-            unit: inventory?.unit || line.unit,
-            costPrice: inventory?.cost || inventory?.costPrice || line.costPrice,
-          };
+          return buildQuoteLineSnapshot(line, product || products.find((item) => item.id === line.productId), inventory);
         }
 
         return { ...line, [field]: value };
@@ -1012,18 +1074,50 @@ export default function CustomerKarte({
     });
   }
 
+  function moveQuoteLine(lineId, direction) {
+    setQuoteForm((current) => {
+      const quoteLines = [...(current.quoteLines ?? [])];
+      const index = quoteLines.findIndex((line) => line.id === lineId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= quoteLines.length) return current;
+      [quoteLines[index], quoteLines[nextIndex]] = [quoteLines[nextIndex], quoteLines[index]];
+      return { ...current, quoteLines };
+    });
+  }
+
+  function refreshQuoteLineFromProduct(lineId) {
+    setQuoteForm((current) => {
+      const quoteLines = (current.quoteLines ?? []).map((line) => {
+        if (line.id !== lineId || !line.productId) return line;
+        const product = products.find((item) => item.id === line.productId);
+        const inventory = inventories.find((item) => item.id === line.inventoryId);
+        return buildQuoteLineSnapshot({
+          ...line,
+          unitPrice: '',
+          costPrice: '',
+          snapshotCreatedAt: new Date().toISOString(),
+        }, product, inventory);
+      });
+      return { ...current, quoteLines };
+    });
+  }
+
   function buildCurrentQuoteContext(quoteId = quoteForm.id || crypto.randomUUID()) {
+    const quoteLines = normalizeQuoteLinesForSave(quoteForm.quoteLines ?? []);
+    const quoteWithLines = { ...quoteForm, quoteLines };
+    const financials = calculateQuoteTotals(quoteWithLines);
     const normalizedQuote = normalizeQuote({
-      ...quoteForm,
+      ...quoteWithLines,
       id: quoteId,
       customerId: customer.id,
-      subtotal: quoteFinancials.subtotal,
-      taxAmount: quoteFinancials.taxAmount,
-      grandTotal: quoteFinancials.grandTotal,
-      totalAmount: quoteFinancials.totalAmount || quoteForm.totalAmount,
-      inventoryCostTotal: quoteFinancials.costTotal || quoteForm.inventoryCostTotal,
-      grossMarginAmount: quoteFinancials.grossMarginAmount || quoteForm.grossMarginAmount,
-      grossMarginRate: quoteForm.grossMarginRate || quoteFinancials.grossMarginRate || inventoryGrossMarginRate,
+      subtotal: financials.subtotal,
+      taxAmount: financials.taxAmount,
+      taxBreakdown: financials.taxBreakdown,
+      grandTotal: financials.grandTotal,
+      totalAmount: financials.totalAmount || quoteForm.totalAmount,
+      inventoryCostTotal: financials.costTotal || quoteForm.inventoryCostTotal,
+      grossMarginAmount: financials.grossMarginAmount || quoteForm.grossMarginAmount,
+      grossMarginRate: quoteForm.grossMarginRate || financials.grossMarginRate || inventoryGrossMarginRate,
       createdBy: user?.id ?? customer.userId,
       createdByName: user?.email ?? '',
     }, user?.id ?? customer.userId);
@@ -1035,7 +1129,7 @@ export default function CustomerKarte({
       products,
       inventories,
       suppliers,
-      financials: quoteFinancials,
+      financials,
     });
   }
 
@@ -1043,6 +1137,11 @@ export default function CustomerKarte({
     const validation = validateQuoteNumber(quoteForm.quoteNumber, quoteForm.id);
     if (!validation.ok) {
       setQuoteError(validation.message);
+      return;
+    }
+    const lineValidation = validateQuoteLines();
+    if (!lineValidation.ok) {
+      setQuoteError(lineValidation.message);
       return;
     }
 
@@ -1057,6 +1156,11 @@ export default function CustomerKarte({
     const validation = validateQuoteNumber(quoteForm.quoteNumber, quoteForm.id);
     if (!validation.ok) {
       setQuoteError(validation.message);
+      return;
+    }
+    const lineValidation = validateQuoteLines();
+    if (!lineValidation.ok) {
+      setQuoteError(lineValidation.message);
       return;
     }
 
@@ -1099,6 +1203,11 @@ export default function CustomerKarte({
       setQuoteError(quoteValidation.message);
       return;
     }
+    const lineValidation = validateQuoteLines();
+    if (!lineValidation.ok) {
+      setQuoteError(lineValidation.message);
+      return;
+    }
 
     setQuoteUploading(true);
     setQuoteError('');
@@ -1107,6 +1216,8 @@ export default function CustomerKarte({
       const quoteId = quoteForm.id || crypto.randomUUID();
       let uploadedFile = null;
       let uploadedPdf = null;
+      const quoteLines = lineValidation.lines;
+      const financials = calculateQuoteTotals({ ...quoteForm, quoteLines });
       const context = buildCurrentQuoteContext(quoteId);
       context.quote.quoteNumber = quoteValidation.value;
       const pdfFile = createQuotePdfFile(context);
@@ -1137,13 +1248,17 @@ export default function CustomerKarte({
         id: quoteId,
         quoteNumber: quoteValidation.value,
         customerId: customer.id,
-        subtotal: quoteFinancials.subtotal,
-        taxAmount: quoteFinancials.taxAmount,
-        grandTotal: quoteFinancials.grandTotal,
-        totalAmount: quoteFinancials.totalAmount || quoteForm.totalAmount,
-        inventoryCostTotal: quoteFinancials.costTotal || quoteForm.inventoryCostTotal,
-        grossMarginAmount: quoteFinancials.grossMarginAmount || quoteForm.grossMarginAmount,
-        grossMarginRate: quoteForm.grossMarginRate || quoteFinancials.grossMarginRate || inventoryGrossMarginRate,
+        quoteLines,
+        productIds: [...new Set(quoteLines.map((line) => line.productId).filter(Boolean))],
+        inventoryIds: [...new Set(quoteLines.map((line) => line.inventoryId).filter(Boolean))],
+        subtotal: financials.subtotal,
+        taxAmount: financials.taxAmount,
+        taxBreakdown: financials.taxBreakdown,
+        grandTotal: financials.grandTotal,
+        totalAmount: financials.totalAmount || quoteForm.totalAmount,
+        inventoryCostTotal: financials.costTotal || quoteForm.inventoryCostTotal,
+        grossMarginAmount: financials.grossMarginAmount || quoteForm.grossMarginAmount,
+        grossMarginRate: quoteForm.grossMarginRate || financials.grossMarginRate || inventoryGrossMarginRate,
         status: nextStatus,
         fileUrl: uploadedFile?.publicUrl || uploadedFile?.url || quoteForm.fileUrl,
         fileName: uploadedFile?.name || quoteFile?.name || quoteForm.fileName,
@@ -2012,6 +2127,29 @@ export default function CustomerKarte({
                 消費税率(%)
                 <input inputMode="decimal" value={quoteForm.taxRate} onChange={(event) => updateQuoteField('taxRate', event.target.value)} />
               </label>
+              <label className="field-label">
+                明細既定税率(%)
+                <input
+                  inputMode="decimal"
+                  value={quoteForm.defaultTaxRate}
+                  onChange={(event) => {
+                    updateQuoteField('defaultTaxRate', event.target.value);
+                    updateQuoteField('taxRate', event.target.value);
+                  }}
+                />
+              </label>
+              <label className="field-label">
+                税表示
+                <select value={quoteForm.taxDisplayMode} onChange={(event) => updateQuoteField('taxDisplayMode', event.target.value)}>
+                  {TAX_DISPLAY_MODES.map((mode) => <option value={mode.value} key={mode.value}>{mode.label}</option>)}
+                </select>
+              </label>
+              <label className="field-label">
+                端数処理
+                <select value={quoteForm.roundingMode} onChange={(event) => updateQuoteField('roundingMode', event.target.value)}>
+                  {ROUNDING_MODES.map((mode) => <option value={mode.value} key={mode.value}>{mode.label}</option>)}
+                </select>
+              </label>
             </div>
             <div className="date-grid">
               <label className="field-label">
@@ -2068,22 +2206,40 @@ export default function CustomerKarte({
                 <span>見積明細</span>
                 <button className="ghost-button" type="button" onClick={addQuoteLine}>明細を追加</button>
               </div>
+              <label className="field-label">
+                商品マスター検索
+                <input
+                  value={quoteProductSearch}
+                  placeholder="商品名・商品コード・メーカー・カテゴリーで検索"
+                  onChange={(event) => setQuoteProductSearch(event.target.value)}
+                />
+              </label>
               {(quoteForm.quoteLines?.length ? quoteForm.quoteLines : [emptyQuoteLine()]).map((line, index) => {
                 const lineProductInventories = inventories.filter((inventory) => !line.productId || inventory.productId === line.productId);
-                const calculatedLine = calculateQuoteTotals({ quoteLines: [line] }).lines[0];
+                const calculatedLine = calculateQuoteTotals({
+                  quoteLines: [line],
+                  defaultTaxRate: quoteForm.defaultTaxRate,
+                  taxDisplayMode: quoteForm.taxDisplayMode,
+                  roundingMode: quoteForm.roundingMode,
+                }).lines[0];
 
                 return (
                   <article className="karte-mini-card" key={line.id}>
                     <div className="history-meta">
                       <span>明細 {index + 1}</span>
-                      <button className="ghost-button" type="button" onClick={() => removeQuoteLine(line.id)}>削除</button>
+                      <div className="mail-action-row">
+                        <button className="ghost-button" type="button" onClick={() => moveQuoteLine(line.id, -1)} disabled={index === 0}>上へ</button>
+                        <button className="ghost-button" type="button" onClick={() => moveQuoteLine(line.id, 1)} disabled={index === (quoteForm.quoteLines?.length ?? 1) - 1}>下へ</button>
+                        <button className="ghost-button" type="button" onClick={() => refreshQuoteLineFromProduct(line.id)} disabled={!line.productId}>最新情報を反映</button>
+                        <button className="ghost-button" type="button" onClick={() => removeQuoteLine(line.id)}>削除</button>
+                      </div>
                     </div>
                     <div className="date-grid">
                       <label className="field-label">
-                        商品
+                        商品（商品マスター）
                         <select value={line.productId || ''} onChange={(event) => updateQuoteLine(line.id, 'productId', event.target.value)}>
                           <option value="">未選択</option>
-                          {products.map((product) => (
+                          {quoteProductOptions.map((product) => (
                             <option value={product.id} key={product.id}>{productDisplayName(product, '商品名未設定')}</option>
                           ))}
                         </select>
@@ -2104,10 +2260,16 @@ export default function CustomerKarte({
                         </select>
                       </label>
                     </div>
-                    <label className="field-label">
-                      商品名・摘要
-                      <input value={line.description || ''} onChange={(event) => updateQuoteLine(line.id, 'description', event.target.value)} />
-                    </label>
+                    <dl className="company-details">
+                      <div><dt>商品コード</dt><dd>{line.productCode || '-'}</dd></div>
+                      <div><dt>商品名</dt><dd>{line.productName || line.description || '-'}</dd></div>
+                      <div><dt>規格/荷姿</dt><dd>{line.packageStyle || '-'}</dd></div>
+                      <div><dt>温度帯</dt><dd>{line.temperatureZone || '-'}</dd></div>
+                      <div><dt>メーカー</dt><dd>{line.manufacturerName || '-'}</dd></div>
+                      <div><dt>産地</dt><dd>{line.origin || '-'}</dd></div>
+                      <div><dt>在庫コード</dt><dd>{line.inventoryCode || '-'}</dd></div>
+                      <div><dt>LOT</dt><dd>{line.inventoryLot || '-'}</dd></div>
+                    </dl>
                     <div className="date-grid">
                       <label className="field-label">
                         数量
@@ -2129,9 +2291,32 @@ export default function CustomerKarte({
                         原価
                         <input inputMode="decimal" value={line.costPrice || ''} onChange={(event) => updateQuoteLine(line.id, 'costPrice', event.target.value)} />
                       </label>
+                      <label className="field-label">
+                        明細税率(%)
+                        <input inputMode="decimal" value={line.taxRate || quoteForm.defaultTaxRate || quoteForm.taxRate || '10'} onChange={(event) => updateQuoteLine(line.id, 'taxRate', event.target.value)} />
+                      </label>
+                      <label className="field-label">
+                        賞味期限
+                        <input value={line.expirationText || ''} placeholder="2027/06/30 / 製造日より12か月 など" onChange={(event) => updateQuoteLine(line.id, 'expirationText', event.target.value)} />
+                      </label>
+                    </div>
+                    <label className="field-label">
+                      明細備考
+                      <input value={line.memo || ''} onChange={(event) => updateQuoteLine(line.id, 'memo', event.target.value)} />
+                    </label>
+                    <div className="date-grid">
+                      <label className="field-label">
+                        商品名スナップショット
+                        <input value={line.productName || line.description || ''} readOnly />
+                      </label>
+                      <label className="field-label">
+                        スナップショット日時
+                        <input value={line.snapshotCreatedAt ? formatDate(line.snapshotCreatedAt) : '-'} readOnly />
+                      </label>
                     </div>
                     <dl className="company-details">
                       <div><dt>売価</dt><dd>{formatPrice(calculatedLine?.amount) || '-'}</dd></div>
+                      <div><dt>消費税</dt><dd>{formatPrice(calculatedLine?.taxAmount) || '-'}</dd></div>
                       <div><dt>粗利額</dt><dd>{formatPrice(calculatedLine?.grossMarginAmount) || '-'}</dd></div>
                       <div><dt>粗利率</dt><dd>{calculatedLine?.grossMarginRate || '-'}</dd></div>
                     </dl>
@@ -2141,8 +2326,20 @@ export default function CustomerKarte({
             </div>
             <div className="price-preview">
               <div>
-                <span>見積金額</span>
+                <span>小計</span>
+                <strong>{formatPrice(quoteFinancials.subtotal) || '-'} {quoteForm.currency}</strong>
+              </div>
+              <div>
+                <span>税抜/税込判定後金額</span>
                 <strong>{formatPrice(quoteFinancials.totalAmount || quoteForm.totalAmount) || '-'} {quoteForm.currency}</strong>
+              </div>
+              <div>
+                <span>消費税</span>
+                <strong>{formatPrice(quoteFinancials.taxAmount) || '-'} {quoteForm.currency}</strong>
+              </div>
+              <div>
+                <span>税込合計</span>
+                <strong>{formatPrice(quoteFinancials.grandTotal) || '-'} {quoteForm.currency}</strong>
               </div>
               <div>
                 <span>原価合計</span>
@@ -2228,6 +2425,10 @@ export default function CustomerKarte({
                 納品条件
                 <input value={quoteForm.deliveryTerms} placeholder="例: 冷凍便 / FOB / CIF など" onChange={(event) => updateQuoteField('deliveryTerms', event.target.value)} />
               </label>
+              <label className="field-label">
+                納期
+                <input value={quoteForm.deliveryDate} placeholder="例: ご発注後7営業日 / 2026/08/01" onChange={(event) => updateQuoteField('deliveryDate', event.target.value)} />
+              </label>
             </div>
             <label className="field-label">
               備考
@@ -2242,15 +2443,20 @@ export default function CustomerKarte({
               <textarea value={quoteForm.lostReason} onChange={(event) => updateQuoteField('lostReason', event.target.value)} />
             </label>
             {quoteUploading && <p className="notice-text">見積ファイルをアップロード中...</p>}
+            {!quoteUploading && (
+              <p className="inline-helper">
+                保存状態: {karte.estimates.some((quote) => quote.id === quoteForm.id) ? '保存済' : '未保存'}
+              </p>
+            )}
             {quoteError && <p className="error-text">{quoteError}</p>}
             <div className="mail-action-row">
-              <button className="ghost-button" type="button" onClick={handleQuotePreview} disabled={!quoteForm.quoteNumber.trim()}>
+              <button className="ghost-button" type="button" onClick={handleQuotePreview} disabled={!quoteForm.quoteNumber.trim() || !quoteLinesReady}>
                 PDFプレビュー
               </button>
-              <button className="ghost-button" type="button" onClick={handleQuoteDownload} disabled={!quoteForm.quoteNumber.trim()}>
+              <button className="ghost-button" type="button" onClick={handleQuoteDownload} disabled={!quoteForm.quoteNumber.trim() || !quoteLinesReady}>
                 PDFダウンロード
               </button>
-              <button className="primary-button" type="submit" disabled={!quoteForm.quoteNumber.trim() || quoteUploading}>
+              <button className="primary-button" type="submit" disabled={!quoteForm.quoteNumber.trim() || !quoteLinesReady || quoteUploading}>
                 PDF出力して見積を登録
               </button>
             </div>

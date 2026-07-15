@@ -10,22 +10,52 @@ export const EXPENSE_ALLOCATION_BASIS = [
   { value: 'sales', label: '売上額比' },
 ];
 
+export const TAX_DISPLAY_MODES = [
+  { value: 'tax_excluded', label: '税抜' },
+  { value: 'tax_included', label: '税込' },
+];
+
+export const ROUNDING_MODES = [
+  { value: 'round', label: '四捨五入' },
+  { value: 'floor', label: '切捨て' },
+  { value: 'ceil', label: '切上げ' },
+];
+
 export function emptyQuoteLine() {
   return {
     id: crypto.randomUUID(),
     productId: '',
     inventoryId: '',
+    productCode: '',
+    productName: '',
+    category: '',
+    manufacturerName: '',
+    origin: '',
+    packageStyle: '',
+    temperatureZone: '',
+    shelfLife: '',
+    expirationText: '',
+    inventoryCode: '',
+    inventoryOwner: '',
+    inventoryStockType: '',
+    inventoryLot: '',
+    inventoryExpiryDate: '',
     description: '',
     quantity: '',
     weight: '',
     unit: 'kg',
     unitPrice: '',
     costPrice: '',
+    taxRate: '',
     amount: '',
     costAmount: '',
+    taxAmount: '',
     grossMarginAmount: '',
     grossMarginRate: '',
     memo: '',
+    snapshotCreatedAt: '',
+    sourceProductUpdatedAt: '',
+    sourceInventoryUpdatedAt: '',
   };
 }
 
@@ -61,8 +91,12 @@ export const emptyQuote = {
   allocationBasis: 'sales',
   expenseMemo: '',
   taxRate: '10',
+  defaultTaxRate: '10',
+  taxDisplayMode: 'tax_excluded',
+  roundingMode: 'round',
   subtotal: '',
   taxAmount: '',
+  taxBreakdown: [],
   grandTotal: '',
   totalAmount: '',
   inventoryCostTotal: '',
@@ -82,6 +116,7 @@ export const emptyQuote = {
   updatedByName: '',
   paymentTerms: '',
   deliveryTerms: '',
+  deliveryDate: '',
   remarks: '',
   memo: '',
   lostReason: '',
@@ -89,12 +124,26 @@ export const emptyQuote = {
   createdByName: '',
 };
 
-function calculateLine(line = {}) {
+function roundAmount(value, mode = 'round') {
+  if (!Number.isFinite(value)) return 0;
+  if (mode === 'floor') return Math.floor(value);
+  if (mode === 'ceil') return Math.ceil(value);
+  return Math.round(value);
+}
+
+function calculateLine(line = {}, defaultTaxRate = '10', roundingMode = 'round', taxDisplayMode = 'tax_excluded') {
   const quantity = parsePrice(line.quantity);
   const unitPrice = parsePrice(line.unitPrice);
   const costPrice = parsePrice(line.costPrice);
+  const taxRate = parsePrice(line.taxRate === '' || line.taxRate === undefined ? defaultTaxRate : line.taxRate);
   const amount = quantity !== '' && unitPrice !== '' ? quantity * unitPrice : parsePrice(line.amount);
   const costAmount = quantity !== '' && costPrice !== '' ? quantity * costPrice : parsePrice(line.costAmount);
+  const taxAmount =
+    amount !== '' && taxRate !== ''
+      ? taxDisplayMode === 'tax_included'
+        ? roundAmount(amount - amount / (1 + taxRate / 100), roundingMode)
+        : roundAmount(amount * (taxRate / 100), roundingMode)
+      : '';
   const grossMarginAmount = amount !== '' && costAmount !== '' ? amount - costAmount : '';
   const grossMarginRate =
     amount !== '' && amount > 0 && grossMarginAmount !== ''
@@ -106,22 +155,46 @@ function calculateLine(line = {}) {
     id: line.id ?? crypto.randomUUID(),
     productId: line.productId ?? '',
     inventoryId: line.inventoryId ?? '',
-    description: line.description ?? '',
+    productCode: line.productCode ?? '',
+    productName: line.productName ?? line.description ?? '',
+    category: line.category ?? '',
+    manufacturerName: line.manufacturerName ?? '',
+    origin: line.origin ?? '',
+    packageStyle: line.packageStyle ?? '',
+    temperatureZone: line.temperatureZone ?? '',
+    shelfLife: line.shelfLife ?? '',
+    expirationText: line.expirationText ?? '',
+    inventoryCode: line.inventoryCode ?? '',
+    inventoryOwner: line.inventoryOwner ?? '',
+    inventoryStockType: line.inventoryStockType ?? '',
+    inventoryLot: line.inventoryLot ?? '',
+    inventoryExpiryDate: line.inventoryExpiryDate ?? '',
+    description: line.description ?? line.productName ?? '',
     quantity: line.quantity ?? '',
     weight: line.weight ?? '',
     unit: line.unit || 'kg',
     unitPrice: line.unitPrice ?? '',
     costPrice: line.costPrice ?? '',
+    taxRate: line.taxRate === undefined || line.taxRate === '' ? defaultTaxRate : line.taxRate,
     amount,
     costAmount,
+    taxAmount,
     grossMarginAmount,
     grossMarginRate,
     memo: line.memo ?? '',
+    snapshotCreatedAt: line.snapshotCreatedAt ?? '',
+    sourceProductUpdatedAt: line.sourceProductUpdatedAt ?? '',
+    sourceInventoryUpdatedAt: line.sourceInventoryUpdatedAt ?? '',
   };
 }
 
 export function calculateQuoteTotals(quote = {}) {
-  const lines = Array.isArray(quote.quoteLines) ? quote.quoteLines.map(calculateLine) : [];
+  const defaultTaxRate = quote.defaultTaxRate ?? quote.taxRate ?? '10';
+  const roundingMode = quote.roundingMode || 'round';
+  const taxDisplayMode = quote.taxDisplayMode || 'tax_excluded';
+  const lines = Array.isArray(quote.quoteLines)
+    ? quote.quoteLines.map((line) => calculateLine(line, defaultTaxRate, roundingMode, taxDisplayMode))
+    : [];
   const lineSubtotal = lines.reduce((sum, line) => sum + (parsePrice(line.amount) || 0), 0);
   const lineCostTotal = lines.reduce((sum, line) => sum + (parsePrice(line.costAmount) || 0), 0);
   const fallbackQuantity = parsePrice(quote.quantity);
@@ -133,12 +206,45 @@ export function calculateQuoteTotals(quote = {}) {
     fallbackQuantity !== '' && fallbackCostPrice !== '' ? fallbackQuantity * fallbackCostPrice : parsePrice(quote.inventoryCostTotal);
   const freight = parsePrice(quote.freight);
   const discount = parsePrice(quote.discount);
-  const taxRate = parsePrice(quote.taxRate);
+  const taxRate = parsePrice(defaultTaxRate);
   const subtotal = lineSubtotal > 0 ? lineSubtotal : fallbackSubtotal || 0;
   const costTotal = lineCostTotal > 0 ? lineCostTotal : fallbackCostTotal || 0;
   const totalAmount = subtotal + (freight || 0) - (discount || 0);
-  const taxAmount = taxRate !== '' ? Math.round(totalAmount * (taxRate / 100)) : 0;
-  const grandTotal = totalAmount + taxAmount;
+  const taxGroups = new Map();
+
+  lines.forEach((line) => {
+    const rate = String(line.taxRate === '' || line.taxRate === undefined ? defaultTaxRate : line.taxRate);
+    taxGroups.set(rate, (taxGroups.get(rate) || 0) + (parsePrice(line.amount) || 0));
+  });
+
+  if (lines.length === 0 || freight || discount) {
+    const rate = String(defaultTaxRate);
+    taxGroups.set(rate, (taxGroups.get(rate) || 0) + (freight || 0) - (discount || 0));
+  }
+
+  const taxBreakdown = [...taxGroups.entries()]
+    .map(([rate, taxableAmount]) => {
+      const parsedRate = parsePrice(rate);
+      const tax =
+        parsedRate !== ''
+          ? taxDisplayMode === 'tax_included'
+            ? roundAmount(taxableAmount - taxableAmount / (1 + parsedRate / 100), roundingMode)
+            : roundAmount(taxableAmount * (parsedRate / 100), roundingMode)
+          : 0;
+      return { rate, taxableAmount, tax };
+    })
+    .filter((item) => item.taxableAmount !== 0 || item.tax !== 0);
+
+  const fallbackTaxAmount =
+    taxRate !== ''
+      ? taxDisplayMode === 'tax_included'
+        ? roundAmount(totalAmount - totalAmount / (1 + taxRate / 100), roundingMode)
+        : roundAmount(totalAmount * (taxRate / 100), roundingMode)
+      : 0;
+  const taxAmount = taxBreakdown.length > 0
+    ? taxBreakdown.reduce((sum, item) => sum + item.tax, 0)
+    : fallbackTaxAmount;
+  const grandTotal = taxDisplayMode === 'tax_included' ? totalAmount : totalAmount + taxAmount;
   const grossMarginAmount = subtotal - costTotal;
   const grossMarginRate = subtotal > 0 ? `${((grossMarginAmount / subtotal) * 100).toFixed(1).replace(/\.0$/, '')}%` : '';
 
@@ -148,6 +254,7 @@ export function calculateQuoteTotals(quote = {}) {
     costTotal,
     totalAmount,
     taxAmount,
+    taxBreakdown,
     grandTotal,
     grossMarginAmount,
     grossMarginRate,
@@ -155,8 +262,13 @@ export function calculateQuoteTotals(quote = {}) {
 }
 
 export function normalizeQuote(quote = {}, userId = '') {
-  const quoteLines = Array.isArray(quote.quoteLines) ? quote.quoteLines.map(calculateLine) : [];
-  const totals = calculateQuoteTotals({ ...quote, quoteLines });
+  const defaultTaxRate = quote.defaultTaxRate ?? quote.default_tax_rate ?? quote.taxRate ?? quote.tax_rate ?? '10';
+  const roundingMode = quote.roundingMode ?? quote.rounding_mode ?? 'round';
+  const taxDisplayMode = quote.taxDisplayMode ?? quote.tax_display_mode ?? 'tax_excluded';
+  const quoteLines = Array.isArray(quote.quoteLines)
+    ? quote.quoteLines.map((line) => calculateLine(line, defaultTaxRate, roundingMode, taxDisplayMode))
+    : [];
+  const totals = calculateQuoteTotals({ ...quote, defaultTaxRate, roundingMode, taxDisplayMode, quoteLines });
 
   return {
     ...emptyQuote,
@@ -191,9 +303,13 @@ export function normalizeQuote(quote = {}, userId = '') {
     commonExpenseAmount: quote.commonExpenseAmount ?? '',
     allocationBasis: quote.allocationBasis ?? 'sales',
     expenseMemo: quote.expenseMemo ?? '',
-    taxRate: quote.taxRate ?? '10',
+    taxRate: quote.taxRate ?? quote.tax_rate ?? defaultTaxRate,
+    defaultTaxRate,
+    taxDisplayMode,
+    roundingMode,
     subtotal: quote.subtotal ?? totals.subtotal,
     taxAmount: quote.taxAmount ?? totals.taxAmount,
+    taxBreakdown: Array.isArray(quote.taxBreakdown) ? quote.taxBreakdown : totals.taxBreakdown,
     grandTotal: quote.grandTotal ?? totals.grandTotal,
     totalAmount: quote.totalAmount ?? totals.totalAmount,
     inventoryCostTotal: quote.inventoryCostTotal ?? totals.costTotal,
@@ -206,6 +322,7 @@ export function normalizeQuote(quote = {}, userId = '') {
     acceptedAt: quote.acceptedAt ?? '',
     updatedBy: quote.updatedBy ?? '',
     updatedByName: quote.updatedByName ?? '',
+    deliveryDate: quote.deliveryDate ?? quote.delivery_date ?? '',
     createdBy: quote.createdBy ?? userId,
     createdByName: quote.createdByName ?? '',
     createdAt: quote.createdAt ?? new Date().toISOString(),
@@ -251,8 +368,12 @@ function toRow(quote) {
     allocation_basis: quote.allocationBasis,
     expense_memo: quote.expenseMemo,
     tax_rate: nullableNumber(quote.taxRate),
+    default_tax_rate: nullableNumber(quote.defaultTaxRate),
+    tax_display_mode: quote.taxDisplayMode,
+    rounding_mode: quote.roundingMode,
     subtotal: nullableNumber(quote.subtotal),
     tax_amount: nullableNumber(quote.taxAmount),
+    tax_breakdown: quote.taxBreakdown,
     grand_total: nullableNumber(quote.grandTotal),
     total_amount: nullableNumber(quote.totalAmount),
     inventory_cost_total: nullableNumber(quote.inventoryCostTotal),
@@ -272,6 +393,7 @@ function toRow(quote) {
     updated_by_name: quote.updatedByName,
     payment_terms: quote.paymentTerms,
     delivery_terms: quote.deliveryTerms,
+    delivery_date: quote.deliveryDate,
     remarks: quote.remarks,
     memo: quote.memo,
     lost_reason: quote.lostReason,
@@ -316,8 +438,12 @@ function fromRow(row) {
     allocationBasis: row.allocation_basis ?? 'sales',
     expenseMemo: row.expense_memo ?? '',
     taxRate: row.tax_rate ?? '10',
+    defaultTaxRate: row.default_tax_rate ?? row.tax_rate ?? '10',
+    taxDisplayMode: row.tax_display_mode ?? 'tax_excluded',
+    roundingMode: row.rounding_mode ?? 'round',
     subtotal: row.subtotal ?? '',
     taxAmount: row.tax_amount ?? '',
+    taxBreakdown: row.tax_breakdown ?? [],
     grandTotal: row.grand_total ?? '',
     totalAmount: row.total_amount ?? '',
     inventoryCostTotal: row.inventory_cost_total ?? '',
@@ -337,6 +463,7 @@ function fromRow(row) {
     updatedByName: row.updated_by_name,
     paymentTerms: row.payment_terms,
     deliveryTerms: row.delivery_terms,
+    deliveryDate: row.delivery_date,
     remarks: row.remarks,
     memo: row.memo,
     lostReason: row.lost_reason,
