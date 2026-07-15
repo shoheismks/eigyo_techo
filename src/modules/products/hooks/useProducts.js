@@ -7,6 +7,10 @@ import {
   mergeByUpdatedAt,
   upsertRecords,
 } from '../../../shared/services/recordSyncService.js';
+import {
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 
 const STORAGE_KEY = 'eigyo-techo-products';
 const TABLE_NAME = 'products';
@@ -54,12 +58,11 @@ export const emptyProduct = {
 };
 
 export function normalizeProductCode(value) {
-  return String(value ?? '').trim();
+  return normalizeBusinessCode(value);
 }
 
 export function isValidProductCode(value) {
-  const code = normalizeProductCode(value);
-  return !code || /^[\x21-\x7E]+$/.test(code);
+  return isValidBusinessCode(value);
 }
 
 export function productDisplayName(product, fallback = '商品') {

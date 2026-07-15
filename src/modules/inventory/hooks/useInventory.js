@@ -1,4 +1,8 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import {
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 import { parsePrice, productDisplayName } from '../../products/hooks/useProducts.js';
 
 export const INVENTORY_STATUSES = [
@@ -38,12 +42,11 @@ export const emptyInventory = {
 };
 
 export function normalizeInventoryCode(value) {
-  return String(value ?? '').trim();
+  return normalizeBusinessCode(value);
 }
 
 export function isValidInventoryCode(value) {
-  const code = normalizeInventoryCode(value);
-  return !code || /^[\x21-\x7E]+$/.test(code);
+  return isValidBusinessCode(value);
 }
 
 function normalizeNumber(value) {

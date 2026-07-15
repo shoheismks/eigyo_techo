@@ -9,6 +9,7 @@ import {
   upsertRemoteCustomer,
   upsertRemoteCustomers,
 } from '../services/customerSyncService.js';
+import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 
 const STORAGE_KEY = 'eigyo-techo-customers';
 
@@ -36,6 +37,7 @@ const VALID_STATUSES = [
 
 const defaultCustomer = {
   userId: '',
+  customerCode: '',
   placeId: '',
   corporateNumber: '',
   companyName: '',
@@ -141,6 +143,7 @@ function normalizeCustomer(customer = {}, userId = '') {
     ...customer,
     id: customer.id ?? crypto.randomUUID(),
     userId: nextUserId,
+    customerCode: normalizeBusinessCode(customer.customerCode ?? customer.customer_code ?? ''),
     status: normalizeStatus(customer.status),
     createdAt: customer.createdAt ?? new Date().toISOString(),
     updatedAt: customer.updatedAt ?? new Date().toISOString(),

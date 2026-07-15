@@ -30,6 +30,13 @@ import {
 import { createEmptyMeetingMinutes, generateMeetingMinutesDraft } from '../../../services/meetingMinutesService.js';
 import { createLineFollowNote } from '../../../services/lineIntegrationService.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
+import {
+  businessCodeDuplicateMessage,
+  businessCodeFormatMessage,
+  hasDuplicateBusinessCode,
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 
@@ -251,6 +258,7 @@ export default function CustomerKarte({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [timelineOrder, setTimelineOrder] = useState('desc');
+  const [customerCodeError, setCustomerCodeError] = useState('');
   const [sampleForm, setSampleForm] = useState(() => createSampleForm(customerId, user));
   const [quoteForm, setQuoteForm] = useState(() => createQuoteForm(customerId, user));
   const [quoteFile, setQuoteFile] = useState(null);
@@ -369,6 +377,22 @@ export default function CustomerKarte({
     updateCustomer(customer.id, { [field]: value });
   }
 
+  function updateCustomerCode(value) {
+    const customerCode = normalizeBusinessCode(value);
+    if (!isValidBusinessCode(customerCode)) {
+      setCustomerCodeError(businessCodeFormatMessage('顧客コード'));
+      return;
+    }
+
+    if (hasDuplicateBusinessCode(customers, 'customerCode', customerCode, customer.id)) {
+      setCustomerCodeError(businessCodeDuplicateMessage('顧客コード'));
+      return;
+    }
+
+    setCustomerCodeError('');
+    updateCustomerField('customerCode', customerCode);
+  }
+
   function updateTags(value) {
     updateCustomerField(
       'tags',
@@ -394,6 +418,27 @@ export default function CustomerKarte({
 
   function updateQuoteField(field, value) {
     setQuoteForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function validateQuoteNumber(quoteNumber, quoteId = '') {
+    const normalizedQuoteNumber = normalizeBusinessCode(quoteNumber);
+    if (!isValidBusinessCode(normalizedQuoteNumber)) {
+      return {
+        ok: false,
+        value: normalizedQuoteNumber,
+        message: businessCodeFormatMessage('見積番号'),
+      };
+    }
+
+    if (hasDuplicateBusinessCode(quotes, 'quoteNumber', normalizedQuoteNumber, quoteId)) {
+      return {
+        ok: false,
+        value: normalizedQuoteNumber,
+        message: businessCodeDuplicateMessage('見積番号'),
+      };
+    }
+
+    return { ok: true, value: normalizedQuoteNumber, message: '' };
   }
 
   function updateAdoptionField(field, value) {
@@ -510,11 +555,31 @@ export default function CustomerKarte({
   }
 
   function handleQuotePreview() {
-    setQuotePreviewHtml(renderQuotePreviewHtml(buildCurrentQuoteContext()));
+    const validation = validateQuoteNumber(quoteForm.quoteNumber, quoteForm.id);
+    if (!validation.ok) {
+      setQuoteError(validation.message);
+      return;
+    }
+
+    setQuoteError('');
+    setQuoteForm((current) => ({ ...current, quoteNumber: validation.value }));
+    const context = buildCurrentQuoteContext();
+    context.quote.quoteNumber = validation.value;
+    setQuotePreviewHtml(renderQuotePreviewHtml(context));
   }
 
   function handleQuoteDownload() {
-    downloadQuotePdf(buildCurrentQuoteContext());
+    const validation = validateQuoteNumber(quoteForm.quoteNumber, quoteForm.id);
+    if (!validation.ok) {
+      setQuoteError(validation.message);
+      return;
+    }
+
+    setQuoteError('');
+    setQuoteForm((current) => ({ ...current, quoteNumber: validation.value }));
+    const context = buildCurrentQuoteContext();
+    context.quote.quoteNumber = validation.value;
+    downloadQuotePdf(context);
   }
 
   function handleAddSample(event) {
@@ -534,7 +599,13 @@ export default function CustomerKarte({
 
   async function handleAddQuote(event) {
     event.preventDefault();
-    if (!addQuote || !quoteForm.quoteNumber.trim()) {
+    const quoteValidation = validateQuoteNumber(quoteForm.quoteNumber, quoteForm.id);
+    if (!addQuote || !quoteValidation.value) {
+      return;
+    }
+
+    if (!quoteValidation.ok) {
+      setQuoteError(quoteValidation.message);
       return;
     }
 
@@ -546,6 +617,7 @@ export default function CustomerKarte({
       let uploadedFile = null;
       let uploadedPdf = null;
       const context = buildCurrentQuoteContext(quoteId);
+      context.quote.quoteNumber = quoteValidation.value;
       const pdfFile = createQuotePdfFile(context);
 
       if (quoteFile) {
@@ -572,6 +644,7 @@ export default function CustomerKarte({
       const normalizedPayload = normalizeQuote({
         ...quoteForm,
         id: quoteId,
+        quoteNumber: quoteValidation.value,
         customerId: customer.id,
         subtotal: quoteFinancials.subtotal,
         taxAmount: quoteFinancials.taxAmount,
@@ -831,6 +904,7 @@ export default function CustomerKarte({
       <div className="karte-grid">
         <Section title="会社基本情報">
           <div className="karte-field-grid">
+            <Field label="顧客コード" value={customer.customerCode} />
             <Field label="会社名" value={customer.companyName} />
             <Field label="正式社名" value={customer.officialName || customer.companyName} />
             <Field label="業種" value={customer.industry} />
@@ -844,6 +918,16 @@ export default function CustomerKarte({
             <Field label="重要度スコア" value={customer.score ?? 0} />
             <Field label="重要度ランク" value={customer.customerRank || customer.rank || 'D'} />
           </div>
+          <label className="field-label">
+            顧客コード
+            <input
+              value={customer.customerCode || ''}
+              placeholder="例: CUST-001"
+              onChange={(event) => updateCustomerField('customerCode', event.target.value)}
+              onBlur={(event) => updateCustomerCode(event.target.value)}
+            />
+          </label>
+          {customerCodeError && <p className="form-error-message">{customerCodeError}</p>}
           <label className="field-label">
             タグ
             <input value={(customer.tags ?? []).join(', ')} onChange={(event) => updateTags(event.target.value)} />
@@ -1116,6 +1200,7 @@ export default function CustomerKarte({
                   value={quoteForm.quoteNumber}
                   placeholder="例: Q-2026-001"
                   onChange={(event) => updateQuoteField('quoteNumber', event.target.value)}
+                  onBlur={(event) => updateQuoteField('quoteNumber', normalizeBusinessCode(event.target.value))}
                 />
               </label>
               <label className="field-label">

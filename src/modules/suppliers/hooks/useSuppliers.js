@@ -1,7 +1,9 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 
 export const emptySupplier = {
   userId: '',
+  supplierCode: '',
   name: '',
   area: '',
   address: '',
@@ -19,6 +21,7 @@ export function normalizeSupplier(supplier = {}, userId = '') {
     ...supplier,
     id: supplier.id ?? crypto.randomUUID(),
     userId: supplier.userId ?? userId,
+    supplierCode: normalizeBusinessCode(supplier.supplierCode ?? supplier.supplier_code ?? ''),
     tags: Array.isArray(supplier.tags) ? supplier.tags : [],
     dealHistories: Array.isArray(supplier.dealHistories) ? supplier.dealHistories : [],
     createdAt: supplier.createdAt ?? new Date().toISOString(),
@@ -30,6 +33,7 @@ function toRow(supplier) {
   return {
     id: supplier.id,
     user_id: supplier.userId,
+    supplier_code: supplier.supplierCode || null,
     name: supplier.name,
     area: supplier.area,
     address: supplier.address,
@@ -48,6 +52,7 @@ function fromRow(row) {
   return normalizeSupplier({
     id: row.id,
     userId: row.user_id,
+    supplierCode: row.supplier_code ?? '',
     name: row.name,
     area: row.area,
     address: row.address,

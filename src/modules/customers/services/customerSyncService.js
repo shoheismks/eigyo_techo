@@ -1,4 +1,5 @@
 import { hasSupabaseConfig, supabase } from '../../../lib/supabase.js';
+import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 
 const TABLE_NAME = 'customers';
 
@@ -112,6 +113,7 @@ function toSupabaseRow(customer) {
   return {
     id: customer.id,
     user_id: customer.userId,
+    customer_code: normalizeBusinessCode(customer.customerCode) || null,
     place_id: customer.placeId,
     corporate_number: customer.corporateNumber,
     company_name: customer.companyName,
@@ -161,6 +163,7 @@ function fromSupabaseRow(row) {
   return {
     id: row.id,
     userId: row.user_id ?? row.userId ?? '',
+    customerCode: row.customer_code ?? row.customerCode ?? '',
     placeId: row.place_id ?? row.placeId ?? '',
     corporateNumber: row.corporate_number ?? row.corporateNumber ?? '',
     companyName: row.company_name ?? row.companyName ?? '',

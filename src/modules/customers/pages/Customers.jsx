@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import CompanyCard from '../../../shared/components/CompanyCard.jsx';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
+import {
+  businessCodeDuplicateMessage,
+  businessCodeFormatMessage,
+  hasDuplicateBusinessCode,
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 import { discoverContactInfo } from '../services/contactDiscoveryService.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 
@@ -8,6 +15,7 @@ const ALL = 'すべて';
 const PAGE_SIZE = 40;
 
 const INITIAL_CUSTOMER_FORM = {
+  customerCode: '',
   companyName: '',
   companyKana: '',
   industry: '',
@@ -133,6 +141,7 @@ export default function Customers({
         (followFilter === '期限切れ' && isOverdue(customer)) ||
         (followFilter === '予定あり' && Boolean(followDate(customer)));
       const searchableText = [
+        customer.customerCode,
         customer.companyName,
         customer.industry,
         customer.area,
@@ -191,6 +200,12 @@ export default function Customers({
 
   const desktopColumns = useMemo(
     () => [
+      {
+        key: 'customerCode',
+        label: '顧客コード',
+        minWidth: '130px',
+        render: (customer) => customer.customerCode || '-',
+      },
       {
         key: 'companyName',
         label: '会社名',
@@ -287,7 +302,18 @@ export default function Customers({
   }
 
   function handleCreateCustomer() {
+    const customerCode = normalizeBusinessCode(customerForm.customerCode);
     const companyName = customerForm.companyName.trim();
+
+    if (!isValidBusinessCode(customerCode)) {
+      setFormError(businessCodeFormatMessage('顧客コード'));
+      return;
+    }
+
+    if (hasDuplicateBusinessCode(customers, 'customerCode', customerCode)) {
+      setFormError(businessCodeDuplicateMessage('顧客コード'));
+      return;
+    }
 
     if (!companyName) {
       setFormError('会社名は必須です。');
@@ -300,6 +326,7 @@ export default function Customers({
 
     addCustomer({
       id: customerId,
+      customerCode,
       companyName,
       companyKana: customerForm.companyKana.trim(),
       industry: customerForm.industry.trim(),
@@ -507,6 +534,15 @@ export default function Customers({
               <section className="customer-editor-section">
                 <h3>基本情報</h3>
                 <div className="customer-editor-grid">
+                  <label className="field-label">
+                    顧客コード
+                    <input
+                      value={customerForm.customerCode}
+                      placeholder="例: CUST-001"
+                      onChange={(event) => updateFormField('customerCode', event.target.value)}
+                      onBlur={() => updateFormField('customerCode', normalizeBusinessCode(customerForm.customerCode))}
+                    />
+                  </label>
                   <label className="field-label">
                     会社名 <span className="required-mark">必須</span>
                     <input value={customerForm.companyName} onChange={(event) => updateFormField('companyName', event.target.value)} />

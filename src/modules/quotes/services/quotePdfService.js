@@ -206,9 +206,11 @@ export function createQuotePdfFile(context) {
     `Issue Date: ${quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10)}`,
     `Valid Until: ${quote.validUntil || '-'}`,
     `Customer: ${customer?.companyName || '-'}`,
+    `Customer Code: ${customer?.customerCode || '-'}`,
     `Contacts: ${contacts.map((contact) => contact.name).filter(Boolean).join(', ') || '-'}`,
     `Project: ${quote.projectName || '-'}`,
     `Supplier: ${supplier?.name || supplier?.companyName || '-'}`,
+    `Supplier Code: ${supplier?.supplierCode || '-'}`,
     'Items:',
     ...rows.map((line, index) => {
       const name = line.description || productName(line.productId, products) || '-';

@@ -1,9 +1,17 @@
 import { useMemo, useState } from 'react';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
+import {
+  businessCodeDuplicateMessage,
+  businessCodeFormatMessage,
+  hasDuplicateBusinessCode,
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 
 const emptySupplier = {
+  supplierCode: '',
   name: '',
   area: '',
   address: '',
@@ -52,6 +60,7 @@ export default function Suppliers({
   const [historySupplierId, setHistorySupplierId] = useState('');
   const [historyForm, setHistoryForm] = useState(emptyHistory);
   const [uploadError, setUploadError] = useState('');
+  const [formError, setFormError] = useState('');
 
   const filteredSuppliers = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -61,6 +70,7 @@ export default function Suppliers({
       }
 
       return [
+        supplier.supplierCode,
         supplier.name,
         supplier.area,
         supplier.address,
@@ -73,6 +83,7 @@ export default function Suppliers({
 
   const desktopColumns = useMemo(
     () => [
+      { key: 'supplierCode', label: '仕入先コード', minWidth: '150px', render: (supplier) => supplier.supplierCode || '-' },
       { key: 'name', label: '仕入先名', minWidth: '240px', width: '18%', render: (supplier) => <strong>{supplier.name}</strong> },
       { key: 'supplierType', label: '種別', minWidth: '100px', width: '100px', render: (supplier) => supplier.supplierType || '-' },
       { key: 'area', label: '国/地域', minWidth: '110px', width: '110px', render: (supplier) => supplier.country || supplier.area || '-' },
@@ -106,12 +117,25 @@ export default function Suppliers({
 
   function handleSubmit(event) {
     event.preventDefault();
+    const supplierCode = normalizeBusinessCode(form.supplierCode);
+    if (!isValidBusinessCode(supplierCode)) {
+      setFormError(businessCodeFormatMessage('仕入先コード'));
+      return;
+    }
+
+    if (hasDuplicateBusinessCode(suppliers, 'supplierCode', supplierCode)) {
+      setFormError(businessCodeDuplicateMessage('仕入先コード'));
+      return;
+    }
+
     if (!form.name.trim()) {
       return;
     }
 
+    setFormError('');
     addSupplier({
       ...form,
+      supplierCode,
       tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
     });
     setForm(emptySupplier);
@@ -175,7 +199,17 @@ export default function Suppliers({
 
       <section className="detail-section">
         <h2>仕入先を追加</h2>
+        {formError && <p className="form-error-message">{formError}</p>}
         <form className="history-add-form" onSubmit={handleSubmit}>
+          <label className="field-label">
+            仕入先コード
+            <input
+              value={form.supplierCode}
+              placeholder="例: SUP-001"
+              onChange={(event) => updateField('supplierCode', event.target.value)}
+              onBlur={() => updateField('supplierCode', normalizeBusinessCode(form.supplierCode))}
+            />
+          </label>
           <label className="field-label">仕入先名<input value={form.name} onChange={(event) => updateField('name', event.target.value)} required /></label>
           <div className="date-grid">
             <label className="field-label">エリア<input value={form.area} onChange={(event) => updateField('area', event.target.value)} /></label>

@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
+import {
+  businessCodeDuplicateMessage,
+  businessCodeFormatMessage,
+  hasDuplicateBusinessCode,
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 import { PROJECT_PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../constants.js';
 import { emptyProject } from '../hooks/useProjects.js';
 import {
@@ -92,6 +99,7 @@ function toggleArrayValue(values, value) {
 function makeInitialProject(defaultCustomerId = '', defaultSupplierId = '') {
   return {
     ...emptyProject,
+    projectCode: '',
     title: '',
     customerId: defaultCustomerId,
     supplierId: defaultSupplierId,
@@ -470,6 +478,7 @@ export default function ProjectPanel({
         const supplier = supplierMap.get(project.supplierId);
         return [
           project.title,
+          project.projectCode,
           project.type,
           project.status,
           project.priority,
@@ -540,6 +549,7 @@ export default function ProjectPanel({
 
   const columns = useMemo(
     () => [
+      { key: 'projectCode', label: '案件コード', minWidth: '140px', render: (project) => project.projectCode || '-' },
       { key: 'title', label: '件名', minWidth: '220px', render: (project) => <strong>{project.title}</strong> },
       { key: 'owner', label: '会社', minWidth: '190px', render: (project) => customerMap.get(project.customerId)?.companyName || supplierMap.get(project.supplierId)?.name || '-' },
       { key: 'type', label: '種別', minWidth: '120px', render: (project) => project.type || '-' },
@@ -575,6 +585,17 @@ export default function ProjectPanel({
 
   function saveProject(event) {
     event.preventDefault();
+    const projectCode = normalizeBusinessCode(form.projectCode);
+    if (!isValidBusinessCode(projectCode)) {
+      setError(businessCodeFormatMessage('案件コード'));
+      return;
+    }
+
+    if (hasDuplicateBusinessCode(projects, 'projectCode', projectCode, editingProject?.id)) {
+      setError(businessCodeDuplicateMessage('案件コード'));
+      return;
+    }
+
     if (!form.title.trim()) {
       setError('件名は必須です。');
       return;
@@ -588,6 +609,7 @@ export default function ProjectPanel({
     const proposalTotals = summarizeProjectProductProposals(productProposals);
     const payload = {
       ...form,
+      projectCode,
       title: form.title.trim(),
       productProposals,
       expectedSales: form.expectedSales || proposalTotals.sales || '',
@@ -608,6 +630,7 @@ export default function ProjectPanel({
     addProject({
       ...project,
       id: crypto.randomUUID(),
+      projectCode: '',
       title: `${project.title} コピー`,
       status: 'リード',
       createdAt: undefined,
@@ -650,6 +673,7 @@ export default function ProjectPanel({
           </div>
           {error && <p className="form-error-message">{error}</p>}
           <div className="project-form-grid">
+            <label className="field-label">案件コード<input value={form.projectCode || ''} placeholder="例: PJ-001" onChange={(event) => updateForm('projectCode', event.target.value)} onBlur={() => updateForm('projectCode', normalizeBusinessCode(form.projectCode))} /></label>
             <label className="field-label project-editor-wide">件名 <span className="required-mark">必須</span><input value={form.title} onChange={(event) => updateForm('title', event.target.value)} /></label>
             <label className="field-label">取引先<select value={form.customerId} onChange={(event) => updateForm('customerId', event.target.value)}><option value="">未選択</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.companyName}</option>)}</select></label>
             <label className="field-label">仕入先<select value={form.supplierId} onChange={(event) => updateForm('supplierId', event.target.value)}><option value="">未選択</option>{suppliers.map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name}</option>)}</select></label>

@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 import { productDisplayName } from '../../products/hooks/useProducts.js';
+import {
+  businessCodeFormatMessage,
+  isValidBusinessCode,
+  normalizeBusinessCode,
+} from '../../../shared/utils/businessCode.js';
 
 const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
 const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];
@@ -124,6 +129,7 @@ export default function CustomerDetail({
   const [historyForm, setHistoryForm] = useState(emptyHistory);
   const [replyTarget, setReplyTarget] = useState(null);
   const [replyForm, setReplyForm] = useState(emptyReply);
+  const [codeError, setCodeError] = useState('');
 
   if (!customer) {
     return (
@@ -139,6 +145,17 @@ export default function CustomerDetail({
 
   function updateField(field, value) {
     updateCustomer(customer.id, { [field]: value });
+  }
+
+  function updateCustomerCode(value) {
+    const customerCode = normalizeBusinessCode(value);
+    if (!isValidBusinessCode(customerCode)) {
+      setCodeError(businessCodeFormatMessage('顧客コード'));
+      return;
+    }
+
+    setCodeError('');
+    updateField('customerCode', customerCode);
   }
 
   function updateTags(value) {
@@ -235,6 +252,16 @@ export default function CustomerDetail({
           </div>
         </div>
 
+        <label className="field-label">
+          顧客コード
+          <input
+            value={customer.customerCode || ''}
+            placeholder="例: CUST-001"
+            onChange={(event) => updateField('customerCode', event.target.value)}
+            onBlur={(event) => updateCustomerCode(event.target.value)}
+          />
+        </label>
+        {codeError && <p className="form-error-message">{codeError}</p>}
         <label className="field-label">
           会社名
           <input value={customer.companyName} onChange={(event) => updateField('companyName', event.target.value)} />

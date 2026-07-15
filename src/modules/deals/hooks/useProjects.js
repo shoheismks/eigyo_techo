@@ -1,9 +1,11 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 import { PROJECT_PRIORITIES, PROJECT_STATUSES, PROJECT_TYPES } from '../constants.js';
 import { normalizeProjectProductProposal } from '../services/projectProductProposalService.js';
 
 export const emptyProject = {
   userId: '',
+  projectCode: '',
   title: '',
   customerId: '',
   supplierId: '',
@@ -42,6 +44,7 @@ export function normalizeProject(project = {}, userId = '') {
     ...project,
     id: project.id ?? crypto.randomUUID(),
     userId: project.userId ?? userId,
+    projectCode: normalizeBusinessCode(project.projectCode ?? project.project_code ?? ''),
     title: project.title ?? '',
     customerId: project.customerId ?? '',
     supplierId: project.supplierId ?? '',
@@ -75,6 +78,7 @@ function toRow(project) {
   return {
     id: project.id,
     user_id: project.userId,
+    project_code: project.projectCode || null,
     title: project.title,
     customer_id: project.customerId || null,
     supplier_id: project.supplierId || null,
@@ -106,6 +110,7 @@ function fromRow(row) {
   return normalizeProject({
     id: row.id,
     userId: row.user_id,
+    projectCode: row.project_code ?? '',
     title: row.title,
     customerId: row.customer_id,
     supplierId: row.supplier_id,

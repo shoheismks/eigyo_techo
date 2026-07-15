@@ -1,4 +1,5 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 import { parsePrice } from '../../products/hooks/useProducts.js';
 
 export const QUOTE_STATUSES = ['作成中', '提出済', '採用', '失注', '期限切れ'];
@@ -173,7 +174,7 @@ export function normalizeQuote(quote = {}, userId = '') {
     unitPrice: quote.unitPrice ?? '',
     unit: quote.unit ?? '',
     costPrice: quote.costPrice ?? '',
-    quoteNumber: quote.quoteNumber ?? '',
+    quoteNumber: normalizeBusinessCode(quote.quoteNumber ?? quote.quote_number ?? ''),
     issueDate: quote.issueDate ?? quote.issue_date ?? '',
     submittedDate: quote.submittedDate ?? quote.submitted_date ?? '',
     validUntil: quote.validUntil ?? quote.valid_until ?? '',
@@ -231,7 +232,7 @@ function toRow(quote) {
     unit_price: nullableNumber(quote.unitPrice),
     unit: quote.unit,
     cost_price: nullableNumber(quote.costPrice),
-    quote_number: quote.quoteNumber,
+    quote_number: quote.quoteNumber || null,
     issue_date: quote.issueDate || null,
     submitted_date: quote.submittedDate || null,
     valid_until: quote.validUntil || null,
