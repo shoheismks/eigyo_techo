@@ -123,6 +123,7 @@ export default function CustomerDetail({
   updateProject,
   removeProject,
   onOpenKarte,
+  onCreateQuote,
   updateCustomer,
   setActivePage,
 }) {
@@ -379,6 +380,7 @@ export default function CustomerDetail({
         defaultCustomerId={customer.id}
         setActivePage={setActivePage}
         onOpenKarte={onOpenKarte}
+        onCreateQuote={onCreateQuote}
       />
 
       <section className={`detail-section ${customer.isDoNotContact ? 'ng-panel' : ''}`}>

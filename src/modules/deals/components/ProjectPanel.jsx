@@ -456,6 +456,7 @@ export default function ProjectPanel({
   defaultSupplierId = '',
   setActivePage,
   onOpenKarte,
+  onCreateQuote,
 }) {
   const [keyword, setKeyword] = useState('');
   const [editingProject, setEditingProject] = useState(null);
@@ -642,6 +643,17 @@ export default function ProjectPanel({
     updateProject(project.id, { status: '終了' });
   }
 
+  function createQuoteForProject(project) {
+    onCreateQuote?.({
+      customerId: project.customerId || '',
+      supplierId: project.supplierId || '',
+      projectName: project.title || '',
+      contactIds: project.contactIds ?? [],
+      productIds: project.productIds ?? [],
+      inventoryIds: project.inventoryIds ?? [],
+    });
+  }
+
   function toggleFormArray(field, value) {
     setForm((current) => ({ ...current, [field]: toggleArrayValue(current[field] ?? [], value) }));
   }
@@ -669,7 +681,14 @@ export default function ProjectPanel({
         }}>
           <div className="section-heading">
             <h3>{editingProject ? '案件編集' : '案件追加'}</h3>
-            <button type="button" className="text-button" onClick={() => setFormOpen(false)}>閉じる</button>
+            <div className="mail-action-row">
+              {editingProject && (
+                <button type="button" className="ghost-button" onClick={() => createQuoteForProject(editingProject)}>
+                  この案件で見積作成
+                </button>
+              )}
+              <button type="button" className="text-button" onClick={() => setFormOpen(false)}>閉じる</button>
+            </div>
           </div>
           {error && <p className="form-error-message">{error}</p>}
           <div className="project-form-grid">
@@ -737,6 +756,7 @@ export default function ProjectPanel({
           <>
             {project.customerId && <button type="button" className="ghost-button" onClick={() => onOpenKarte?.(project.customerId)}>取引先</button>}
             {project.supplierId && <button type="button" className="ghost-button" onClick={() => setActivePage?.('Suppliers')}>仕入先</button>}
+            <button type="button" className="ghost-button" onClick={() => createQuoteForProject(project)}>見積作成</button>
             <button type="button" className="ghost-button" onClick={() => startEdit(project)}>編集</button>
             <button type="button" className="ghost-button" onClick={() => duplicateProject(project)}>複製</button>
             <button type="button" className="ghost-button" onClick={() => finishProject(project)}>終了</button>

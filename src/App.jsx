@@ -14,6 +14,7 @@ import { useProducts } from './modules/products/hooks/useProducts.js';
 import { useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
+import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
 import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
 import Login from './pages/Login.jsx';
 
@@ -118,6 +119,7 @@ function AuthenticatedApp() {
   const [globalCustomerSearch, setGlobalCustomerSearch] = useState('');
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const [quoteDraft, setQuoteDraft] = useState(null);
 
   const {
     customers,
@@ -223,6 +225,50 @@ function AuthenticatedApp() {
   function openProductDetail(productId) {
     setSelectedProductId(productId === 'new' ? '' : productId);
     setActivePage('ProductDetail');
+  }
+
+  function buildProductQuoteLine(productId) {
+    const product = products.find((item) => item.id === productId);
+    if (!product) return null;
+    return {
+      id: crypto.randomUUID(),
+      productId: product.id,
+      productCode: product.productCode || '',
+      productName: [product.productCode, product.name].filter(Boolean).join(' / ') || product.name || '',
+      description: [product.productCode, product.name].filter(Boolean).join(' / ') || product.name || '',
+      category: product.category || '',
+      manufacturerName: product.manufacturerName || '',
+      origin: product.origin || '',
+      packageStyle: product.packageStyle || '',
+      temperatureZone: product.temperatureZone || '',
+      unit: product.sellingPriceUnit || product.costUnit || 'kg',
+      unitPrice: product.desiredSellingPrice || '',
+      costPrice: product.costPrice || '',
+      taxRate: '10',
+      snapshotCreatedAt: new Date().toISOString(),
+      sourceProductUpdatedAt: product.updatedAt || '',
+    };
+  }
+
+  function openQuoteForm(initial = {}) {
+    const quoteLines = initial.productId
+      ? [buildProductQuoteLine(initial.productId)].filter(Boolean)
+      : initial.quoteLines;
+    setQuoteDraft({
+      id: crypto.randomUUID(),
+      ...initial,
+      quoteLines,
+      productIds: initial.productId ? [initial.productId] : initial.productIds,
+      inventoryIds: initial.inventoryIds ?? [],
+      contactIds: initial.contactIds ?? [],
+    });
+  }
+
+  function handleQuoteSaved(quote) {
+    if (quote.customerId) {
+      setSelectedCustomerId(quote.customerId);
+      setActivePage('CustomerKarte');
+    }
   }
 
   function handleAddAction(actionKey) {
@@ -356,6 +402,7 @@ function AuthenticatedApp() {
             activePage={activePage}
             importError={importError}
             setActivePage={setActivePage}
+            onCreateQuote={openQuoteForm}
             addCustomer={addCustomer}
             isSaved={isSaved}
             customers={customers}
@@ -425,6 +472,21 @@ function AuthenticatedApp() {
           </Suspense>
         </PageErrorBoundary>
       </AppLayout>
+      <QuoteFormModal
+        open={Boolean(quoteDraft)}
+        draft={quoteDraft}
+        customers={customers}
+        contacts={contacts}
+        products={products}
+        inventories={inventories}
+        suppliers={suppliers}
+        quotes={quotes}
+        addQuote={addQuote}
+        updateQuote={updateQuote}
+        user={user}
+        onClose={() => setQuoteDraft(null)}
+        onSaved={handleQuoteSaved}
+      />
       <OnboardingTutorial
         open={tutorialOpen}
         stepIndex={tutorialStepIndex}
@@ -442,6 +504,7 @@ function ActivePage({
   activePage,
   importError,
   setActivePage,
+  onCreateQuote,
   addCustomer,
   isSaved,
   customers,
@@ -592,6 +655,7 @@ function ActivePage({
           addAdoption={addAdoption}
           updateAdoption={updateAdoption}
           setActivePage={setActivePage}
+          onCreateQuote={onCreateQuote}
           user={user}
         />
       </Suspense>
@@ -618,6 +682,7 @@ function ActivePage({
         onOpenKarte={openCustomerKarte}
         updateCustomer={updateCustomer}
         setActivePage={setActivePage}
+        onCreateQuote={onCreateQuote}
         user={user}
       />
     );
@@ -643,6 +708,7 @@ function ActivePage({
         updateCustomer={updateCustomer}
         setActivePage={setActivePage}
         onOpenKarte={openCustomerKarte}
+        onCreateQuote={onCreateQuote}
       />
     );
   }
@@ -678,6 +744,7 @@ function ActivePage({
         updateInventory={updateInventory}
         removeInventory={removeInventory}
         setActivePage={setActivePage}
+        onCreateQuote={onCreateQuote}
         userId={userId}
       />
     );
@@ -717,6 +784,7 @@ function ActivePage({
         removeProject={removeProject}
         setActivePage={setActivePage}
         onOpenKarte={openCustomerKarte}
+        onCreateQuote={onCreateQuote}
         userId={userId}
       />
     );

@@ -523,6 +523,7 @@ export default function CustomerKarte({
   addInventory,
   updateInventory,
   setActivePage,
+  onCreateQuote,
   user,
 }) {
   const [analysis, setAnalysis] = useState(null);
@@ -1518,6 +1519,7 @@ export default function CustomerKarte({
           <a className="ghost-button external-button" href={googleSearchUrl(customer.companyName)} target="_blank" rel="noreferrer">Google検索</a>
           {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
           <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
+          <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>＋見積作成</button>
           {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
         </div>
       </header>
@@ -1735,6 +1737,7 @@ export default function CustomerKarte({
           removeProject={removeProject}
           defaultCustomerId={customer.id}
           setActivePage={setActivePage}
+          onCreateQuote={onCreateQuote}
         />
 
         <Section title="商談履歴" count={karte.dealHistories.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setHistoryForm(emptyHistoryForm)}>＋追加</button>}>
@@ -2034,7 +2037,7 @@ export default function CustomerKarte({
           {karte.adoptions.length === 0 && <AddCard title="採用品を追加" description="この顧客で採用された商品を記録します" onClick={startAddAdoption} />}
         </Section>
 
-        <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setQuoteForm(createQuoteForm(customer.id, user, quotes))}>＋追加</button>}>
+        <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={() => onCreateQuote?.({})}>＋新規見積</button>}>
           <form className="sample-form" onSubmit={handleAddQuote}>
             <div className="date-grid">
               <label className="field-label">

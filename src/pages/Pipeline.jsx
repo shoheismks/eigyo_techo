@@ -37,6 +37,7 @@ export default function Pipeline({
   updateCustomer,
   setActivePage,
   onOpenKarte,
+  onCreateQuote,
 }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '');
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -137,6 +138,7 @@ export default function Pipeline({
         removeProject={removeProject}
         setActivePage={setActivePage}
         onOpenKarte={onOpenKarte}
+        onCreateQuote={onCreateQuote}
       />
 
       <section className="pipeline-desktop">

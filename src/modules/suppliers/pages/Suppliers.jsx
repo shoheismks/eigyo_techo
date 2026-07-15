@@ -53,6 +53,7 @@ export default function Suppliers({
   removeProject,
   setActivePage,
   onOpenKarte,
+  onCreateQuote,
   userId,
 }) {
   const [keyword, setKeyword] = useState('');
@@ -263,6 +264,7 @@ export default function Suppliers({
         removeProject={removeProject}
         setActivePage={setActivePage}
         onOpenKarte={onOpenKarte}
+        onCreateQuote={onCreateQuote}
       />
 
       <section className="result-stack suppliers-list-section">

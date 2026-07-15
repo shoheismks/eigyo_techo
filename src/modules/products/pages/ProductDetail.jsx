@@ -97,6 +97,7 @@ export default function ProductDetail({
   updateInventory,
   removeInventory,
   setActivePage,
+  onCreateQuote,
   userId = '',
 }) {
   const [form, setForm] = useState(() =>
@@ -454,9 +455,16 @@ export default function ProductDetail({
         <section className="detail-section">
           <div className="section-heading">
             <h2>基本情報</h2>
-            <button type="button" className="text-button" onClick={() => setActivePage('Products')}>
-              一覧へ
-            </button>
+            <div className="mail-action-row">
+              {!isNew && (
+                <button type="button" className="ghost-button" onClick={() => onCreateQuote?.({ productId: form.id })}>
+                  この商品で見積作成
+                </button>
+              )}
+              <button type="button" className="text-button" onClick={() => setActivePage('Products')}>
+                一覧へ
+              </button>
+            </div>
           </div>
 
           <label className="field-label">
