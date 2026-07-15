@@ -107,6 +107,7 @@ export default function QuoteFormModal({
   const [productSearch, setProductSearch] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState('未保存');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -114,6 +115,7 @@ export default function QuoteFormModal({
     setForm(createInitialQuote({ draft, quotes, user }));
     setProductSearch('');
     setPreviewHtml('');
+    setSaveState('未保存');
     setError('');
   }, [draft, open, quotes, user]);
 
@@ -135,10 +137,12 @@ export default function QuoteFormModal({
   if (!open) return null;
 
   function updateField(field, value) {
+    setSaveState('作成中');
     setForm((current) => ({ ...current, [field]: value }));
   }
 
   function updateLine(lineId, field, value) {
+    setSaveState('作成中');
     setForm((current) => {
       const quoteLines = (current.quoteLines?.length ? current.quoteLines : [emptyQuoteLine()]).map((line) => {
         if (line.id !== lineId) return line;
@@ -163,10 +167,12 @@ export default function QuoteFormModal({
   }
 
   function addLine() {
+    setSaveState('作成中');
     setForm((current) => ({ ...current, quoteLines: [...(current.quoteLines ?? []), emptyQuoteLine()] }));
   }
 
   function removeLine(lineId) {
+    setSaveState('作成中');
     setForm((current) => {
       const quoteLines = (current.quoteLines ?? []).filter((line) => line.id !== lineId);
       const nextLines = quoteLines.length ? quoteLines : [emptyQuoteLine()];
@@ -247,6 +253,7 @@ export default function QuoteFormModal({
     }
 
     setSaving(true);
+    setSaveState('保存中');
     setError('');
     try {
       const context = buildContext();
@@ -282,10 +289,12 @@ export default function QuoteFormModal({
       } else {
         await addQuote(payload);
       }
+      setSaveState('保存済');
       onSaved?.(payload);
       onClose?.();
     } catch (err) {
       setError(err.message || '見積の保存に失敗しました。');
+      setSaveState('未保存');
     } finally {
       setSaving(false);
     }
@@ -299,6 +308,7 @@ export default function QuoteFormModal({
             <h2>見積作成</h2>
             <span>{selectedCustomer?.companyName || '顧客未選択'}</span>
           </div>
+          <span className={`info-badge ${saving ? '' : 'ready'}`}>{saving ? '保存中' : saveState}</span>
           <button type="button" className="text-button" onClick={onClose}>閉じる</button>
         </div>
 

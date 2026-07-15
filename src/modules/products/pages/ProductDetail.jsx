@@ -870,6 +870,13 @@ export default function ProductDetail({
                       メモ
                       <textarea value={inventory.memo || ''} onChange={(event) => updateInventory?.(inventory.id, { memo: event.target.value })} />
                     </label>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => onCreateQuote?.({ productId: form.id, inventoryId: inventory.id })}
+                    >
+                      この在庫で見積作成
+                    </button>
                     <button className="ghost-button danger" type="button" onClick={() => removeInventory?.(inventory.id)}>
                       在庫を削除
                     </button>

@@ -227,12 +227,14 @@ function AuthenticatedApp() {
     setActivePage('ProductDetail');
   }
 
-  function buildProductQuoteLine(productId) {
+  function buildProductQuoteLine(productId, inventoryId = '', proposal = {}) {
     const product = products.find((item) => item.id === productId);
+    const inventory = inventories.find((item) => item.id === inventoryId);
     if (!product) return null;
     return {
       id: crypto.randomUUID(),
       productId: product.id,
+      inventoryId: inventory?.id || '',
       productCode: product.productCode || '',
       productName: [product.productCode, product.name].filter(Boolean).join(' / ') || product.name || '',
       description: [product.productCode, product.name].filter(Boolean).join(' / ') || product.name || '',
@@ -241,25 +243,61 @@ function AuthenticatedApp() {
       origin: product.origin || '',
       packageStyle: product.packageStyle || '',
       temperatureZone: product.temperatureZone || '',
-      unit: product.sellingPriceUnit || product.costUnit || 'kg',
-      unitPrice: product.desiredSellingPrice || '',
-      costPrice: product.costPrice || '',
+      expirationText: inventory?.expiryDate || product.shelfLife || '',
+      inventoryCode: inventory?.inventoryCode || inventory?.inventory_code || '',
+      inventoryOwner: inventory?.owner || '',
+      inventoryStockType: inventory?.stockType || '',
+      inventoryLot: inventory?.lot || '',
+      inventoryExpiryDate: inventory?.expiryDate || '',
+      quantity: proposal.monthlyExpectedQuantity || proposal.quantity || '',
+      unit: proposal.unit || product.sellingPriceUnit || product.costUnit || inventory?.unit || 'kg',
+      unitPrice: proposal.expectedSellingPrice || product.desiredSellingPrice || '',
+      costPrice: inventory?.cost || inventory?.costPrice || proposal.expectedCost || product.costPrice || '',
       taxRate: '10',
       snapshotCreatedAt: new Date().toISOString(),
       sourceProductUpdatedAt: product.updatedAt || '',
+      sourceInventoryUpdatedAt: inventory?.updatedAt || '',
     };
   }
 
   function openQuoteForm(initial = {}) {
-    const quoteLines = initial.productId
-      ? [buildProductQuoteLine(initial.productId)].filter(Boolean)
-      : initial.quoteLines;
+    const proposalLines = (initial.productProposals ?? [])
+      .map((proposal) => buildProductQuoteLine(proposal.productId, proposal.inventoryId, proposal))
+      .filter(Boolean);
+    const inventoryLines = (initial.inventoryIds ?? [])
+      .map((inventoryId) => {
+        const inventory = inventories.find((item) => item.id === inventoryId);
+        return inventory ? buildProductQuoteLine(inventory.productId, inventory.id) : null;
+      })
+      .filter(Boolean);
+    const productLines = (initial.productIds ?? [])
+      .map((productId) => buildProductQuoteLine(productId))
+      .filter(Boolean);
+    const quoteLines = initial.quoteLines?.length
+      ? initial.quoteLines
+      : initial.inventoryId
+        ? [buildProductQuoteLine(initial.productId, initial.inventoryId)].filter(Boolean)
+        : initial.productId
+          ? [buildProductQuoteLine(initial.productId)].filter(Boolean)
+          : [...proposalLines, ...inventoryLines, ...productLines];
+    const uniqueQuoteLines = quoteLines.filter((line, index, lines) => {
+      const key = `${line.productId || ''}:${line.inventoryId || ''}`;
+      return lines.findIndex((item) => `${item.productId || ''}:${item.inventoryId || ''}` === key) === index;
+    });
     setQuoteDraft({
       id: crypto.randomUUID(),
       ...initial,
-      quoteLines,
-      productIds: initial.productId ? [initial.productId] : initial.productIds,
-      inventoryIds: initial.inventoryIds ?? [],
+      quoteLines: uniqueQuoteLines,
+      productIds: [...new Set([
+        ...(initial.productId ? [initial.productId] : []),
+        ...(initial.productIds ?? []),
+        ...uniqueQuoteLines.map((line) => line.productId).filter(Boolean),
+      ])],
+      inventoryIds: [...new Set([
+        ...(initial.inventoryId ? [initial.inventoryId] : []),
+        ...(initial.inventoryIds ?? []),
+        ...uniqueQuoteLines.map((line) => line.inventoryId).filter(Boolean),
+      ])],
       contactIds: initial.contactIds ?? [],
     });
   }
@@ -278,7 +316,13 @@ function AuthenticatedApp() {
       deal: 'Pipeline',
       complaint: 'Complaints',
       supplier: 'Suppliers',
+      quote: null,
     };
+
+    if (actionKey === 'quote') {
+      openQuoteForm({});
+      return;
+    }
 
     if (actionKey === 'product') {
       openProductDetail('new');

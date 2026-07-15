@@ -1519,7 +1519,7 @@ export default function CustomerKarte({
           <a className="ghost-button external-button" href={googleSearchUrl(customer.companyName)} target="_blank" rel="noreferrer">Google検索</a>
           {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
           <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
-          <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>＋見積作成</button>
+          <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
           {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
         </div>
       </header>
@@ -1624,6 +1624,18 @@ export default function CustomerKarte({
                   <span className="info-badge">決裁権 {contact.decisionPower || '-'}</span>
                   <span className="info-badge ready">Rank {contact.importanceRank || 'D'}</span>
                   <span className="info-badge">Score {contact.importanceScore ?? 0}</span>
+                </div>
+                <div className="card-actions">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCreateQuote?.({ customerId: customer.id, contactIds: [contact.id] });
+                    }}
+                  >
+                    見積作成
+                  </button>
                 </div>
                 <p className="inline-helper">{contact.memo || '人物メモなし'}</p>
               </article>

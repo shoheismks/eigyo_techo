@@ -651,6 +651,7 @@ export default function ProjectPanel({
       contactIds: project.contactIds ?? [],
       productIds: project.productIds ?? [],
       inventoryIds: project.inventoryIds ?? [],
+      productProposals: project.productProposals ?? [],
     });
   }
 
@@ -683,8 +684,8 @@ export default function ProjectPanel({
             <h3>{editingProject ? '案件編集' : '案件追加'}</h3>
             <div className="mail-action-row">
               {editingProject && (
-                <button type="button" className="ghost-button" onClick={() => createQuoteForProject(editingProject)}>
-                  この案件で見積作成
+                <button type="button" className="primary-button" onClick={() => createQuoteForProject(editingProject)}>
+                  見積作成
                 </button>
               )}
               <button type="button" className="text-button" onClick={() => setFormOpen(false)}>閉じる</button>
@@ -790,6 +791,7 @@ export default function ProjectPanel({
             <p className="inline-helper">次回: {dashboard?.nextAction || '-'} / 予定: {formatDate(dashboard?.nextSchedule) || '-'}</p>
             <p>{project.memo || 'メモなし'}</p>
             <div className="card-actions">
+              <button type="button" className="primary-button" onClick={() => createQuoteForProject(project)}>見積作成</button>
               <button type="button" className="ghost-button" onClick={() => startEdit(project)}>編集</button>
               <button type="button" className="ghost-button" onClick={() => duplicateProject(project)}>複製</button>
               <button type="button" className="ghost-button" onClick={() => finishProject(project)}>終了</button>
