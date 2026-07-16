@@ -550,7 +550,7 @@
 - 目的: 複数の所属会社・事業体を見積発行元として登録し、見積ごとに発行元とPDFテンプレートを切り替える。
 - 画面: `SettingsPage`, `QuoteFormModal`, `CustomerDetail`, `CustomerKarte`, `ProjectPanel`
 - 入力: 会社名、正式社名、ロゴ、住所、電話、メール、登録番号、振込先、担当者、印影、既定税率、既定支払条件、既定納品条件、既定備考、既定PDFテンプレート、有効/無効、既定フラグ。
-- 出力: 見積PDFの発行元表示、見積フォームの既定税率/条件、顧客/案件ごとの既定発行元。
+- 出力: 見積PDFの発行元表示、見積フォームの既定税率/条件、顧客/案件ごとの既定発行元。新規見積の既定税率は8%とし、発行元に個別税率がある場合はその税率を優先する。
 - 保存先: Supabase `issuers`, `quotes.issuer_id`, `quotes.issuer_snapshot`, `quotes.pdf_template`, `customers.default_issuer_id`, `projects.default_issuer_id`
 - 関連データ: `quotes`, `customers`, `projects`, Supabase Storage `app-attachments`
 - 今後の拡張: 発行元別PDFテンプレート詳細、承認フロー、部門別印影、電子署名、適格請求書設定。

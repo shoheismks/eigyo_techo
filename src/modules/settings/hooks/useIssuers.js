@@ -6,6 +6,8 @@ export const PDF_TEMPLATE_OPTIONS = [
   { value: 'executive', label: 'エグゼクティブ' },
 ];
 
+export const DEFAULT_ISSUER_TAX_RATE = '8';
+
 export const emptyIssuer = {
   userId: '',
   name: '',
@@ -22,7 +24,7 @@ export const emptyIssuer = {
   sealUrl: '',
   sealFileName: '',
   sealStoragePath: '',
-  defaultTaxRate: '10',
+  defaultTaxRate: DEFAULT_ISSUER_TAX_RATE,
   defaultPaymentTerms: '',
   defaultDeliveryTerms: '',
   defaultRemarks: '',
@@ -50,7 +52,7 @@ export function normalizeIssuer(issuer = {}, userId = '') {
     sealUrl: issuer.sealUrl ?? issuer.seal_url ?? '',
     sealFileName: issuer.sealFileName ?? issuer.seal_file_name ?? '',
     sealStoragePath: issuer.sealStoragePath ?? issuer.seal_storage_path ?? '',
-    defaultTaxRate: String(issuer.defaultTaxRate ?? issuer.default_tax_rate ?? '10'),
+    defaultTaxRate: String(issuer.defaultTaxRate ?? issuer.default_tax_rate ?? DEFAULT_ISSUER_TAX_RATE),
     defaultPaymentTerms: issuer.defaultPaymentTerms ?? issuer.default_payment_terms ?? '',
     defaultDeliveryTerms: issuer.defaultDeliveryTerms ?? issuer.default_delivery_terms ?? '',
     defaultRemarks: issuer.defaultRemarks ?? issuer.default_remarks ?? '',
@@ -134,7 +136,7 @@ function fromRow(row) {
     sealUrl: row.seal_url,
     sealFileName: row.seal_file_name,
     sealStoragePath: row.seal_storage_path,
-    defaultTaxRate: row.default_tax_rate ?? '10',
+    defaultTaxRate: row.default_tax_rate ?? DEFAULT_ISSUER_TAX_RATE,
     defaultPaymentTerms: row.default_payment_terms,
     defaultDeliveryTerms: row.default_delivery_terms,
     defaultRemarks: row.default_remarks,

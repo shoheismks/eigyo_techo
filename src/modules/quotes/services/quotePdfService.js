@@ -1,4 +1,4 @@
-import { calculateQuoteTotals } from '../hooks/useQuotes.js';
+import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals } from '../hooks/useQuotes.js';
 import { productDisplayName } from '../../products/hooks/useProducts.js';
 
 const A4_WIDTH = 595;
@@ -23,6 +23,17 @@ function money(value, currency = 'JPY') {
   if (value === '' || value === null || value === undefined) return '-';
   const text = numberValue(value).toLocaleString('ja-JP');
   return currency === 'JPY' ? `${text}円` : `${text} ${currency}`;
+}
+
+function taxRateLabel(taxBreakdown = [], defaultTaxRate = DEFAULT_QUOTE_TAX_RATE) {
+  const rates = [...new Set(
+    (Array.isArray(taxBreakdown) ? taxBreakdown : [])
+      .map((item) => item.rate)
+      .filter((rate) => rate !== '' && rate !== null && rate !== undefined)
+      .map((rate) => `${rate}%`),
+  )];
+
+  return rates.length > 0 ? rates.join(' / ') : `${defaultTaxRate}%`;
 }
 
 function truncate(value = '', length = 28) {
@@ -62,7 +73,7 @@ function quoteLinesWithFallback(quote = {}, products = [], inventories = []) {
       unit: quote.unit,
       unitPrice: quote.unitPrice,
       costPrice: quote.costPrice,
-      taxRate: quote.defaultTaxRate ?? quote.taxRate ?? '10',
+      taxRate: quote.defaultTaxRate ?? quote.taxRate ?? DEFAULT_QUOTE_TAX_RATE,
     }];
   }
 
@@ -80,7 +91,7 @@ function quoteLinesWithFallback(quote = {}, products = [], inventories = []) {
       unitPrice: quote.unitPrice,
       costPrice: quote.costPrice || inventory?.cost || inventory?.costPrice,
       expirationText: inventory?.expiryDate || inventory?.expirationDate || '',
-      taxRate: quote.defaultTaxRate ?? quote.taxRate ?? '10',
+      taxRate: quote.defaultTaxRate ?? quote.taxRate ?? DEFAULT_QUOTE_TAX_RATE,
     };
   });
 }
@@ -235,7 +246,7 @@ export function renderQuotePreviewHtml(context) {
                 <div><span>小計</span><span>${escapeHtml(money(financials.subtotal, quote.currency))}</span></div>
                 <div><span>値引</span><span>${escapeHtml(money(quote.discount || 0, quote.currency))}</span></div>
                 <div><span>運賃</span><span>${escapeHtml(money(quote.freight || 0, quote.currency))}</span></div>
-                <div><span>消費税</span><span>${escapeHtml(money(financials.taxAmount, quote.currency))}</span></div>
+                <div><span>消費税 ${escapeHtml(taxRateLabel(financials.taxBreakdown, quote.defaultTaxRate))}</span><span>${escapeHtml(money(financials.taxAmount, quote.currency))}</span></div>
                 <div><strong>合計</strong><strong>${escapeHtml(money(financials.grandTotal, quote.currency))}</strong></div>
               </div>
             </div>
@@ -317,7 +328,7 @@ export function createQuotePdfFile(context) {
         { text: `小計: ${money(financials.subtotal, quote.currency)}`, x: 390, y: totalY, size: 9 },
         { text: `値引: ${money(quote.discount || 0, quote.currency)}`, x: 390, y: totalY - 16, size: 9 },
         { text: `運賃: ${money(quote.freight || 0, quote.currency)}`, x: 390, y: totalY - 32, size: 9 },
-        { text: `消費税: ${money(financials.taxAmount, quote.currency)}`, x: 390, y: totalY - 48, size: 9 },
+        { text: `消費税 ${taxRateLabel(financials.taxBreakdown, quote.defaultTaxRate)}: ${money(financials.taxAmount, quote.currency)}`, x: 390, y: totalY - 48, size: 9 },
         { text: `合計: ${money(financials.grandTotal, quote.currency)}`, x: 390, y: totalY - 66, size: 11 },
         { text: `支払条件: ${quote.paymentTerms || '-'}`, x: 40, y: totalY, size: 9 },
         { text: `配送条件: ${quote.deliveryTerms || '-'}`, x: 40, y: totalY - 16, size: 9 },

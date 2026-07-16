@@ -5,6 +5,7 @@ import {
   QUOTE_STATUSES,
   ROUNDING_MODES,
   TAX_DISPLAY_MODES,
+  DEFAULT_QUOTE_TAX_RATE,
   calculateQuoteTotals,
   emptyQuote,
   emptyQuoteLine,
@@ -42,7 +43,7 @@ function generateQuoteNumber(quotes = []) {
 
 function createInitialQuote({ draft, quotes, user, issuers = [] }) {
   const issuer = issuers.find((item) => item.id === draft?.issuerId) || issuers.find((item) => item.isDefault && item.isActive) || issuers.find((item) => item.isActive);
-  const defaultTaxRate = String(draft?.defaultTaxRate || issuer?.defaultTaxRate || '10');
+  const defaultTaxRate = String(draft?.defaultTaxRate || issuer?.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE);
   return normalizeQuote({
     ...emptyQuote,
     ...draft,
@@ -65,7 +66,7 @@ function createInitialQuote({ draft, quotes, user, issuers = [] }) {
   }, user?.id ?? '');
 }
 
-function buildLineSnapshot(line = {}, product, inventory, defaultTaxRate = '10') {
+function buildLineSnapshot(line = {}, product, inventory, defaultTaxRate = DEFAULT_QUOTE_TAX_RATE) {
   const productName = productDisplayName(product, line.productName || line.description || '');
   return {
     ...line,
@@ -89,7 +90,7 @@ function buildLineSnapshot(line = {}, product, inventory, defaultTaxRate = '10')
     unit: product?.sellingPriceUnit || product?.costUnit || inventory?.unit || line.unit || 'kg',
     unitPrice: line.unitPrice || product?.desiredSellingPrice || '',
     costPrice: inventory?.cost || inventory?.costPrice || line.costPrice || product?.costPrice || '',
-    taxRate: line.taxRate || defaultTaxRate || '10',
+    taxRate: line.taxRate || defaultTaxRate || DEFAULT_QUOTE_TAX_RATE,
     snapshotCreatedAt: line.snapshotCreatedAt || new Date().toISOString(),
     sourceProductUpdatedAt: product?.updatedAt || line.sourceProductUpdatedAt || '',
     sourceInventoryUpdatedAt: inventory?.updatedAt || line.sourceInventoryUpdatedAt || '',
@@ -376,7 +377,7 @@ export default function QuoteFormModal({
                   <label className="field-label">単位<input value={line.unit || ''} onChange={(event) => updateLine(line.id, 'unit', event.target.value)} /></label>
                   <label className="field-label">単価<input inputMode="decimal" value={line.unitPrice || ''} onChange={(event) => updateLine(line.id, 'unitPrice', event.target.value)} /></label>
                   <label className="field-label">原価<input inputMode="decimal" value={line.costPrice || ''} onChange={(event) => updateLine(line.id, 'costPrice', event.target.value)} /></label>
-                  <label className="field-label">税率(%)<input inputMode="decimal" value={line.taxRate || form.defaultTaxRate || '10'} onChange={(event) => updateLine(line.id, 'taxRate', event.target.value)} /></label>
+                  <label className="field-label">税率(%)<input inputMode="decimal" value={line.taxRate || form.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE} onChange={(event) => updateLine(line.id, 'taxRate', event.target.value)} /></label>
                   <label className="field-label">賞味期限<input value={line.expirationText || ''} onChange={(event) => updateLine(line.id, 'expirationText', event.target.value)} /></label>
                 </div>
                 <label className="field-label">明細備考<input value={line.memo || ''} onChange={(event) => updateLine(line.id, 'memo', event.target.value)} /></label>

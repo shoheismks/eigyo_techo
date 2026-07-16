@@ -21,6 +21,8 @@ export const ROUNDING_MODES = [
   { value: 'ceil', label: '切上げ' },
 ];
 
+export const DEFAULT_QUOTE_TAX_RATE = '8';
+
 export function emptyQuoteLine() {
   return {
     id: crypto.randomUUID(),
@@ -94,8 +96,8 @@ export const emptyQuote = {
   commonExpenseAmount: '',
   allocationBasis: 'sales',
   expenseMemo: '',
-  taxRate: '10',
-  defaultTaxRate: '10',
+  taxRate: DEFAULT_QUOTE_TAX_RATE,
+  defaultTaxRate: DEFAULT_QUOTE_TAX_RATE,
   taxDisplayMode: 'tax_excluded',
   roundingMode: 'round',
   subtotal: '',
@@ -135,7 +137,7 @@ function roundAmount(value, mode = 'round') {
   return Math.round(value);
 }
 
-function calculateLine(line = {}, defaultTaxRate = '10', roundingMode = 'round', taxDisplayMode = 'tax_excluded') {
+function calculateLine(line = {}, defaultTaxRate = DEFAULT_QUOTE_TAX_RATE, roundingMode = 'round', taxDisplayMode = 'tax_excluded') {
   const quantity = parsePrice(line.quantity);
   const unitPrice = parsePrice(line.unitPrice);
   const costPrice = parsePrice(line.costPrice);
@@ -193,7 +195,7 @@ function calculateLine(line = {}, defaultTaxRate = '10', roundingMode = 'round',
 }
 
 export function calculateQuoteTotals(quote = {}) {
-  const defaultTaxRate = quote.defaultTaxRate ?? quote.taxRate ?? '10';
+  const defaultTaxRate = quote.defaultTaxRate ?? quote.taxRate ?? DEFAULT_QUOTE_TAX_RATE;
   const roundingMode = quote.roundingMode || 'round';
   const taxDisplayMode = quote.taxDisplayMode || 'tax_excluded';
   const lines = Array.isArray(quote.quoteLines)
@@ -266,7 +268,7 @@ export function calculateQuoteTotals(quote = {}) {
 }
 
 export function normalizeQuote(quote = {}, userId = '') {
-  const defaultTaxRate = quote.defaultTaxRate ?? quote.default_tax_rate ?? quote.taxRate ?? quote.tax_rate ?? '10';
+  const defaultTaxRate = quote.defaultTaxRate ?? quote.default_tax_rate ?? quote.taxRate ?? quote.tax_rate ?? DEFAULT_QUOTE_TAX_RATE;
   const roundingMode = quote.roundingMode ?? quote.rounding_mode ?? 'round';
   const taxDisplayMode = quote.taxDisplayMode ?? quote.tax_display_mode ?? 'tax_excluded';
   const quoteLines = Array.isArray(quote.quoteLines)
@@ -453,8 +455,8 @@ function fromRow(row) {
     commonExpenseAmount: row.common_expense_amount ?? '',
     allocationBasis: row.allocation_basis ?? 'sales',
     expenseMemo: row.expense_memo ?? '',
-    taxRate: row.tax_rate ?? '10',
-    defaultTaxRate: row.default_tax_rate ?? row.tax_rate ?? '10',
+    taxRate: row.tax_rate ?? DEFAULT_QUOTE_TAX_RATE,
+    defaultTaxRate: row.default_tax_rate ?? row.tax_rate ?? DEFAULT_QUOTE_TAX_RATE,
     taxDisplayMode: row.tax_display_mode ?? 'tax_excluded',
     roundingMode: row.rounding_mode ?? 'round',
     subtotal: row.subtotal ?? '',

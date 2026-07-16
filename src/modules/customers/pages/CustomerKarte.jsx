@@ -19,6 +19,7 @@ import {
   QUOTE_STATUSES,
   ROUNDING_MODES,
   TAX_DISPLAY_MODES,
+  DEFAULT_QUOTE_TAX_RATE,
   calculateQuoteTotals,
   emptyQuote,
   emptyQuoteLine,
@@ -377,8 +378,8 @@ function createQuoteForm(customerId = '', user, quotes = []) {
     issueDate: todayString(),
     submittedDate: todayString(),
     validUntil: addDaysString(todayString(), 14),
-    taxRate: '10',
-    defaultTaxRate: '10',
+    taxRate: DEFAULT_QUOTE_TAX_RATE,
+    defaultTaxRate: DEFAULT_QUOTE_TAX_RATE,
     taxDisplayMode: 'tax_excluded',
     roundingMode: 'round',
     quoteLines: [emptyQuoteLine()],
@@ -1007,7 +1008,7 @@ export default function CustomerKarte({
       unit: product?.sellingPriceUnit || product?.costUnit || inventory?.unit || line.unit || 'kg',
       unitPrice: line.unitPrice || product?.desiredSellingPrice || '',
       costPrice: inventory?.cost || inventory?.costPrice || line.costPrice || product?.costPrice || '',
-      taxRate: line.taxRate || quoteForm.defaultTaxRate || quoteForm.taxRate || '10',
+      taxRate: line.taxRate || quoteForm.defaultTaxRate || quoteForm.taxRate || DEFAULT_QUOTE_TAX_RATE,
       snapshotCreatedAt: line.snapshotCreatedAt || new Date().toISOString(),
       sourceProductUpdatedAt: product?.updatedAt || line.sourceProductUpdatedAt || '',
       sourceInventoryUpdatedAt: inventory?.updatedAt || line.sourceInventoryUpdatedAt || '',
@@ -2317,7 +2318,7 @@ export default function CustomerKarte({
                       </label>
                       <label className="field-label">
                         明細税率(%)
-                        <input inputMode="decimal" value={line.taxRate || quoteForm.defaultTaxRate || quoteForm.taxRate || '10'} onChange={(event) => updateQuoteLine(line.id, 'taxRate', event.target.value)} />
+                        <input inputMode="decimal" value={line.taxRate || quoteForm.defaultTaxRate || quoteForm.taxRate || DEFAULT_QUOTE_TAX_RATE} onChange={(event) => updateQuoteLine(line.id, 'taxRate', event.target.value)} />
                       </label>
                       <label className="field-label">
                         賞味期限

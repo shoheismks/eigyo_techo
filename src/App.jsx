@@ -11,7 +11,7 @@ import { useProjects } from './modules/deals/hooks/useProjects.js';
 import { useEvents } from './modules/calendar/hooks/useEvents.js';
 import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
-import { useQuotes } from './modules/quotes/hooks/useQuotes.js';
+import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
 import { useIssuers } from './modules/settings/hooks/useIssuers.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
@@ -260,7 +260,7 @@ function AuthenticatedApp() {
       unit: proposal.unit || product.sellingPriceUnit || product.costUnit || inventory?.unit || 'kg',
       unitPrice: proposal.expectedSellingPrice || product.desiredSellingPrice || '',
       costPrice: inventory?.cost || inventory?.costPrice || proposal.expectedCost || product.costPrice || '',
-      taxRate: '10',
+      taxRate: DEFAULT_QUOTE_TAX_RATE,
       snapshotCreatedAt: new Date().toISOString(),
       sourceProductUpdatedAt: product.updatedAt || '',
       sourceInventoryUpdatedAt: inventory?.updatedAt || '',
@@ -304,8 +304,8 @@ function AuthenticatedApp() {
       ...initial,
       issuerId: initial.issuerId || defaultIssuer?.id || '',
       pdfTemplate: initial.pdfTemplate || defaultIssuer?.defaultPdfTemplate || 'standard',
-      defaultTaxRate: initial.defaultTaxRate || defaultIssuer?.defaultTaxRate || '10',
-      taxRate: initial.taxRate || defaultIssuer?.defaultTaxRate || '10',
+      defaultTaxRate: initial.defaultTaxRate || defaultIssuer?.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE,
+      taxRate: initial.taxRate || defaultIssuer?.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE,
       paymentTerms: initial.paymentTerms || defaultIssuer?.defaultPaymentTerms || '',
       deliveryTerms: initial.deliveryTerms || defaultIssuer?.defaultDeliveryTerms || '',
       remarks: initial.remarks || defaultIssuer?.defaultRemarks || '',

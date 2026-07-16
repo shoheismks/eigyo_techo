@@ -7,7 +7,7 @@ import {
   restoreBackupPayload,
 } from '../services/backupService.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
-import { PDF_TEMPLATE_OPTIONS, emptyIssuer } from '../hooks/useIssuers.js';
+import { DEFAULT_ISSUER_TAX_RATE, PDF_TEMPLATE_OPTIONS, emptyIssuer } from '../hooks/useIssuers.js';
 
 export default function SettingsPage({
   user,
@@ -242,7 +242,7 @@ export default function SettingsPage({
               <div className="lead-badges">
                 {issuer.isDefault && <span className="info-badge ready">既定</span>}
                 <span className="info-badge">{issuer.isActive === false ? '無効' : '有効'}</span>
-                <span className="info-badge">税率 {issuer.defaultTaxRate || '10'}%</span>
+                <span className="info-badge">税率 {issuer.defaultTaxRate || DEFAULT_ISSUER_TAX_RATE}%</span>
               </div>
               <div className="card-actions">
                 <button className="ghost-button" type="button" onClick={() => editIssuer(issuer)}>編集</button>
