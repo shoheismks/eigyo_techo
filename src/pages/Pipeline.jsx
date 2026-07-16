@@ -25,6 +25,7 @@ export default function Pipeline({
   contacts = [],
   products = [],
   inventories = [],
+  issuers = [],
   quotes = [],
   samples = [],
   complaints = [],
@@ -128,6 +129,7 @@ export default function Pipeline({
         contacts={contacts}
         products={products}
         inventories={inventories}
+        issuers={issuers}
         quotes={quotes}
         samples={samples}
         complaints={complaints}

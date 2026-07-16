@@ -13,6 +13,7 @@ import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
 import { useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
+import { useIssuers } from './modules/settings/hooks/useIssuers.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
 import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
 import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
@@ -158,6 +159,12 @@ function AuthenticatedApp() {
     removeRecord: removeQuote,
   } = useQuotes(userId);
   const {
+    records: issuers,
+    addRecord: addIssuer,
+    updateRecord: updateIssuer,
+    removeRecord: removeIssuer,
+  } = useIssuers(userId);
+  const {
     records: projects,
     addRecord: addProject,
     updateRecord: updateProject,
@@ -261,6 +268,14 @@ function AuthenticatedApp() {
   }
 
   function openQuoteForm(initial = {}) {
+    const initialCustomer = customers.find((customer) => customer.id === initial.customerId);
+    const initialProject = projects.find((project) => project.id === initial.projectId);
+    const defaultIssuer =
+      issuers.find((issuer) => issuer.id === initial.issuerId) ||
+      issuers.find((issuer) => issuer.id === initialProject?.defaultIssuerId) ||
+      issuers.find((issuer) => issuer.id === initialCustomer?.defaultIssuerId) ||
+      issuers.find((issuer) => issuer.isDefault && issuer.isActive !== false) ||
+      issuers.find((issuer) => issuer.isActive !== false);
     const proposalLines = (initial.productProposals ?? [])
       .map((proposal) => buildProductQuoteLine(proposal.productId, proposal.inventoryId, proposal))
       .filter(Boolean);
@@ -287,6 +302,13 @@ function AuthenticatedApp() {
     setQuoteDraft({
       id: crypto.randomUUID(),
       ...initial,
+      issuerId: initial.issuerId || defaultIssuer?.id || '',
+      pdfTemplate: initial.pdfTemplate || defaultIssuer?.defaultPdfTemplate || 'standard',
+      defaultTaxRate: initial.defaultTaxRate || defaultIssuer?.defaultTaxRate || '10',
+      taxRate: initial.taxRate || defaultIssuer?.defaultTaxRate || '10',
+      paymentTerms: initial.paymentTerms || defaultIssuer?.defaultPaymentTerms || '',
+      deliveryTerms: initial.deliveryTerms || defaultIssuer?.defaultDeliveryTerms || '',
+      remarks: initial.remarks || defaultIssuer?.defaultRemarks || '',
       quoteLines: uniqueQuoteLines,
       productIds: [...new Set([
         ...(initial.productId ? [initial.productId] : []),
@@ -478,6 +500,10 @@ function AuthenticatedApp() {
             updateSample={updateSample}
             removeSample={removeSample}
             quotes={quotes}
+            issuers={issuers}
+            addIssuer={addIssuer}
+            updateIssuer={updateIssuer}
+            removeIssuer={removeIssuer}
             addQuote={addQuote}
             updateQuote={updateQuote}
             removeQuote={removeQuote}
@@ -524,6 +550,7 @@ function AuthenticatedApp() {
         products={products}
         inventories={inventories}
         suppliers={suppliers}
+        issuers={issuers}
         quotes={quotes}
         addQuote={addQuote}
         updateQuote={updateQuote}
@@ -580,6 +607,10 @@ function ActivePage({
   updateSample,
   removeSample,
   quotes,
+  issuers,
+  addIssuer,
+  updateIssuer,
+  removeIssuer,
   addQuote,
   updateQuote,
   removeQuote,
@@ -674,6 +705,7 @@ function ActivePage({
           samples={samples}
           quotes={quotes}
           suppliers={suppliers}
+          issuers={issuers}
           projects={projects}
           complaints={complaints}
           events={events}
@@ -714,6 +746,7 @@ function ActivePage({
         contacts={contacts}
         projects={projects}
         suppliers={suppliers}
+        issuers={issuers}
         inventories={inventories}
         quotes={quotes}
         samples={samples}
@@ -737,6 +770,7 @@ function ActivePage({
       <Pipeline
         customers={customers}
         suppliers={suppliers}
+        issuers={issuers}
         contacts={contacts}
         products={products}
         inventories={inventories}
@@ -812,6 +846,7 @@ function ActivePage({
         suppliers={suppliers}
         projects={projects}
         customers={customers}
+        issuers={issuers}
         addSupplier={addSupplier}
         updateSupplier={updateSupplier}
         removeSupplier={removeSupplier}
@@ -909,6 +944,10 @@ function ActivePage({
         reloadFromCloud={reloadFromCloud}
         signOut={signOut}
         userId={userId}
+        issuers={issuers}
+        addIssuer={addIssuer}
+        updateIssuer={updateIssuer}
+        removeIssuer={removeIssuer}
         backupDatasets={{
           customers,
           products,
@@ -920,6 +959,7 @@ function ActivePage({
           complaints,
           samples,
           quotes,
+          issuers,
           adoptions,
           attachments,
           events,
@@ -935,6 +975,7 @@ function ActivePage({
           complaints: { records: complaints, add: addComplaint, update: updateComplaint },
           samples: { records: samples, add: addSample, update: updateSample },
           quotes: { records: quotes, add: addQuote, update: updateQuote },
+          issuers: { records: issuers, add: addIssuer, update: updateIssuer },
           adoptions: { records: adoptions, add: addAdoption, update: updateAdoption },
           attachments: { records: attachments, add: addAttachment, update: updateAttachment },
           events: { records: events, add: addEvent, update: updateEvent },

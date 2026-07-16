@@ -503,6 +503,7 @@ export default function CustomerKarte({
   attachments,
   samples = [],
   quotes = [],
+  issuers = [],
   updateCustomer,
   addProject,
   updateProject,
@@ -1574,6 +1575,13 @@ export default function CustomerKarte({
               {PIPELINE_STATUSES.map((status) => <option key={status}>{status}</option>)}
             </select>
           </label>
+          <label className="field-label">
+            既定発行元
+            <select value={customer.defaultIssuerId || ''} onChange={(event) => updateCustomerField('defaultIssuerId', event.target.value)}>
+              <option value="">未設定</option>
+              {issuers.filter((issuer) => issuer.isActive !== false).map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}
+            </select>
+          </label>
         </Section>
 
         <Section title="担当者一覧" count={karte.contacts.length} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddContact}>＋追加</button>}>
@@ -1739,6 +1747,7 @@ export default function CustomerKarte({
           contacts={contacts}
           products={products}
           inventories={inventories}
+          issuers={issuers}
           quotes={quotes}
           samples={samples}
           complaints={complaints}

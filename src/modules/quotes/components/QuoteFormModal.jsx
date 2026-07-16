@@ -10,6 +10,7 @@ import {
   emptyQuoteLine,
   normalizeQuote,
 } from '../hooks/useQuotes.js';
+import { createIssuerSnapshot } from '../../settings/hooks/useIssuers.js';
 import {
   buildQuotePdfContext,
   createQuotePdfFile,
@@ -39,18 +40,25 @@ function generateQuoteNumber(quotes = []) {
   return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
-function createInitialQuote({ draft, quotes, user }) {
+function createInitialQuote({ draft, quotes, user, issuers = [] }) {
+  const issuer = issuers.find((item) => item.id === draft?.issuerId) || issuers.find((item) => item.isDefault && item.isActive) || issuers.find((item) => item.isActive);
+  const defaultTaxRate = String(draft?.defaultTaxRate || issuer?.defaultTaxRate || '10');
   return normalizeQuote({
     ...emptyQuote,
     ...draft,
     quoteNumber: draft?.quoteNumber || generateQuoteNumber(quotes),
-    issueDate: todayString(),
-    submittedDate: todayString(),
-    validUntil: addDaysString(todayString(), 14),
-    taxRate: '10',
-    defaultTaxRate: '10',
+    issuerId: draft?.issuerId || issuer?.id || '',
+    pdfTemplate: draft?.pdfTemplate || issuer?.defaultPdfTemplate || 'standard',
+    issueDate: draft?.issueDate || todayString(),
+    submittedDate: draft?.submittedDate || todayString(),
+    validUntil: draft?.validUntil || addDaysString(todayString(), 14),
+    taxRate: defaultTaxRate,
+    defaultTaxRate,
     taxDisplayMode: 'tax_excluded',
     roundingMode: 'round',
+    paymentTerms: draft?.paymentTerms || issuer?.defaultPaymentTerms || '',
+    deliveryTerms: draft?.deliveryTerms || issuer?.defaultDeliveryTerms || '',
+    remarks: draft?.remarks || issuer?.defaultRemarks || '',
     quoteLines: draft?.quoteLines?.length ? draft.quoteLines : [emptyQuoteLine()],
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
@@ -96,6 +104,7 @@ export default function QuoteFormModal({
   products = [],
   inventories = [],
   suppliers = [],
+  issuers = [],
   quotes = [],
   addQuote,
   updateQuote,
@@ -103,7 +112,7 @@ export default function QuoteFormModal({
   onClose,
   onSaved,
 }) {
-  const [form, setForm] = useState(() => createInitialQuote({ draft, quotes, user }));
+  const [form, setForm] = useState(() => createInitialQuote({ draft, quotes, user, issuers }));
   const [productSearch, setProductSearch] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [saving, setSaving] = useState(false);
@@ -112,14 +121,16 @@ export default function QuoteFormModal({
 
   useEffect(() => {
     if (!open) return;
-    setForm(createInitialQuote({ draft, quotes, user }));
+    setForm(createInitialQuote({ draft, quotes, user, issuers }));
     setProductSearch('');
     setPreviewHtml('');
     setSaveState('未保存');
     setError('');
-  }, [draft, open, quotes, user]);
+  }, [draft, open, quotes, user, issuers]);
 
   const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
+  const activeIssuers = issuers.filter((issuer) => issuer.isActive !== false);
+  const selectedIssuer = issuers.find((issuer) => issuer.id === form.issuerId) || activeIssuers[0];
   const visibleContacts = contacts.filter((contact) => !form.customerId || contact.customerId === form.customerId);
   const productOptions = useMemo(() => {
     const keyword = productSearch.trim().toLowerCase();
@@ -138,6 +149,20 @@ export default function QuoteFormModal({
 
   function updateField(field, value) {
     setSaveState('作成中');
+    if (field === 'issuerId') {
+      const issuer = issuers.find((item) => item.id === value);
+      setForm((current) => ({
+        ...current,
+        issuerId: value,
+        pdfTemplate: issuer?.defaultPdfTemplate || current.pdfTemplate || 'standard',
+        defaultTaxRate: issuer?.defaultTaxRate || current.defaultTaxRate,
+        taxRate: issuer?.defaultTaxRate || current.taxRate,
+        paymentTerms: current.paymentTerms || issuer?.defaultPaymentTerms || '',
+        deliveryTerms: current.deliveryTerms || issuer?.defaultDeliveryTerms || '',
+        remarks: current.remarks || issuer?.defaultRemarks || '',
+      }));
+      return;
+    }
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -187,9 +212,10 @@ export default function QuoteFormModal({
       return buildLineSnapshot(line, product, inventory, form.defaultTaxRate);
     });
     const financials = calculateQuoteTotals({ ...form, quoteLines });
-    const quote = normalizeQuote({
-      ...form,
-      quoteLines,
+      const quote = normalizeQuote({
+        ...form,
+        issuerSnapshot: form.issuerSnapshot || createIssuerSnapshot(selectedIssuer),
+        quoteLines,
       productIds: [...new Set(quoteLines.map((line) => line.productId).filter(Boolean))],
       inventoryIds: [...new Set(quoteLines.map((line) => line.inventoryId).filter(Boolean))],
       subtotal: financials.subtotal,
@@ -213,6 +239,7 @@ export default function QuoteFormModal({
       products,
       inventories,
       suppliers,
+      issuer: selectedIssuer,
       financials,
     });
   }
@@ -315,6 +342,8 @@ export default function QuoteFormModal({
         <div className="date-grid">
           <label className="field-label">顧客<select value={form.customerId} onChange={(event) => updateField('customerId', event.target.value)}><option value="">選択してください</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.companyName}</option>)}</select></label>
           <label className="field-label">担当者<select value={form.contactIds?.[0] || ''} onChange={(event) => updateField('contactIds', event.target.value ? [event.target.value] : [])}><option value="">未選択</option>{visibleContacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name}</option>)}</select></label>
+          <label className="field-label">発行元<select value={form.issuerId || ''} onChange={(event) => updateField('issuerId', event.target.value)}><option value="">未選択</option>{activeIssuers.map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}</select></label>
+          <label className="field-label">PDFテンプレート<select value={form.pdfTemplate || 'standard'} onChange={(event) => updateField('pdfTemplate', event.target.value)}><option value="standard">標準</option><option value="compact">コンパクト</option><option value="executive">エグゼクティブ</option></select></label>
           <label className="field-label">見積番号<input value={form.quoteNumber} onChange={(event) => updateField('quoteNumber', event.target.value)} /></label>
           <label className="field-label">案件<input value={form.projectName} onChange={(event) => updateField('projectName', event.target.value)} /></label>
           <label className="field-label">ステータス<select value={form.status} onChange={(event) => updateField('status', event.target.value)}>{QUOTE_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>

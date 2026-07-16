@@ -544,3 +544,13 @@
 - 保存先: Supabase `customers.customer_code`, `suppliers.supplier_code`, `projects.project_code`, `products.product_code`, `inventories.inventory_code`, `quotes.quote_number`。
 - 関連データ: 内部関連付けは既存IDを維持し、コードは表示・検索・帳票・現物識別用に限定する。
 - 今後の拡張: バーコード、QR、CSVインポート/エクスポート、ERP/WMS連携、取引先別コード変換。
+## 追加: 見積発行元マスター
+
+- ステータス: 開発中
+- 目的: 複数の所属会社・事業体を見積発行元として登録し、見積ごとに発行元とPDFテンプレートを切り替える。
+- 画面: `SettingsPage`, `QuoteFormModal`, `CustomerDetail`, `CustomerKarte`, `ProjectPanel`
+- 入力: 会社名、正式社名、ロゴ、住所、電話、メール、登録番号、振込先、担当者、印影、既定税率、既定支払条件、既定納品条件、既定備考、既定PDFテンプレート、有効/無効、既定フラグ。
+- 出力: 見積PDFの発行元表示、見積フォームの既定税率/条件、顧客/案件ごとの既定発行元。
+- 保存先: Supabase `issuers`, `quotes.issuer_id`, `quotes.issuer_snapshot`, `quotes.pdf_template`, `customers.default_issuer_id`, `projects.default_issuer_id`
+- 関連データ: `quotes`, `customers`, `projects`, Supabase Storage `app-attachments`
+- 今後の拡張: 発行元別PDFテンプレート詳細、承認フロー、部門別印影、電子署名、適格請求書設定。

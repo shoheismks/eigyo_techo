@@ -243,6 +243,7 @@ function buildProjectTimeline({
   contacts = [],
   products = [],
   inventories = [],
+  issuers = [],
   quotes = [],
   samples = [],
   complaints = [],
@@ -444,6 +445,7 @@ export default function ProjectPanel({
   contacts = [],
   products = [],
   inventories = [],
+  issuers = [],
   quotes = [],
   samples = [],
   complaints = [],
@@ -645,8 +647,10 @@ export default function ProjectPanel({
 
   function createQuoteForProject(project) {
     onCreateQuote?.({
+      projectId: project.id,
       customerId: project.customerId || '',
       supplierId: project.supplierId || '',
+      issuerId: project.defaultIssuerId || '',
       projectName: project.title || '',
       contactIds: project.contactIds ?? [],
       productIds: project.productIds ?? [],
@@ -697,6 +701,7 @@ export default function ProjectPanel({
             <label className="field-label project-editor-wide">件名 <span className="required-mark">必須</span><input value={form.title} onChange={(event) => updateForm('title', event.target.value)} /></label>
             <label className="field-label">取引先<select value={form.customerId} onChange={(event) => updateForm('customerId', event.target.value)}><option value="">未選択</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.companyName}</option>)}</select></label>
             <label className="field-label">仕入先<select value={form.supplierId} onChange={(event) => updateForm('supplierId', event.target.value)}><option value="">未選択</option>{suppliers.map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name}</option>)}</select></label>
+            <label className="field-label">既定発行元<select value={form.defaultIssuerId || ''} onChange={(event) => updateForm('defaultIssuerId', event.target.value)}><option value="">未設定</option>{issuers.filter((issuer) => issuer.isActive !== false).map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}</select></label>
             <label className="field-label">種別<select value={form.type} onChange={(event) => updateForm('type', event.target.value)}>{PROJECT_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
             <label className="field-label">ステータス<select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>{PROJECT_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label className="field-label">優先度<select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>{PROJECT_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}</select></label>

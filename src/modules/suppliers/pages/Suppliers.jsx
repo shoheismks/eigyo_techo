@@ -40,6 +40,7 @@ export default function Suppliers({
   contacts = [],
   products = [],
   inventories = [],
+  issuers = [],
   quotes = [],
   samples = [],
   complaints = [],
@@ -254,6 +255,7 @@ export default function Suppliers({
         contacts={contacts}
         products={products}
         inventories={inventories}
+        issuers={issuers}
         quotes={quotes}
         samples={samples}
         complaints={complaints}

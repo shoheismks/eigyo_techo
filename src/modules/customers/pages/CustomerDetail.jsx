@@ -112,6 +112,7 @@ export default function CustomerDetail({
   products,
   projects = [],
   suppliers = [],
+  issuers = [],
   contacts = [],
   inventories = [],
   quotes = [],
@@ -276,6 +277,13 @@ export default function CustomerDetail({
           <input value={customer.area} onChange={(event) => updateField('area', event.target.value)} />
         </label>
         <label className="field-label">
+          既定発行元
+          <select value={customer.defaultIssuerId || ''} onChange={(event) => updateField('defaultIssuerId', event.target.value)}>
+            <option value="">未設定</option>
+            {issuers.filter((issuer) => issuer.isActive !== false).map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
           住所
           <input value={customer.address} onChange={(event) => updateField('address', event.target.value)} />
         </label>
@@ -369,6 +377,7 @@ export default function CustomerDetail({
         contacts={contacts}
         products={products}
         inventories={inventories}
+        issuers={issuers}
         quotes={quotes}
         samples={samples}
         complaints={complaints}

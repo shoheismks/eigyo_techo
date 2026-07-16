@@ -92,6 +92,7 @@ export function buildQuotePdfContext({
   products = [],
   inventories = [],
   suppliers = [],
+  issuer,
   financials,
 }) {
   const selectedContacts = contacts.filter((contact) => (quote.contactIds ?? []).includes(contact.id));
@@ -108,6 +109,7 @@ export function buildQuotePdfContext({
     inventories,
     selectedInventories,
     supplier,
+    issuer: quote.issuerSnapshot || issuer || null,
     financials: totals,
     generatedAt: new Date().toISOString(),
   };
@@ -144,12 +146,15 @@ function renderLineCells(line, index, quote, products) {
 }
 
 export function renderQuotePreviewHtml(context) {
-  const { quote, customer, contacts, products, supplier, financials, generatedAt } = context;
+  const { quote, customer, contacts, products, supplier, issuer, financials, generatedAt } = context;
   const contactNames = contacts.map((contact) => contact.name).filter(Boolean).join(', ') || '-';
   const lines = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(lines);
   const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
   const finalPageIndex = pages.length - 1;
+  const issuerName = issuer?.legalName || issuer?.name || '営業手帳';
+  const issuerAddress = issuer?.address || '食品営業CRM';
+  const issuerContact = [issuer?.phone, issuer?.email].filter(Boolean).join(' / ') || 'sample@example.com';
 
   return `
     <article class="quote-preview-document quote-a4-preview">
@@ -176,8 +181,9 @@ export function renderQuotePreviewHtml(context) {
         <section class="quote-page">
           <div class="quote-header">
             <div>
-              <div class="quote-logo">営</div>
-              <p><strong>営業手帳</strong><br>食品営業CRM<br>sample@example.com</p>
+              ${issuer?.logoUrl ? `<img class="quote-logo" src="${escapeHtml(issuer.logoUrl)}" alt="">` : `<div class="quote-logo">${escapeHtml(issuerName.slice(0, 1))}</div>`}
+              <p><strong>${escapeHtml(issuerName)}</strong><br>${escapeHtml(issuerAddress)}<br>${escapeHtml(issuerContact)}</p>
+              ${issuer?.registrationNumber ? `<p>登録番号: ${escapeHtml(issuer.registrationNumber)}</p>` : ''}
             </div>
             <div>
               <div>見積番号: ${escapeHtml(quote.quoteNumber || '-')}</div>
@@ -193,6 +199,7 @@ export function renderQuotePreviewHtml(context) {
               <div><strong>御担当者:</strong> ${escapeHtml(contactNames)}</div>
               <div><strong>件名:</strong> ${escapeHtml(quote.projectName || '-')}</div>
               <div><strong>仕入先:</strong> ${escapeHtml(supplier?.name || supplier?.companyName || '-')}</div>
+              <div><strong>発行元担当:</strong> ${escapeHtml(issuer?.contactPerson || '-')}</div>
             </div>
           ` : `<h2 class="quote-title">御見積書 続き</h2>`}
           <table class="quote-table">
@@ -222,6 +229,7 @@ export function renderQuotePreviewHtml(context) {
                 <div><strong>配送条件:</strong> ${escapeHtml(quote.deliveryTerms || '-')}</div>
                 <div><strong>納期:</strong> ${escapeHtml(quote.deliveryDate || '-')}</div>
                 <div><strong>備考:</strong><br>${escapeHtml(quote.remarks || quote.memo || '-').replace(/\n/g, '<br>')}</div>
+                ${issuer?.bankAccount ? `<div><strong>振込先:</strong> ${escapeHtml(issuer.bankAccount)}</div>` : ''}
               </div>
               <div class="quote-total">
                 <div><span>小計</span><span>${escapeHtml(money(financials.subtotal, quote.currency))}</span></div>
@@ -240,16 +248,21 @@ export function renderQuotePreviewHtml(context) {
 }
 
 export function createQuotePdfFile(context) {
-  const { quote, customer, contacts, products, supplier, financials, generatedAt } = context;
+  const { quote, customer, contacts, products, supplier, issuer, financials, generatedAt } = context;
   const rows = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(rows);
   const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
   const contactNames = contacts.map((contact) => contact.name).filter(Boolean).join(', ') || '-';
+  const issuerName = issuer?.legalName || issuer?.name || '営業手帳';
+  const issuerAddress = issuer?.address || '食品営業CRM';
+  const issuerContact = [issuer?.phone, issuer?.email].filter(Boolean).join(' / ');
   const pdfPages = pages.map((pageRows, pageIndex) => {
     const isLast = pageIndex === pages.length - 1;
     const lines = [
       { text: '御見積書', x: 260, y: 800, size: 16 },
-      { text: `営業手帳 食品営業CRM`, x: 40, y: 805, size: 9 },
+      { text: issuerName, x: 40, y: 805, size: 9 },
+      { text: issuerAddress, x: 40, y: 790, size: 8 },
+      { text: issuerContact, x: 40, y: 777, size: 8 },
       { text: `見積番号: ${quote.quoteNumber || '-'}`, x: 400, y: 805, size: 9 },
       { text: `作成日: ${issueDate}`, x: 400, y: 790, size: 9 },
       { text: `有効期限: ${quote.validUntil || '-'}`, x: 400, y: 775, size: 9 },
@@ -262,6 +275,7 @@ export function createQuotePdfFile(context) {
         { text: `御担当者: ${contactNames}`, x: 40, y: 745, size: 9 },
         { text: `件名: ${quote.projectName || '-'}`, x: 40, y: 730, size: 9 },
         { text: `仕入先: ${supplier?.name || supplier?.companyName || '-'}`, x: 40, y: 715, size: 9 },
+        { text: `発行元担当: ${issuer?.contactPerson || '-'}`, x: 360, y: 715, size: 9 },
       );
     } else {
       lines.push({ text: '御見積書 続き', x: 40, y: 745, size: 10 });
@@ -309,6 +323,7 @@ export function createQuotePdfFile(context) {
         { text: `配送条件: ${quote.deliveryTerms || '-'}`, x: 40, y: totalY - 16, size: 9 },
         { text: `納期: ${quote.deliveryDate || '-'}`, x: 40, y: totalY - 32, size: 9 },
         { text: `備考: ${truncate(quote.remarks || quote.memo || '-', 46)}`, x: 40, y: totalY - 48, size: 9 },
+        { text: `振込先: ${truncate(issuer?.bankAccount || '-', 46)}`, x: 40, y: totalY - 64, size: 9 },
       );
     }
 

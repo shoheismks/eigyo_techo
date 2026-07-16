@@ -12,6 +12,7 @@ const DATASET_KEYS = [
   'complaints',
   'samples',
   'quotes',
+  'issuers',
   'adoptions',
   'attachments',
 ];
