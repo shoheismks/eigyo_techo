@@ -51,7 +51,7 @@ export async function uploadAttachment({ file, userId, ownerType, ownerId, field
   const uploadFile = await compressImageFile(file);
   const extension = getExtension(file.name);
   const safeField = field || 'attachment';
-  const path = `${userId}/${ownerType}/${ownerId}/${safeField}-${crypto.randomUUID()}${extension}`;
+  const path = buildStoragePath({ userId, ownerType, ownerId, field: safeField, extension });
 
   const { error } = await supabase.storage
     .from(ATTACHMENT_BUCKET)
@@ -84,6 +84,18 @@ export async function uploadAttachment({ file, userId, ownerType, ownerId, field
 function getExtension(fileName = '') {
   const index = fileName.lastIndexOf('.');
   return index >= 0 ? fileName.slice(index) : '';
+}
+
+function buildStoragePath({ userId, ownerType, ownerId, field, extension }) {
+  if (ownerType === 'issuer' && field === 'logo') {
+    return `${userId}/issuers/${ownerId}/logos/${crypto.randomUUID()}${extension}`;
+  }
+
+  if (ownerType === 'issuer' && field === 'seal') {
+    return `${userId}/issuers/${ownerId}/seals/${crypto.randomUUID()}${extension}`;
+  }
+
+  return `${userId}/${ownerType}/${ownerId}/${field}-${crypto.randomUUID()}${extension}`;
 }
 
 function isOnline() {
