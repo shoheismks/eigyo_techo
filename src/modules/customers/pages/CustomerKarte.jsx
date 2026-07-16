@@ -51,6 +51,17 @@ import {
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 
+const KARTE_TABS = [
+  { id: 'overview', label: '概要' },
+  { id: 'projects', label: '案件' },
+  { id: 'quotes', label: '見積' },
+  { id: 'sales', label: '販売実績' },
+  { id: 'products', label: '商品' },
+  { id: 'samples', label: 'サンプル' },
+  { id: 'calendar', label: 'カレンダー' },
+  { id: 'activity', label: '活動履歴' },
+];
+
 const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
 const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];
 
@@ -560,6 +571,7 @@ export default function CustomerKarte({
   const [replyTarget, setReplyTarget] = useState(null);
   const [replyForm, setReplyForm] = useState(emptyReplyForm);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [karteTab, setKarteTab] = useState('overview');
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
@@ -689,6 +701,54 @@ export default function CustomerKarte({
     karte.complaints.length > 0 || karte.dealHistories.some((history) => history.hasComplaint);
   const canCreateMail = !customer.isDoNotContact;
   const nextFollowDate = customer.nextFollowUpDate || customer.nextFollowDate;
+  const customerProjects = projects.filter((project) => project.customerId === customer.id);
+  const activeProjects = customerProjects.filter(
+    (project) => !['終了', '失注', '定番化'].includes(project.status),
+  );
+  const quoteTotals = karte.estimates.reduce(
+    (sum, quote) => {
+      const totals = quoteTotalsForSummary(quote);
+      return {
+        sales: sum.sales + totals.sales,
+        gross: sum.gross + totals.gross,
+        operating: sum.operating + totals.operating,
+        real: sum.real + totals.real,
+      };
+    },
+    { sales: 0, gross: 0, operating: 0, real: 0 },
+  );
+  const pendingQuotes = karte.estimates.filter((quote) => !['採用', '失注', '期限切れ'].includes(quote.status));
+  const upcomingEvents = [...karte.events]
+    .filter((event) => event.startAt || event.nextFollowDate)
+    .sort((a, b) => String(a.startAt || a.nextFollowDate).localeCompare(String(b.startAt || b.nextFollowDate)))
+    .slice(0, 5);
+  const urgentTasks = [
+    nextFollowDate && {
+      id: 'follow',
+      date: nextFollowDate,
+      title: '次回フォロー',
+      detail: customer.pipelineMemo || customer.memo || 'フォロー内容を確認',
+    },
+    ...activeProjects.slice(0, 3).map((project) => ({
+      id: project.id,
+      date: project.nextActionDate || project.expectedCloseDate || project.updatedAt,
+      title: project.title || '案件',
+      detail: project.nextAction || project.status || '-',
+    })),
+    ...karte.samples.filter((sample) => sample.followUpDate).slice(0, 3).map((sample) => ({
+      id: sample.id,
+      date: sample.followUpDate,
+      title: sample.sampleName || 'サンプル',
+      detail: sample.nextAction || sample.status || '-',
+    })),
+  ].filter(Boolean).sort((a, b) => String(a.date || '9999-12-31').localeCompare(String(b.date || '9999-12-31')));
+  const kpiItems = [
+    { label: '進行中案件', value: `${activeProjects.length}件`, tone: activeProjects.length > 0 ? 'ready' : '' },
+    { label: '見積金額', value: `${formatPrice(quoteTotals.sales) || '0'}円`, tone: pendingQuotes.length > 0 ? 'active' : '' },
+    { label: '粗利', value: `${formatPrice(quoteTotals.gross) || '0'}円`, tone: 'ready' },
+    { label: '実質利益', value: `${formatPrice(quoteTotals.real) || '0'}円`, tone: quoteTotals.real < 0 ? 'failed' : 'ready' },
+    { label: '次回予定', value: urgentTasks[0]?.date ? formatDate(urgentTasks[0].date) : '-', tone: dueClass(urgentTasks[0]?.date) },
+  ];
 
   function updateCustomerField(field, value) {
     updateCustomer(customer.id, { [field]: value });
@@ -1501,7 +1561,7 @@ export default function CustomerKarte({
   }
 
   return (
-    <main className="page karte-page">
+    <main className={`page karte-page karte-tab-${karteTab}`}>
       <header className={`karte-header ${isHighRank ? 'high-rank' : ''} ${hasComplaints ? 'has-complaint' : ''}`}>
         <div>
           <button className="text-button" type="button" onClick={() => setActivePage('Customers')}>
@@ -1521,7 +1581,8 @@ export default function CustomerKarte({
           <a className="ghost-button external-button" href={googleSearchUrl(customer.companyName)} target="_blank" rel="noreferrer">Google検索</a>
           {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
           <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
-          <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
+          <button className="primary-button karte-main-action" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
+          <button className="primary-button karte-main-action" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
           {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
         </div>
       </header>
@@ -1535,7 +1596,66 @@ export default function CustomerKarte({
         />
       )}
 
-      <div className="karte-grid">
+      <section className="karte-kpi-strip" aria-label="顧客カルテKPI">
+        {kpiItems.map((item) => (
+          <div className={`karte-kpi-card ${item.tone || ''}`} key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
+      </section>
+
+      <div className="karte-workspace">
+        <div className="karte-main-pane">
+          <nav className="karte-tabs" aria-label="顧客カルテタブ">
+            {KARTE_TABS.map((tab) => (
+              <button
+                className={karteTab === tab.id ? 'selected' : ''}
+                type="button"
+                key={tab.id}
+                onClick={() => setKarteTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          <section className="karte-sales-dashboard" aria-label="販売実績">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Sales Performance</p>
+                <h2>販売実績</h2>
+              </div>
+              <span className="info-badge ready">{printSummary?.year || new Date().getFullYear()}年度</span>
+            </div>
+            <div className="karte-sales-grid">
+              <article className="karte-mini-card">
+                <h3>月別売上推移</h3>
+                <div className="karte-bar-chart">
+                  {(printSummary?.monthlySales ?? []).map((month) => (
+                    <div className="karte-bar-item" key={month.label}>
+                      <span style={{ height: `${month.rate || 4}%` }} />
+                      <small>{month.label}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+              <article className="karte-mini-card">
+                <h3>商品別TOP5</h3>
+                <div className="karte-ranking-list">
+                  {(printSummary?.products ?? []).length > 0 ? printSummary.products.map((product, index) => (
+                    <div className="karte-ranking-row" key={product.name}>
+                      <strong>{index + 1}. {product.name}</strong>
+                      <span>{formatPrice(product.sales) || '0'}円</span>
+                      <small>粗利 {formatPrice(product.gross) || '0'}円 / 実質 {formatPrice(product.real) || '0'}円</small>
+                    </div>
+                  )) : <p className="inline-helper">販売実績はまだありません。</p>}
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <div className="karte-grid">
         <Section title="会社基本情報">
           <div className="karte-field-grid">
             <Field label="顧客コード" value={customer.customerCode} />
@@ -2754,6 +2874,63 @@ export default function CustomerKarte({
             </div>
           )}
         </Section>
+          </div>
+        </div>
+
+        <aside className="karte-side-panel" aria-label="次回予定とTODO">
+          <div className="karte-side-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Next Action</p>
+                <h2>次回予定・TODO</h2>
+              </div>
+              <span className={`info-badge ${dueClass(urgentTasks[0]?.date)}`}>{urgentTasks[0]?.date ? formatDate(urgentTasks[0].date) : '-'}</span>
+            </div>
+            <div className="karte-task-list">
+              {urgentTasks.length > 0 ? urgentTasks.slice(0, 6).map((task) => (
+                <button className="karte-task-item" type="button" key={task.id} onClick={() => setKarteTab(task.title === 'サンプル' ? 'samples' : 'projects')}>
+                  <span>{formatDate(task.date)}</span>
+                  <strong>{task.title}</strong>
+                  <small>{task.detail}</small>
+                </button>
+              )) : <p className="inline-helper">直近のTODOはありません。</p>}
+            </div>
+          </div>
+
+          <div className="karte-side-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Calendar</p>
+                <h2>近日予定</h2>
+              </div>
+              <button className="ghost-button compact-action-button" type="button" onClick={() => setKarteTab('calendar')}>開く</button>
+            </div>
+            <div className="karte-task-list">
+              {upcomingEvents.length > 0 ? upcomingEvents.map((event) => (
+                <button className="karte-task-item" type="button" key={event.id} onClick={() => setKarteTab('calendar')}>
+                  <span>{formatDate(event.startAt || event.nextFollowDate)}</span>
+                  <strong>{event.title || event.eventType || '予定'}</strong>
+                  <small>{event.location || event.status || '-'}</small>
+                </button>
+              )) : <p className="inline-helper">近日予定はありません。</p>}
+            </div>
+          </div>
+
+          <div className="karte-side-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Quick Action</p>
+                <h2>よく使う操作</h2>
+              </div>
+            </div>
+            <div className="karte-side-actions">
+              <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
+              <button className="primary-button" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
+              <button className="ghost-button" type="button" onClick={startAddContact}>担当者追加</button>
+              <button className="ghost-button" type="button" onClick={startAddSample}>サンプル追加</button>
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   );

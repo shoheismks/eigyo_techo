@@ -1,0 +1,252 @@
+.karte-workspace {
+  display: grid;
+  gap: 14px;
+}
+
+.karte-main-pane {
+  min-width: 0;
+}
+
+.karte-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.karte-kpi-card {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 26, 43, 0.94), rgba(10, 15, 26, 0.94));
+  padding: 12px;
+}
+
+.karte-kpi-card span,
+.karte-task-item span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.karte-kpi-card strong {
+  color: var(--white);
+  font-size: 1.28rem;
+  line-height: 1.1;
+}
+
+.karte-kpi-card.ready {
+  border-color: rgba(94, 226, 160, 0.42);
+}
+
+.karte-kpi-card.active {
+  border-color: rgba(102, 163, 255, 0.52);
+}
+
+.karte-kpi-card.failed {
+  border-color: rgba(255, 107, 123, 0.58);
+}
+
+.karte-main-action {
+  box-shadow: 0 0 0 1px rgba(102, 163, 255, 0.25), 0 12px 30px rgba(40, 120, 255, 0.22);
+}
+
+.karte-tabs {
+  position: sticky;
+  top: 102px;
+  z-index: 7;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(7, 11, 19, 0.94);
+  padding: 8px;
+  backdrop-filter: blur(14px);
+}
+
+.karte-tabs button {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 12px;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.karte-tabs button.selected {
+  border-color: rgba(102, 163, 255, 0.62);
+  background: rgba(40, 120, 255, 0.22);
+  color: var(--white);
+}
+
+.karte-page .karte-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.karte-page .karte-grid > * {
+  display: none;
+  grid-column: auto !important;
+}
+
+.karte-page.karte-tab-overview .karte-grid > :nth-child(1),
+.karte-page.karte-tab-overview .karte-grid > :nth-child(2),
+.karte-page.karte-tab-overview .karte-grid > :nth-child(3),
+.karte-page.karte-tab-overview .karte-grid > :nth-child(15),
+.karte-page.karte-tab-overview .karte-grid > :nth-child(16),
+.karte-page.karte-tab-projects .karte-grid > :nth-child(5),
+.karte-page.karte-tab-projects .karte-grid > :nth-child(6),
+.karte-page.karte-tab-projects .karte-grid > :nth-child(7),
+.karte-page.karte-tab-quotes .karte-grid > :nth-child(11),
+.karte-page.karte-tab-products .karte-grid > :nth-child(8),
+.karte-page.karte-tab-products .karte-grid > :nth-child(9),
+.karte-page.karte-tab-products .karte-grid > :nth-child(10),
+.karte-page.karte-tab-samples .karte-grid > :nth-child(12),
+.karte-page.karte-tab-calendar .karte-grid > :nth-child(14),
+.karte-page.karte-tab-calendar .karte-grid > :nth-child(15),
+.karte-page.karte-tab-activity .karte-grid > :nth-child(4),
+.karte-page.karte-tab-activity .karte-grid > :nth-child(6),
+.karte-page.karte-tab-activity .karte-grid > :nth-child(7),
+.karte-page.karte-tab-activity .karte-grid > :nth-child(13),
+.karte-page.karte-tab-activity .karte-grid > :nth-child(16) {
+  display: block;
+}
+
+.karte-sales-dashboard {
+  display: none;
+  margin-top: 12px;
+}
+
+.karte-page.karte-tab-sales .karte-sales-dashboard {
+  display: grid;
+  gap: 12px;
+}
+
+.karte-sales-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.karte-bar-chart {
+  min-height: 180px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(18px, 1fr));
+  align-items: end;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 12px;
+}
+
+.karte-bar-item {
+  min-height: 150px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  align-items: end;
+  text-align: center;
+}
+
+.karte-bar-item span {
+  width: 100%;
+  min-height: 6px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--blue), rgba(102, 163, 255, 0.34));
+}
+
+.karte-bar-item small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.karte-ranking-list,
+.karte-task-list,
+.karte-side-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.karte-ranking-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.karte-ranking-row small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.karte-side-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.karte-side-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17, 26, 43, 0.96), rgba(10, 15, 26, 0.96));
+  padding: 12px;
+}
+
+.karte-task-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 10px;
+  text-align: left;
+}
+
+.karte-task-item strong {
+  color: var(--white);
+}
+
+.karte-task-item small {
+  color: var(--muted);
+}
+
+@media (min-width: 768px) {
+  .karte-workspace {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+
+  .karte-side-panel {
+    position: sticky;
+    top: 110px;
+  }
+
+  .karte-sales-grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .karte-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .karte-tabs {
+    top: 108px;
+    margin-inline: -4px;
+  }
+
+  .karte-side-panel {
+    order: 2;
+  }
+}
