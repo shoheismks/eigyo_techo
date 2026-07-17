@@ -231,6 +231,16 @@
 | 発行元別 約款テンプレート | 開発中 | 設定画面で編集可能 |
 | 見積/成約確認書 約款snapshot | 開発中 | 過去文書を固定保存 |
 | PDF 約款掲載 | 開発中 | 顧客向けPDF末尾に掲載 |
+
+## 追加: 見積書 / 成約確認書 分離
+
+| 項目 | 状態 | メモ |
+| --- | --- | --- |
+| 見積書PDFの約款全文非表示 | 完了 | 見積書には重要条件要約のみ表示 |
+| 成約確認書PDFの約款全文表示 | 完了 | `terms_snapshot` と `visible_terms` を使用 |
+| PDF URL分離 | 完了 | 見積書 `pdf_url`、成約確認書 `confirmation_pdf_url` |
+| 発行元別の見積書末尾文言 | 完了 | `issuers.default_quote_terms_summary` |
+| 成約確認書専用画面 | 未着手 | 現在はQuoteFormから作成 |
 | 改訂番号/履歴 | 開発中 | `confirmation_revision`, `confirmation_history` を保持 |
 | 電子署名連携 | 未着手 | 外部サービス連携は将来対応 |
 | 法務承認フロー | 未着手 | 専門家確認と承認履歴管理 |

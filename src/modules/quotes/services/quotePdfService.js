@@ -1,6 +1,6 @@
 import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals } from '../hooks/useQuotes.js';
 import { productDisplayName } from '../../products/hooks/useProducts.js';
-import { TERMS_FIELDS, normalizeVisibleTerms, termsSummary } from './termsTemplateService.js';
+import { DEFAULT_QUOTE_TERMS_SUMMARY, TERMS_FIELDS, normalizeVisibleTerms, termsSummary } from './termsTemplateService.js';
 
 const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
@@ -35,6 +35,10 @@ function taxRateLabel(taxBreakdown = [], defaultTaxRate = DEFAULT_QUOTE_TAX_RATE
   )];
 
   return rates.length > 0 ? rates.join(' / ') : `${defaultTaxRate}%`;
+}
+
+function quoteTermsSummaryText(quote = {}, issuer = null) {
+  return quote.quoteTermsSummary || quote.issuerSnapshot?.defaultQuoteTermsSummary || issuer?.defaultQuoteTermsSummary || DEFAULT_QUOTE_TERMS_SUMMARY;
 }
 
 function truncate(value = '', length = 28) {
@@ -309,7 +313,7 @@ export function renderQuotePreviewHtml(context) {
                 <div><strong>納期:</strong> ${escapeHtml(quote.deliveryDate || '-')}</div>
                 <div><strong>備考:</strong><br>${escapeHtml(quote.remarks || quote.memo || '-').replace(/\n/g, '<br>')}</div>
                 ${issuer?.bankAccount ? `<div><strong>振込先:</strong> ${escapeHtml(issuer.bankAccount)}</div>` : ''}
-                ${termsSummary(quote.termsSnapshot).length > 0 ? `<div><strong>重要条件:</strong><br>${termsSummary(quote.termsSnapshot).map((item) => escapeHtml(item)).join('<br>')}</div>` : ''}
+                <div><strong>重要条件:</strong><br>${escapeHtml(quoteTermsSummaryText(quote, issuer)).replace(/\n/g, '<br>')}</div>
               </div>
               <div class="quote-total">
                 <div><span>小計</span><span>${escapeHtml(money(financials.subtotal, quote.currency))}</span></div>
@@ -319,7 +323,7 @@ export function renderQuotePreviewHtml(context) {
                 <div><strong>合計</strong><strong>${escapeHtml(money(financials.grandTotal, quote.currency))}</strong></div>
               </div>
             </div>
-            ${renderTermsHtml(quote)}
+            <p class="quote-terms-summary">${escapeHtml(quoteTermsSummaryText(quote, issuer)).replace(/\n/g, '<br>')}</p>
           ` : ''}
           <div class="quote-footer">明細ヘッダーは各ページ再表示 / 顧客向けPDFには社内原価・利益を表示しません</div>
         </section>
@@ -328,8 +332,15 @@ export function renderQuotePreviewHtml(context) {
   `;
 }
 
-export function createQuotePdfFile(context) {
+export function renderConfirmationPreviewHtml(context) {
+  const html = renderQuotePreviewHtml(context)
+    .replace('quote-preview-document quote-a4-preview', 'quote-preview-document quote-a4-preview confirmation-preview-document');
+  return html.replace('</article>', `${renderTermsHtml(context.quote)}</article>`);
+}
+
+export function createQuotePdfFile(context, documentType = 'quote') {
   const { quote, customer, contacts, products, supplier, issuer, financials, generatedAt } = context;
+  const isConfirmation = documentType === 'confirmation';
   const rows = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(rows);
   const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
@@ -337,6 +348,7 @@ export function createQuotePdfFile(context) {
   const issuerName = issuer?.legalName || issuer?.name || '営業手帳';
   const issuerAddress = issuer?.address || '食品営業CRM';
   const issuerContact = [issuer?.phone, issuer?.email].filter(Boolean).join(' / ');
+  const documentTitle = isConfirmation ? '成約確認書' : '御見積書';
   const termsEntries = visibleTermsEntries(quote);
   const termsPdfLines = [
     `約款バージョン: ${quote.termsVersion || '-'} / 適用開始日: ${quote.termsEffectiveDate || '-'}`,
@@ -350,12 +362,12 @@ export function createQuotePdfFile(context) {
     `発行元担当者: ${issuer?.contactPerson || '-'} / 顧客担当者: ${quote.acceptedByCustomerName || '-'}`,
     `確認日: ${quote.acceptedAt ? String(quote.acceptedAt).slice(0, 10) : '-'} / 確認方法: ${quote.acceptanceMethod || '-'}`,
   ].filter((line) => line !== undefined && line !== null);
-  const termsPages = termsPdfLines.length > 1 ? chunkLines(termsPdfLines, 34) : [];
+  const termsPages = isConfirmation && termsPdfLines.length > 1 ? chunkLines(termsPdfLines, 34) : [];
   const totalPdfPages = pages.length + termsPages.length;
   const pdfPages = pages.map((pageRows, pageIndex) => {
     const isLast = pageIndex === pages.length - 1;
     const lines = [
-      { text: '御見積書', x: 260, y: 800, size: 16 },
+      { text: documentTitle, x: 260, y: 800, size: 16 },
       { text: issuerName, x: 40, y: 805, size: 9 },
       { text: issuerAddress, x: 40, y: 790, size: 8 },
       { text: issuerContact, x: 40, y: 777, size: 8 },
@@ -420,7 +432,7 @@ export function createQuotePdfFile(context) {
         { text: `納期: ${quote.deliveryDate || '-'}`, x: 40, y: totalY - 32, size: 9 },
         { text: `備考: ${truncate(quote.remarks || quote.memo || '-', 46)}`, x: 40, y: totalY - 48, size: 9 },
         { text: `振込先: ${truncate(issuer?.bankAccount || '-', 46)}`, x: 40, y: totalY - 64, size: 9 },
-        { text: `重要条件: ${truncate(termsSummary(quote.termsSnapshot).join(' / '), 46) || '-'}`, x: 40, y: totalY - 80, size: 9 },
+        { text: `重要条件: ${truncate(quoteTermsSummaryText(quote, issuer), 46) || '-'}`, x: 40, y: totalY - 80, size: 9 },
       );
     }
 
@@ -441,12 +453,30 @@ export function createQuotePdfFile(context) {
   });
   const pdf = buildUnicodePdf(pdfPages);
   const blob = new Blob([pdf], { type: 'application/pdf' });
-  const fileName = `${quote.quoteNumber || 'quote'}-${Date.now()}.pdf`.replace(/[\\/:*?"<>|]/g, '-');
+  const prefix = isConfirmation ? 'confirmation' : 'quote';
+  const fileName = `${quote.quoteNumber || prefix}-${prefix}-${Date.now()}.pdf`.replace(/[\\/:*?"<>|]/g, '-');
   return new File([blob], fileName, { type: 'application/pdf' });
+}
+
+export function createConfirmationPdfFile(context) {
+  return createQuotePdfFile(context, 'confirmation');
 }
 
 export function downloadQuotePdf(context) {
   const file = createQuotePdfFile(context);
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  return file.name;
+}
+
+export function downloadConfirmationPdf(context) {
+  const file = createConfirmationPdfFile(context);
   const url = URL.createObjectURL(file);
   const link = document.createElement('a');
   link.href = url;

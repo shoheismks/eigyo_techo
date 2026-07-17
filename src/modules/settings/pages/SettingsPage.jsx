@@ -222,6 +222,7 @@ export default function SettingsPage({
           <label className="field-label">既定支払条件<input value={issuerForm.defaultPaymentTerms || ''} onChange={(event) => updateIssuerForm('defaultPaymentTerms', event.target.value)} /></label>
           <label className="field-label">既定納品条件<input value={issuerForm.defaultDeliveryTerms || ''} onChange={(event) => updateIssuerForm('defaultDeliveryTerms', event.target.value)} /></label>
           <label className="field-label">既定備考<textarea value={issuerForm.defaultRemarks || ''} onChange={(event) => updateIssuerForm('defaultRemarks', event.target.value)} /></label>
+          <label className="field-label">見積書末尾文言<textarea value={issuerForm.defaultQuoteTermsSummary || ''} onChange={(event) => updateIssuerForm('defaultQuoteTermsSummary', event.target.value)} /></label>
           <div className="sample-form quote-terms-editor">
             <div className="section-heading">
               <div>

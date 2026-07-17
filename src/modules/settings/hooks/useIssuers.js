@@ -1,5 +1,5 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
-import { DEFAULT_ISSUER_TERMS } from '../../quotes/services/termsTemplateService.js';
+import { DEFAULT_ISSUER_TERMS, DEFAULT_QUOTE_TERMS_SUMMARY } from '../../quotes/services/termsTemplateService.js';
 
 export const PDF_TEMPLATE_OPTIONS = [
   { value: 'standard', label: '標準' },
@@ -29,6 +29,7 @@ export const emptyIssuer = {
   defaultPaymentTerms: '',
   defaultDeliveryTerms: '',
   defaultRemarks: '',
+  defaultQuoteTermsSummary: DEFAULT_QUOTE_TERMS_SUMMARY,
   defaultPdfTemplate: 'standard',
   ...DEFAULT_ISSUER_TERMS,
   termsVersion: '',
@@ -60,6 +61,7 @@ export function normalizeIssuer(issuer = {}, userId = '') {
     defaultPaymentTerms: issuer.defaultPaymentTerms ?? issuer.default_payment_terms ?? '',
     defaultDeliveryTerms: issuer.defaultDeliveryTerms ?? issuer.default_delivery_terms ?? '',
     defaultRemarks: issuer.defaultRemarks ?? issuer.default_remarks ?? '',
+    defaultQuoteTermsSummary: issuer.defaultQuoteTermsSummary ?? issuer.default_quote_terms_summary ?? DEFAULT_QUOTE_TERMS_SUMMARY,
     defaultPdfTemplate: issuer.defaultPdfTemplate ?? issuer.default_pdf_template ?? 'standard',
     defaultTradeTerms: issuer.defaultTradeTerms ?? issuer.default_trade_terms ?? DEFAULT_ISSUER_TERMS.defaultTradeTerms,
     defaultDisclaimer: issuer.defaultDisclaimer ?? issuer.default_disclaimer ?? DEFAULT_ISSUER_TERMS.defaultDisclaimer,
@@ -100,6 +102,7 @@ export function createIssuerSnapshot(issuer = null) {
     defaultPaymentTerms: normalized.defaultPaymentTerms,
     defaultDeliveryTerms: normalized.defaultDeliveryTerms,
     defaultRemarks: normalized.defaultRemarks,
+    defaultQuoteTermsSummary: normalized.defaultQuoteTermsSummary,
     defaultPdfTemplate: normalized.defaultPdfTemplate,
     defaultTradeTerms: normalized.defaultTradeTerms,
     defaultDisclaimer: normalized.defaultDisclaimer,
@@ -140,6 +143,7 @@ function toRow(issuer) {
     default_payment_terms: issuer.defaultPaymentTerms,
     default_delivery_terms: issuer.defaultDeliveryTerms,
     default_remarks: issuer.defaultRemarks,
+    default_quote_terms_summary: issuer.defaultQuoteTermsSummary,
     default_pdf_template: issuer.defaultPdfTemplate,
     default_trade_terms: issuer.defaultTradeTerms,
     default_disclaimer: issuer.defaultDisclaimer,
@@ -183,6 +187,7 @@ function fromRow(row) {
     defaultPaymentTerms: row.default_payment_terms,
     defaultDeliveryTerms: row.default_delivery_terms,
     defaultRemarks: row.default_remarks,
+    defaultQuoteTermsSummary: row.default_quote_terms_summary,
     defaultPdfTemplate: row.default_pdf_template,
     defaultTradeTerms: row.default_trade_terms,
     defaultDisclaimer: row.default_disclaimer,

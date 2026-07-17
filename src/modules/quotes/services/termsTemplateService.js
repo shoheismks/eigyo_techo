@@ -26,6 +26,8 @@ export const DEFAULT_ISSUER_TERMS = {
   defaultGoverningLaw: '本取引は日本法に準拠し、紛争が生じた場合は発行元所在地を管轄する裁判所を合意管轄とします。',
 };
 
+export const DEFAULT_QUOTE_TERMS_SUMMARY = '成約時には、別途発行する成約確認書および適用約款に基づきます。';
+
 export function createTermsSnapshotFromIssuer(issuer = {}, existing = {}) {
   const terms = TERMS_FIELDS.reduce((snapshot, field) => ({
     ...snapshot,

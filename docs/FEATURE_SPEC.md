@@ -565,4 +565,15 @@
 - 保存先: `issuers` は既定テンプレート、`quotes` は `terms_snapshot` と確認情報を保存する。
 - 関連データ: 発行元、見積、案件、顧客、PDF履歴。
 - 今後の拡張: 電子署名、版管理UI、成約確認書専用テーブル、法務承認フロー。
+
+## 追加: 見積書 / 成約確認書の表示分離
+
+- ステータス: 開発中
+- 目的: 見積書は価格・数量・税率・支払条件・配送条件・納期・有効期限の提示に限定し、成約確認書で約款全文と確認欄を扱う。
+- 画面: `QuoteFormModal`, 設定画面の発行元マスター, PDFプレビュー/PDF出力。
+- 入力: 見積書用の重要条件要約 `quoteTermsSummary`、成約確認書用の約款snapshot、顧客確認者、確認方法、確認日。
+- 出力: 見積書PDF、成約確認書PDF、別々のPDF履歴。
+- 保存先: 見積書PDFは `quotes.pdf_url` 系、成約確認書PDFは `quotes.confirmation_pdf_url` 系。本文はSupabase Storage、メタ情報はSupabase Database。
+- 関連データ: `quotes`, `issuers`, `customers`, `projects`, Supabase Storage `app-attachments`
+- 今後の拡張: 成約確認書専用詳細画面、電子署名連携、法務承認フロー、帳票テンプレートの詳細設定。
 - 注意: 仮テンプレートは管理者が編集できる前提。実運用前に専門家確認が必要。

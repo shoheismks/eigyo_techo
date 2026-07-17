@@ -13,14 +13,18 @@ import {
 } from '../hooks/useQuotes.js';
 import { createIssuerSnapshot } from '../../settings/hooks/useIssuers.js';
 import {
+  DEFAULT_QUOTE_TERMS_SUMMARY,
   TERMS_FIELDS,
   createTermsSnapshotFromIssuer,
   normalizeVisibleTerms,
 } from '../services/termsTemplateService.js';
 import {
   buildQuotePdfContext,
+  createConfirmationPdfFile,
   createQuotePdfFile,
+  downloadConfirmationPdf,
   downloadQuotePdf,
+  renderConfirmationPreviewHtml,
   renderQuotePreviewHtml,
 } from '../services/quotePdfService.js';
 
@@ -66,6 +70,7 @@ function createInitialQuote({ draft, quotes, user, issuers = [] }) {
     paymentTerms: draft?.paymentTerms || issuer?.defaultPaymentTerms || '',
     deliveryTerms: draft?.deliveryTerms || issuer?.defaultDeliveryTerms || '',
     remarks: draft?.remarks || issuer?.defaultRemarks || '',
+    quoteTermsSummary: draft?.quoteTermsSummary || issuer?.defaultQuoteTermsSummary || DEFAULT_QUOTE_TERMS_SUMMARY,
     termsSnapshot,
     disclaimerSnapshot: draft?.disclaimerSnapshot || {
       disclaimer: termsSnapshot.disclaimer || '',
@@ -134,6 +139,7 @@ export default function QuoteFormModal({
   const [form, setForm] = useState(() => createInitialQuote({ draft, quotes, user, issuers }));
   const [productSearch, setProductSearch] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
+  const [confirmationPreviewHtml, setConfirmationPreviewHtml] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState('未保存');
   const [error, setError] = useState('');
@@ -143,6 +149,7 @@ export default function QuoteFormModal({
     setForm(createInitialQuote({ draft, quotes, user, issuers }));
     setProductSearch('');
     setPreviewHtml('');
+    setConfirmationPreviewHtml('');
     setSaveState('未保存');
     setError('');
   }, [draft, open, quotes, user, issuers]);
@@ -180,6 +187,7 @@ export default function QuoteFormModal({
         paymentTerms: current.paymentTerms || issuer?.defaultPaymentTerms || '',
         deliveryTerms: current.deliveryTerms || issuer?.defaultDeliveryTerms || '',
         remarks: current.remarks || issuer?.defaultRemarks || '',
+        quoteTermsSummary: current.quoteTermsSummary || issuer?.defaultQuoteTermsSummary || DEFAULT_QUOTE_TERMS_SUMMARY,
         termsSnapshot: nextTermsSnapshot,
         disclaimerSnapshot: {
           disclaimer: nextTermsSnapshot.disclaimer || '',
@@ -280,6 +288,7 @@ export default function QuoteFormModal({
         ...form,
         issuerSnapshot: form.issuerSnapshot || createIssuerSnapshot(selectedIssuer),
         termsSnapshot: form.termsSnapshot || createTermsSnapshotFromIssuer(selectedIssuer),
+        quoteTermsSummary: form.quoteTermsSummary || selectedIssuer?.defaultQuoteTermsSummary || DEFAULT_QUOTE_TERMS_SUMMARY,
         disclaimerSnapshot: form.disclaimerSnapshot || {
           disclaimer: form.termsSnapshot?.disclaimer || '',
           deliveryDisclaimer: form.termsSnapshot?.deliveryDisclaimer || '',
@@ -330,6 +339,18 @@ export default function QuoteFormModal({
     }
     setError('');
     setPreviewHtml(renderQuotePreviewHtml(buildContext()));
+    setConfirmationPreviewHtml('');
+  }
+
+  function handleConfirmationPreview() {
+    const message = validate();
+    if (message) {
+      setError(message);
+      return;
+    }
+    setError('');
+    setPreviewHtml('');
+    setConfirmationPreviewHtml(renderConfirmationPreviewHtml(buildContext()));
   }
 
   function handleDownload() {
@@ -340,6 +361,77 @@ export default function QuoteFormModal({
     }
     setError('');
     downloadQuotePdf(buildContext());
+  }
+
+  function handleConfirmationDownload() {
+    const message = validate();
+    if (message) {
+      setError(message);
+      return;
+    }
+    setError('');
+    downloadConfirmationPdf(buildContext());
+  }
+
+  async function handleConfirmationSubmit() {
+    const message = validate();
+    if (message) {
+      setError(message);
+      return;
+    }
+
+    setSaving(true);
+    setSaveState('菫晏ｭ倅ｸｭ');
+    setError('');
+    try {
+      const context = buildContext();
+      const pdfFile = createConfirmationPdfFile(context);
+      const uploadedPdf = await uploadAttachment({
+        file: pdfFile,
+        userId: user?.id ?? context.quote.userId,
+        ownerType: 'quote',
+        ownerId: context.quote.id,
+        field: 'confirmationPdf',
+      });
+      const generatedAt = new Date().toISOString();
+      const payload = normalizeQuote({
+        ...context.quote,
+        confirmationPdfUrl: uploadedPdf?.publicUrl || uploadedPdf?.url || context.quote.confirmationPdfUrl,
+        confirmationPdfFileName: uploadedPdf?.name || pdfFile.name,
+        confirmationPdfStoragePath: uploadedPdf?.path || context.quote.confirmationPdfStoragePath,
+        confirmationPdfGeneratedAt: generatedAt,
+        confirmationGeneratedBy: user?.id || context.quote.userId || '',
+        confirmationGeneratedByName: user?.email || context.quote.createdByName || '',
+        confirmationPdfHistory: [
+          ...(context.quote.confirmationPdfHistory ?? []),
+          {
+            id: crypto.randomUUID(),
+            type: 'confirmation',
+            revision: context.quote.confirmationRevision || 1,
+            generatedAt,
+            createdBy: user?.id || context.quote.userId || '',
+            createdByName: user?.email || context.quote.createdByName || '',
+            fileName: uploadedPdf?.name || pdfFile.name,
+            url: uploadedPdf?.publicUrl || uploadedPdf?.url || '',
+          },
+        ],
+      }, user?.id ?? '');
+
+      const exists = quotes.some((quote) => quote.id === payload.id);
+      if (exists && updateQuote) {
+        await updateQuote(payload.id, payload);
+      } else {
+        await addQuote(payload);
+      }
+      setForm(payload);
+      setSaveState('saved');
+      onSaved?.(payload);
+    } catch (err) {
+      setError(err.message || 'Failed to save confirmation PDF.');
+      setSaveState('unsaved');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -370,11 +462,16 @@ export default function QuoteFormModal({
         pdfFileName: uploadedPdf?.name || pdfFile.name,
         pdfStoragePath: uploadedPdf?.path || context.quote.pdfStoragePath,
         pdfGeneratedAt: generatedAt,
+        pdfGeneratedBy: user?.id || context.quote.userId || '',
+        pdfGeneratedByName: user?.email || context.quote.createdByName || '',
         pdfHistory: [
           ...(context.quote.pdfHistory ?? []),
           {
             id: crypto.randomUUID(),
+            type: 'quote',
             generatedAt,
+            createdBy: user?.id || context.quote.userId || '',
+            createdByName: user?.email || context.quote.createdByName || '',
             fileName: uploadedPdf?.name || pdfFile.name,
             url: uploadedPdf?.publicUrl || uploadedPdf?.url || '',
           },
@@ -473,7 +570,36 @@ export default function QuoteFormModal({
         </div>
         <label className="field-label">備考<textarea value={form.remarks} onChange={(event) => updateField('remarks', event.target.value)} /></label>
 
-        <section className="sample-form quote-terms-editor">
+        <section className="sample-form quote-terms-editor quote-terms-summary-editor">
+          <div className="section-heading">
+            <div>
+              <h3>重要条件の要約</h3>
+              <span>見積書PDFにはこの短文だけを表示します。約款全文と署名欄は成約確認書PDFへ分離します。</span>
+            </div>
+          </div>
+          <label className="field-label">
+            見積書末尾文言
+            <textarea
+              value={form.quoteTermsSummary || ''}
+              onChange={(event) => updateField('quoteTermsSummary', event.target.value)}
+            />
+          </label>
+          <div className="date-grid">
+            <label className="field-label">約款バージョン<input value={form.termsVersion || ''} onChange={(event) => updateField('termsVersion', event.target.value)} /></label>
+            <label className="field-label">適用開始日<input type="date" value={form.termsEffectiveDate || ''} onChange={(event) => updateField('termsEffectiveDate', event.target.value)} /></label>
+            <label className="field-label">顧客確認者<input value={form.acceptedByCustomerName || ''} onChange={(event) => updateField('acceptedByCustomerName', event.target.value)} /></label>
+            <label className="field-label">確認方法<input value={form.acceptanceMethod || ''} placeholder="例: 書面 / メール / 電子確認" onChange={(event) => updateField('acceptanceMethod', event.target.value)} /></label>
+          </div>
+          <p className="notice-text">取引約款・免責事項の全文は発行元管理の既定文面からスナップショット保存し、成約確認書PDFにのみ表示します。</p>
+          <div className="mail-action-row">
+            <button type="button" className="ghost-button" onClick={handleConfirmationPreview} disabled={!linesReady}>成約確認書プレビュー</button>
+            <button type="button" className="ghost-button" onClick={handleConfirmationDownload} disabled={!linesReady}>成約確認書PDFダウンロード</button>
+            <button type="button" className="primary-button" onClick={handleConfirmationSubmit} disabled={saving || !linesReady}>{saving ? '保存中...' : '成約確認書作成'}</button>
+          </div>
+          {form.confirmationPdfUrl && <p className="notice-text">成約確認書PDF: <a href={form.confirmationPdfUrl} target="_blank" rel="noreferrer">{form.confirmationPdfFileName || 'PDFを開く'}</a></p>}
+        </section>
+
+        <section className="sample-form quote-terms-editor" hidden>
           <div className="section-heading">
             <div>
               <h3>約款・免責</h3>
@@ -532,6 +658,7 @@ export default function QuoteFormModal({
           <button type="submit" className="primary-button" disabled={saving || !linesReady}>{saving ? '保存中...' : '保存して見積詳細へ'}</button>
         </div>
         {previewHtml && <div className="quote-preview-frame" dangerouslySetInnerHTML={{ __html: previewHtml }} />}
+        {confirmationPreviewHtml && <div className="quote-preview-frame" dangerouslySetInnerHTML={{ __html: confirmationPreviewHtml }} />}
       </form>
     </div>
   );
