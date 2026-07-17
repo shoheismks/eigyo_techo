@@ -13,6 +13,11 @@ import {
 } from '../hooks/useQuotes.js';
 import { createIssuerSnapshot } from '../../settings/hooks/useIssuers.js';
 import {
+  TERMS_FIELDS,
+  createTermsSnapshotFromIssuer,
+  normalizeVisibleTerms,
+} from '../services/termsTemplateService.js';
+import {
   buildQuotePdfContext,
   createQuotePdfFile,
   downloadQuotePdf,
@@ -44,6 +49,7 @@ function generateQuoteNumber(quotes = []) {
 function createInitialQuote({ draft, quotes, user, issuers = [] }) {
   const issuer = issuers.find((item) => item.id === draft?.issuerId) || issuers.find((item) => item.isDefault && item.isActive) || issuers.find((item) => item.isActive);
   const defaultTaxRate = String(draft?.defaultTaxRate || issuer?.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE);
+  const termsSnapshot = draft?.termsSnapshot || createTermsSnapshotFromIssuer(issuer);
   return normalizeQuote({
     ...emptyQuote,
     ...draft,
@@ -60,6 +66,18 @@ function createInitialQuote({ draft, quotes, user, issuers = [] }) {
     paymentTerms: draft?.paymentTerms || issuer?.defaultPaymentTerms || '',
     deliveryTerms: draft?.deliveryTerms || issuer?.defaultDeliveryTerms || '',
     remarks: draft?.remarks || issuer?.defaultRemarks || '',
+    termsSnapshot,
+    disclaimerSnapshot: draft?.disclaimerSnapshot || {
+      disclaimer: termsSnapshot.disclaimer || '',
+      deliveryDisclaimer: termsSnapshot.deliveryDisclaimer || '',
+      forceMajeure: termsSnapshot.forceMajeure || '',
+    },
+    visibleTerms: normalizeVisibleTerms(draft?.visibleTerms || {}),
+    specialTerms: draft?.specialTerms || '',
+    termsVersion: draft?.termsVersion || issuer?.termsVersion || '',
+    termsEffectiveDate: draft?.termsEffectiveDate || issuer?.termsEffectiveDate || '',
+    acceptanceMethod: draft?.acceptanceMethod || '',
+    acceptedByCustomerName: draft?.acceptedByCustomerName || '',
     quoteLines: draft?.quoteLines?.length ? draft.quoteLines : [emptyQuoteLine()],
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
@@ -152,6 +170,7 @@ export default function QuoteFormModal({
     setSaveState('作成中');
     if (field === 'issuerId') {
       const issuer = issuers.find((item) => item.id === value);
+      const nextTermsSnapshot = createTermsSnapshotFromIssuer(issuer);
       setForm((current) => ({
         ...current,
         issuerId: value,
@@ -161,10 +180,54 @@ export default function QuoteFormModal({
         paymentTerms: current.paymentTerms || issuer?.defaultPaymentTerms || '',
         deliveryTerms: current.deliveryTerms || issuer?.defaultDeliveryTerms || '',
         remarks: current.remarks || issuer?.defaultRemarks || '',
+        termsSnapshot: nextTermsSnapshot,
+        disclaimerSnapshot: {
+          disclaimer: nextTermsSnapshot.disclaimer || '',
+          deliveryDisclaimer: nextTermsSnapshot.deliveryDisclaimer || '',
+          forceMajeure: nextTermsSnapshot.forceMajeure || '',
+        },
+        termsVersion: issuer?.termsVersion || current.termsVersion || '',
+        termsEffectiveDate: issuer?.termsEffectiveDate || current.termsEffectiveDate || '',
       }));
       return;
     }
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateTermsField(field, value) {
+    setSaveState('作成中');
+    setForm((current) => ({
+      ...current,
+      termsSnapshot: {
+        ...(current.termsSnapshot ?? {}),
+        [field]: value,
+      },
+      disclaimerSnapshot: {
+        ...(current.disclaimerSnapshot ?? {}),
+        ...(field === 'disclaimer' ? { disclaimer: value } : {}),
+        ...(field === 'deliveryDisclaimer' ? { deliveryDisclaimer: value } : {}),
+        ...(field === 'forceMajeure' ? { forceMajeure: value } : {}),
+      },
+    }));
+  }
+
+  function toggleVisibleTerm(field, checked) {
+    setSaveState('作成中');
+    setForm((current) => ({
+      ...current,
+      visibleTerms: {
+        ...normalizeVisibleTerms(current.visibleTerms),
+        [field]: checked,
+      },
+    }));
+  }
+
+  function setAllVisibleTerms(checked) {
+    setSaveState('作成中');
+    setForm((current) => ({
+      ...current,
+      visibleTerms: TERMS_FIELDS.reduce((visible, field) => ({ ...visible, [field.key]: checked }), {}),
+    }));
   }
 
   function updateLine(lineId, field, value) {
@@ -216,6 +279,13 @@ export default function QuoteFormModal({
       const quote = normalizeQuote({
         ...form,
         issuerSnapshot: form.issuerSnapshot || createIssuerSnapshot(selectedIssuer),
+        termsSnapshot: form.termsSnapshot || createTermsSnapshotFromIssuer(selectedIssuer),
+        disclaimerSnapshot: form.disclaimerSnapshot || {
+          disclaimer: form.termsSnapshot?.disclaimer || '',
+          deliveryDisclaimer: form.termsSnapshot?.deliveryDisclaimer || '',
+          forceMajeure: form.termsSnapshot?.forceMajeure || '',
+        },
+        visibleTerms: normalizeVisibleTerms(form.visibleTerms),
         quoteLines,
       productIds: [...new Set(quoteLines.map((line) => line.productId).filter(Boolean))],
       inventoryIds: [...new Set(quoteLines.map((line) => line.inventoryId).filter(Boolean))],
@@ -402,6 +472,51 @@ export default function QuoteFormModal({
           <label className="field-label">納期<input value={form.deliveryDate} onChange={(event) => updateField('deliveryDate', event.target.value)} /></label>
         </div>
         <label className="field-label">備考<textarea value={form.remarks} onChange={(event) => updateField('remarks', event.target.value)} /></label>
+
+        <section className="sample-form quote-terms-editor">
+          <div className="section-heading">
+            <div>
+              <h3>約款・免責</h3>
+              <span>発行元の既定文面をこの見積/成約確認書用にスナップショット保存します。</span>
+            </div>
+            <div className="mail-action-row">
+              <button className="ghost-button" type="button" onClick={() => setAllVisibleTerms(true)}>すべて表示</button>
+              <button className="ghost-button" type="button" onClick={() => setAllVisibleTerms(false)}>すべて非表示</button>
+            </div>
+          </div>
+          <p className="notice-text">法的文言は実運用前に専門家確認を行ってください。ここで編集した内容は発行元マスターへ逆反映しません。</p>
+          <div className="date-grid">
+            <label className="field-label">約款バージョン<input value={form.termsVersion || ''} onChange={(event) => updateField('termsVersion', event.target.value)} /></label>
+            <label className="field-label">適用開始日<input type="date" value={form.termsEffectiveDate || ''} onChange={(event) => updateField('termsEffectiveDate', event.target.value)} /></label>
+            <label className="field-label">顧客確認者<input value={form.acceptedByCustomerName || ''} onChange={(event) => updateField('acceptedByCustomerName', event.target.value)} /></label>
+            <label className="field-label">確認方法<input value={form.acceptanceMethod || ''} placeholder="例: 書面 / メール / 電子確認" onChange={(event) => updateField('acceptanceMethod', event.target.value)} /></label>
+          </div>
+          <div className="terms-field-list">
+            {TERMS_FIELDS.map((field) => {
+              const visibleTerms = normalizeVisibleTerms(form.visibleTerms);
+              return (
+                <article className="terms-field-card" key={field.key}>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={visibleTerms[field.key] !== false}
+                      onChange={(event) => toggleVisibleTerm(field.key, event.target.checked)}
+                    />
+                    PDFへ表示
+                  </label>
+                  <label className="field-label">
+                    {field.label}
+                    <textarea
+                      value={form.termsSnapshot?.[field.key] || ''}
+                      onChange={(event) => updateTermsField(field.key, event.target.value)}
+                    />
+                  </label>
+                </article>
+              );
+            })}
+          </div>
+          <label className="field-label">個別特記事項<textarea value={form.specialTerms || ''} onChange={(event) => updateField('specialTerms', event.target.value)} /></label>
+        </section>
 
         <div className="price-preview">
           <div><span>小計</span><strong>{formatPrice(totals.subtotal) || '-'} {form.currency}</strong></div>

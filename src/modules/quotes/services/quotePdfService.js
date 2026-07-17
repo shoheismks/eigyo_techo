@@ -1,5 +1,6 @@
 import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals } from '../hooks/useQuotes.js';
 import { productDisplayName } from '../../products/hooks/useProducts.js';
+import { TERMS_FIELDS, normalizeVisibleTerms, termsSummary } from './termsTemplateService.js';
 
 const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
@@ -138,6 +139,21 @@ function lineName(line, products = []) {
   return line.productName || line.description || productName(line.productId, products) || '-';
 }
 
+function splitText(value = '', size = 52) {
+  const text = String(value || '');
+  const lines = [];
+  text.split('\n').forEach((paragraph) => {
+    if (!paragraph) {
+      lines.push('');
+      return;
+    }
+    for (let index = 0; index < paragraph.length; index += size) {
+      lines.push(paragraph.slice(index, index + size));
+    }
+  });
+  return lines;
+}
+
 function renderLineCells(line, index, quote, products) {
   return `
     <tr>
@@ -153,6 +169,48 @@ function renderLineCells(line, index, quote, products) {
       <td class="money">${escapeHtml(money(line.amount, quote.currency))}</td>
       <td>${escapeHtml(truncate(line.memo || '', 24))}</td>
     </tr>
+  `;
+}
+
+function visibleTermsEntries(quote = {}) {
+  const visibleTerms = normalizeVisibleTerms(quote.visibleTerms);
+  const snapshot = quote.termsSnapshot || {};
+  return TERMS_FIELDS
+    .filter((field) => visibleTerms[field.key] !== false)
+    .map((field) => ({ ...field, value: snapshot[field.key] || '' }))
+    .filter((field) => field.value.trim());
+}
+
+function renderTermsHtml(quote = {}) {
+  const entries = visibleTermsEntries(quote);
+  if (entries.length === 0 && !quote.specialTerms) return '';
+  return `
+    <section class="quote-terms-section">
+      <h3>取引条件・約款</h3>
+      <p class="quote-terms-meta">約款バージョン: ${escapeHtml(quote.termsVersion || '-')} / 適用開始日: ${escapeHtml(quote.termsEffectiveDate || '-')}</p>
+      <div class="quote-terms-summary">
+        ${termsSummary(quote.termsSnapshot).map((item) => `<p>${escapeHtml(item)}</p>`).join('')}
+      </div>
+      ${entries.map((entry) => `
+        <div class="quote-term-block">
+          <strong>${escapeHtml(entry.label)}</strong>
+          <p>${escapeHtml(entry.value).replace(/\n/g, '<br>')}</p>
+        </div>
+      `).join('')}
+      ${quote.specialTerms ? `
+        <div class="quote-term-block important">
+          <strong>個別特記事項</strong>
+          <p>${escapeHtml(quote.specialTerms).replace(/\n/g, '<br>')}</p>
+        </div>
+      ` : ''}
+      <div class="quote-acceptance-box">
+        <p>上記内容および添付約款を確認し、合意します。</p>
+        <div><span>発行元担当者</span><span>${escapeHtml(quote.issuerSnapshot?.contactPerson || '-')}</span></div>
+        <div><span>顧客担当者</span><span>${escapeHtml(quote.acceptedByCustomerName || '-')}</span></div>
+        <div><span>確認日</span><span>${escapeHtml(quote.acceptedAt ? String(quote.acceptedAt).slice(0, 10) : '-')}</span></div>
+        <div><span>確認方法</span><span>${escapeHtml(quote.acceptanceMethod || '-')}</span></div>
+      </div>
+    </section>
   `;
 }
 
@@ -186,6 +244,16 @@ export function renderQuotePreviewHtml(context) {
         .quote-total strong { font-size: 15px; }
         .quote-conditions { font-size: 10pt; line-height: 1.7; }
         .quote-footer { margin-top: 10px; text-align: right; font-size: 9pt; color: #6b7280; }
+        .quote-terms-section { margin-top: 20px; page-break-before: auto; font-size: 9pt; line-height: 1.65; color: #111827; }
+        .quote-terms-section h3 { border-bottom: 1px solid #9ca3af; padding-bottom: 5px; margin: 0 0 8px; }
+        .quote-terms-meta { color: #4b5563; margin: 0 0 8px; }
+        .quote-terms-summary { border-left: 3px solid #1d4ed8; background: #eff6ff; padding: 8px 10px; margin-bottom: 10px; }
+        .quote-terms-summary p { margin: 0 0 4px; }
+        .quote-term-block { break-inside: avoid; border-bottom: 1px solid #e5e7eb; padding: 8px 0; }
+        .quote-term-block p { margin: 4px 0 0; white-space: pre-wrap; }
+        .quote-term-block.important { border: 1px solid #bfdbfe; background: #eff6ff; padding: 10px; }
+        .quote-acceptance-box { break-inside: avoid; border: 1px solid #111827; margin-top: 14px; padding: 10px; }
+        .quote-acceptance-box div { display: grid; grid-template-columns: 120px 1fr; border-top: 1px solid #e5e7eb; padding: 7px 0; }
         @media (max-width: 767px) { .quote-a4-preview { padding: 8px; } .quote-page { padding: 14px; min-height: auto; overflow-x: auto; } .quote-summary { grid-template-columns: 1fr; } }
       </style>
       ${pages.map((pageLines, pageIndex) => `
@@ -241,6 +309,7 @@ export function renderQuotePreviewHtml(context) {
                 <div><strong>納期:</strong> ${escapeHtml(quote.deliveryDate || '-')}</div>
                 <div><strong>備考:</strong><br>${escapeHtml(quote.remarks || quote.memo || '-').replace(/\n/g, '<br>')}</div>
                 ${issuer?.bankAccount ? `<div><strong>振込先:</strong> ${escapeHtml(issuer.bankAccount)}</div>` : ''}
+                ${termsSummary(quote.termsSnapshot).length > 0 ? `<div><strong>重要条件:</strong><br>${termsSummary(quote.termsSnapshot).map((item) => escapeHtml(item)).join('<br>')}</div>` : ''}
               </div>
               <div class="quote-total">
                 <div><span>小計</span><span>${escapeHtml(money(financials.subtotal, quote.currency))}</span></div>
@@ -250,6 +319,7 @@ export function renderQuotePreviewHtml(context) {
                 <div><strong>合計</strong><strong>${escapeHtml(money(financials.grandTotal, quote.currency))}</strong></div>
               </div>
             </div>
+            ${renderTermsHtml(quote)}
           ` : ''}
           <div class="quote-footer">明細ヘッダーは各ページ再表示 / 顧客向けPDFには社内原価・利益を表示しません</div>
         </section>
@@ -267,6 +337,21 @@ export function createQuotePdfFile(context) {
   const issuerName = issuer?.legalName || issuer?.name || '営業手帳';
   const issuerAddress = issuer?.address || '食品営業CRM';
   const issuerContact = [issuer?.phone, issuer?.email].filter(Boolean).join(' / ');
+  const termsEntries = visibleTermsEntries(quote);
+  const termsPdfLines = [
+    `約款バージョン: ${quote.termsVersion || '-'} / 適用開始日: ${quote.termsEffectiveDate || '-'}`,
+    ...termsSummary(quote.termsSnapshot).flatMap((item) => splitText(`重要条件: ${item}`, 58)),
+    ...termsEntries.flatMap((entry) => [
+      `【${entry.label}】`,
+      ...splitText(entry.value, 58),
+    ]),
+    ...(quote.specialTerms ? ['【個別特記事項】', ...splitText(quote.specialTerms, 58)] : []),
+    '【確認欄】上記内容および添付約款を確認し、合意します。',
+    `発行元担当者: ${issuer?.contactPerson || '-'} / 顧客担当者: ${quote.acceptedByCustomerName || '-'}`,
+    `確認日: ${quote.acceptedAt ? String(quote.acceptedAt).slice(0, 10) : '-'} / 確認方法: ${quote.acceptanceMethod || '-'}`,
+  ].filter((line) => line !== undefined && line !== null);
+  const termsPages = termsPdfLines.length > 1 ? chunkLines(termsPdfLines, 34) : [];
+  const totalPdfPages = pages.length + termsPages.length;
   const pdfPages = pages.map((pageRows, pageIndex) => {
     const isLast = pageIndex === pages.length - 1;
     const lines = [
@@ -277,7 +362,7 @@ export function createQuotePdfFile(context) {
       { text: `見積番号: ${quote.quoteNumber || '-'}`, x: 400, y: 805, size: 9 },
       { text: `作成日: ${issueDate}`, x: 400, y: 790, size: 9 },
       { text: `有効期限: ${quote.validUntil || '-'}`, x: 400, y: 775, size: 9 },
-      { text: `Page ${pageIndex + 1} / ${pages.length}`, x: 400, y: 760, size: 9 },
+      { text: `Page ${pageIndex + 1} / ${totalPdfPages}`, x: 400, y: 760, size: 9 },
     ];
 
     if (pageIndex === 0) {
@@ -335,10 +420,24 @@ export function createQuotePdfFile(context) {
         { text: `納期: ${quote.deliveryDate || '-'}`, x: 40, y: totalY - 32, size: 9 },
         { text: `備考: ${truncate(quote.remarks || quote.memo || '-', 46)}`, x: 40, y: totalY - 48, size: 9 },
         { text: `振込先: ${truncate(issuer?.bankAccount || '-', 46)}`, x: 40, y: totalY - 64, size: 9 },
+        { text: `重要条件: ${truncate(termsSummary(quote.termsSnapshot).join(' / '), 46) || '-'}`, x: 40, y: totalY - 80, size: 9 },
       );
     }
 
     return lines;
+  });
+  termsPages.forEach((termsPage, termsPageIndex) => {
+    const pageNumber = pages.length + termsPageIndex + 1;
+    pdfPages.push([
+      { text: '取引条件・約款', x: 40, y: 805, size: 14 },
+      { text: `見積番号: ${quote.quoteNumber || '-'} / Page ${pageNumber} / ${totalPdfPages}`, x: 360, y: 805, size: 9 },
+      ...termsPage.map((line, index) => ({
+        text: line,
+        x: 40,
+        y: 775 - index * 19,
+        size: line.startsWith('【') ? 10 : 8,
+      })),
+    ]);
   });
   const pdf = buildUnicodePdf(pdfPages);
   const blob = new Blob([pdf], { type: 'application/pdf' });

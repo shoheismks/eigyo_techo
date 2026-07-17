@@ -2048,3 +2048,30 @@
 .pipeline-dot.red {
   background: var(--danger);
 }
+
+.quote-terms-editor {
+  border-color: rgba(102, 163, 255, 0.32);
+  background: rgba(40, 120, 255, 0.06);
+}
+
+.terms-field-list {
+  display: grid;
+  gap: 10px;
+}
+
+.terms-field-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px;
+}
+
+.terms-field-card textarea {
+  min-height: 96px;
+}
+
+@media (min-width: 768px) {
+  .terms-field-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

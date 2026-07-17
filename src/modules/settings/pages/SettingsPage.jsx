@@ -8,6 +8,7 @@ import {
 } from '../services/backupService.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import { DEFAULT_ISSUER_TAX_RATE, PDF_TEMPLATE_OPTIONS, emptyIssuer } from '../hooks/useIssuers.js';
+import { TERMS_FIELDS } from '../../quotes/services/termsTemplateService.js';
 
 export default function SettingsPage({
   user,
@@ -221,6 +222,30 @@ export default function SettingsPage({
           <label className="field-label">既定支払条件<input value={issuerForm.defaultPaymentTerms || ''} onChange={(event) => updateIssuerForm('defaultPaymentTerms', event.target.value)} /></label>
           <label className="field-label">既定納品条件<input value={issuerForm.defaultDeliveryTerms || ''} onChange={(event) => updateIssuerForm('defaultDeliveryTerms', event.target.value)} /></label>
           <label className="field-label">既定備考<textarea value={issuerForm.defaultRemarks || ''} onChange={(event) => updateIssuerForm('defaultRemarks', event.target.value)} /></label>
+          <div className="sample-form quote-terms-editor">
+            <div className="section-heading">
+              <div>
+                <h3>既定取引約款・免責事項</h3>
+                <span>見積/成約確認書作成時に初期反映されます。保存済み文書には逆反映されません。</span>
+              </div>
+            </div>
+            <p className="notice-text">以下は仮テンプレートです。実運用前に必ず専門家確認を行ってください。</p>
+            <div className="date-grid">
+              <label className="field-label">約款バージョン<input value={issuerForm.termsVersion || ''} onChange={(event) => updateIssuerForm('termsVersion', event.target.value)} /></label>
+              <label className="field-label">約款適用開始日<input type="date" value={issuerForm.termsEffectiveDate || ''} onChange={(event) => updateIssuerForm('termsEffectiveDate', event.target.value)} /></label>
+            </div>
+            <div className="terms-field-list">
+              {TERMS_FIELDS.map((field) => (
+                <label className="field-label terms-field-card" key={field.key}>
+                  既定{field.label}
+                  <textarea
+                    value={issuerForm[field.issuerKey] || ''}
+                    onChange={(event) => updateIssuerForm(field.issuerKey, event.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="date-grid">
             <label className="field-label file-field">ロゴ<input type="file" accept="image/*" onChange={(event) => updateIssuerForm('logoFile', event.target.files?.[0] ?? null)} /></label>
             <label className="field-label file-field">印影<input type="file" accept="image/*" onChange={(event) => updateIssuerForm('sealFile', event.target.files?.[0] ?? null)} /></label>
