@@ -14,7 +14,7 @@ const customerPages = [
 ];
 const productPages = ['Products', 'ProductDetail'];
 const pipelinePages = ['Pipeline'];
-const salesOrderPages = ['SalesOrders'];
+const salesOrderPages = ['SalesOrders', 'Shipments'];
 const inventoryPages = ['Inventory'];
 
 const navGroups = [
@@ -35,6 +35,7 @@ const navGroups = [
       { key: 'Pipeline', label: '見積', helper: '見積作成' },
       { key: 'Pipeline', label: '成約確認書', helper: '約款・確認書' },
       { key: 'SalesOrders', label: '受注', helper: '受注一覧・詳細' },
+      { key: 'Shipments', label: '出荷', helper: '出荷一覧・ピッキング' },
       { key: 'Invoices', label: '請求書', helper: '請求・入金確認' },
     ],
   },

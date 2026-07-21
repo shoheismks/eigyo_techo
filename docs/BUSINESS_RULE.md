@@ -412,3 +412,14 @@ AIが生成した内容は必ずユーザーが確認・編集してから利用
 - 出庫の初期ルールはFEFO、賞味期限がない場合はFIFOとする。
 - 期限切れ、隔離、論理削除ロットは通常の使用可能在庫から除外する。
 - 旧 `inventories` は移行期間中の互換用途として残し、最終的には別migrationで廃止する。
+
+## 受注出荷ルール
+
+- 出荷は受注に紐づけて管理し、1受注に対して複数回の出荷を許可する。
+- 出荷ステータスは `Draft`、`Picking`、`Ready`、`Shipped`、`Cancelled` とする。
+- 在庫数量を減算するのは `Shipped` に確定した時のみとし、`Draft`、`Picking`、`Ready` では在庫数量を変更しない。
+- 未引当商品の出荷、引当済数量を超える出荷、受注数量を超える出荷は禁止する。
+- 出荷確定時は `inventory_lots.quantity`、`inventory_reservations.fulfilled_quantity`、`sales_order_lines.shipped_quantity`、`sales_orders.shipment_status` をRPC内のTransactionで更新する。
+- 出荷取消時は履歴を削除せず、`inventory_movements.movement_type = shipment_cancel` として取消履歴を残す。
+- 受注ステータスは出荷数量に応じて `未出荷`、`一部出荷`、`出荷済` を自動判定する。
+- 納品書PDF、送り状、配送会社API、請求書連携は別フェーズで扱う。

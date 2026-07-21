@@ -624,3 +624,16 @@
 - 関連データ: `products`, `suppliers`, `customers`, `projects`, `quotes`, `invoices`
 - 今後の拡張: 受注、出荷、WMS/ERP、バーコード、QR、棚卸一括入力、監査ログ連携。
 - 互換方針: 旧 `inventories` は移行期間中のみ残す。新テーブルを正とし、旧 `movement_history` への書き込みは段階的に停止する。
+---
+
+## 受注管理 Phase 3: 出荷管理
+
+- ステータス: 開発中
+- 目的: 受注から出荷予定を作成し、出荷確定時にのみ在庫ロットと引当を更新する。
+- 画面: `SalesOrders` の出荷セクション、`Shipments` 出荷一覧/詳細。
+- 入力: 受注、受注明細、出荷数量、引当ロット、出荷日、納品予定日、配送会社、追跡番号、メモ、出荷ステータス。
+- 出力: 出荷番号、出荷履歴、ピッキングリスト、受注別の未出荷/一部出荷/出荷済ステータス、出荷数量、残数量。
+- 保存先: Supabase `shipments`, `shipment_lines`。出荷確定・取消履歴は `inventory_movements`。
+- 関連データ: `sales_orders`, `sales_order_lines`, `inventory_lots`, `inventory_reservations`, `inventory_movements`, `customers`, `products`。
+- 今回対象外: 納品書PDF、送り状発行、配送会社API連携、請求書連携、帳票センター。
+- 今後の拡張: 納品書、送り状、出荷承認、配送会社API、請求書自動作成、WMS連携。

@@ -8,6 +8,7 @@ import {
   generateSalesOrderNumber,
   normalizeSalesOrder,
 } from '../hooks/useSalesOrders.js';
+import { SALES_ORDER_SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_LABELS } from '../../shipments/hooks/useShipments.js';
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -61,6 +62,14 @@ function reservationStatusLabel(status) {
   return RESERVATION_STATUS_LABELS[status] || status || '未引当';
 }
 
+function shipmentStatusLabel(status) {
+  return SALES_ORDER_SHIPMENT_STATUS_LABELS[status] || status || '未出荷';
+}
+
+function shipmentDocumentStatusLabel(status) {
+  return SHIPMENT_STATUS_LABELS[status] || status || '-';
+}
+
 function customerName(customer) {
   return customer?.companyName || customer?.name || '-';
 }
@@ -95,6 +104,7 @@ function makeManualDraft({ orders, issuers, user }) {
 
 export default function SalesOrders({
   salesOrders = [],
+  shipments = [],
   addSalesOrder,
   updateSalesOrder,
   removeSalesOrder,
@@ -110,6 +120,11 @@ export default function SalesOrders({
   reserveLineLot,
   releaseLineReservations,
   reallocateLineFefo,
+  createShipmentFromOrder,
+  updateShipmentStatus,
+  shipShipment,
+  cancelShipment,
+  reloadShipments,
   reloadInventory,
   initialDraft = null,
   onDraftHandled,
@@ -127,6 +142,8 @@ export default function SalesOrders({
   const [reservationBusy, setReservationBusy] = useState('');
   const [selectedLotByLine, setSelectedLotByLine] = useState({});
   const [reservationQuantityByLine, setReservationQuantityByLine] = useState({});
+  const [shipmentBusy, setShipmentBusy] = useState('');
+  const [shipmentQuantityByLine, setShipmentQuantityByLine] = useState({});
 
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const contactMap = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
@@ -222,6 +239,65 @@ export default function SalesOrders({
     return { lines, ordered, reserved, available, shortage, rate: ordered > 0 ? Math.round((reserved / ordered) * 100) : 0 };
   }, [activeReservations, form.id, form.salesOrderLines, inventoryLots]);
 
+  const activeShipments = useMemo(
+    () => shipments.filter((shipment) => !shipment.isDeleted && shipment.status !== 'Cancelled'),
+    [shipments],
+  );
+
+  const shipmentSummaryByOrder = useMemo(() => {
+    const result = new Map();
+    salesOrders.forEach((order) => {
+      const ordered = order.salesOrderLines.reduce((sum, line) => sum + numberValue(line.quantity), 0);
+      const shipped = activeShipments
+        .filter((shipment) => shipment.salesOrderId === order.id && shipment.status === 'Shipped')
+        .flatMap((shipment) => shipment.shipmentLines || [])
+        .reduce((sum, line) => sum + numberValue(line.quantity), 0);
+      const pending = activeShipments
+        .filter((shipment) => shipment.salesOrderId === order.id && shipment.status !== 'Shipped')
+        .flatMap((shipment) => shipment.shipmentLines || [])
+        .reduce((sum, line) => sum + numberValue(line.quantity), 0);
+      const status = ordered <= 0 ? 'unshipped' : shipped >= ordered ? 'shipped' : shipped > 0 ? 'partial' : 'unshipped';
+      result.set(order.id, { ordered, shipped, pending, remaining: Math.max(0, ordered - shipped), status });
+    });
+    return result;
+  }, [activeShipments, salesOrders]);
+
+  const formShipments = useMemo(
+    () => shipments.filter((shipment) => !shipment.isDeleted && shipment.salesOrderId === form.id),
+    [form.id, shipments],
+  );
+
+  const formShipmentSummary = useMemo(() => {
+    const shippedLines = formShipments
+      .filter((shipment) => shipment.status === 'Shipped')
+      .flatMap((shipment) => shipment.shipmentLines || []);
+    const pendingLines = formShipments
+      .filter((shipment) => shipment.status !== 'Cancelled' && shipment.status !== 'Shipped')
+      .flatMap((shipment) => shipment.shipmentLines || []);
+
+    const lines = form.salesOrderLines.map((line) => {
+      const shipped = shippedLines
+        .filter((shipmentLine) => shipmentLine.salesOrderLineId === line.id)
+        .reduce((sum, shipmentLine) => sum + numberValue(shipmentLine.quantity), 0);
+      const pending = pendingLines
+        .filter((shipmentLine) => shipmentLine.salesOrderLineId === line.id)
+        .reduce((sum, shipmentLine) => sum + numberValue(shipmentLine.quantity), 0);
+      const ordered = numberValue(line.quantity);
+      return {
+        line,
+        ordered,
+        shipped,
+        pending,
+        remaining: Math.max(0, ordered - shipped),
+      };
+    });
+    const ordered = lines.reduce((sum, item) => sum + item.ordered, 0);
+    const shipped = lines.reduce((sum, item) => sum + item.shipped, 0);
+    const pending = lines.reduce((sum, item) => sum + item.pending, 0);
+    const status = ordered <= 0 ? 'unshipped' : shipped >= ordered ? 'shipped' : shipped > 0 ? 'partial' : 'unshipped';
+    return { lines, ordered, shipped, pending, remaining: Math.max(0, ordered - shipped), status };
+  }, [form.salesOrderLines, formShipments]);
+
   const columns = [
     { key: 'salesOrderNumber', label: '受注番号', minWidth: '160px', render: (order) => <strong>{order.salesOrderNumber || '-'}</strong> },
     { key: 'customer', label: '顧客', minWidth: '220px', render: (order) => customerName(customerMap.get(order.customerId)) },
@@ -233,6 +309,10 @@ export default function SalesOrders({
     { key: 'reservationStatus', label: '引当状況', minWidth: '130px', render: (order) => {
       const summary = reservationSummaryByOrder.get(order.id);
       return `${reservationStatusLabel(summary?.status)} ${summary?.rate || 0}%`;
+    } },
+    { key: 'shipmentStatus', label: '出荷状況', minWidth: '130px', render: (order) => {
+      const summary = shipmentSummaryByOrder.get(order.id);
+      return `${shipmentStatusLabel(summary?.status)} ${summary?.shipped || 0}/${summary?.ordered || 0}`;
     } },
     { key: 'grandTotal', label: '受注金額', minWidth: '120px', render: (order) => money(order.grandTotal) },
     { key: 'status', label: 'ステータス', minWidth: '110px', render: (order) => order.status || '-' },
@@ -385,6 +465,64 @@ export default function SalesOrders({
     return runReservationAction(line.id, () => reallocateLineFefo?.(form.id, line.id, reservationQuantityByLine[line.id] || null));
   }
 
+  async function runShipmentAction(action) {
+    if (!editingId) {
+      setMessage('出荷登録は受注を保存してから実行してください。');
+      return;
+    }
+    setShipmentBusy('order');
+    setMessage('');
+    try {
+      await action();
+      await Promise.all([reloadShipments?.(), reloadInventory?.()]);
+      setMessage('出荷情報を更新しました。');
+    } catch (error) {
+      setMessage(error.message || '出荷処理に失敗しました。');
+    } finally {
+      setShipmentBusy('');
+    }
+  }
+
+  function createFullShipment() {
+    return runShipmentAction(() => createShipmentFromOrder?.({
+      salesOrderId: form.id,
+      lines: null,
+      status: 'Draft',
+      shipmentDate: todayString(),
+      plannedDeliveryDate: form.expectedDeliveryDate || '',
+      note: 'full shipment from sales order',
+    }));
+  }
+
+  function createPartialShipment() {
+    const lines = form.salesOrderLines
+      .map((line) => ({
+        salesOrderLineId: line.id,
+        quantity: shipmentQuantityByLine[line.id] || '',
+      }))
+      .filter((line) => numberValue(line.quantity) > 0);
+    if (!lines.length) {
+      setMessage('一部出荷する数量を入力してください。');
+      return;
+    }
+    return runShipmentAction(() => createShipmentFromOrder?.({
+      salesOrderId: form.id,
+      lines,
+      status: 'Draft',
+      shipmentDate: todayString(),
+      plannedDeliveryDate: form.expectedDeliveryDate || '',
+      note: 'partial shipment from sales order',
+    }));
+  }
+
+  function changeShipmentStatus(shipment, status) {
+    return runShipmentAction(() => {
+      if (status === 'Shipped') return shipShipment?.(shipment.id, { shipmentDate: shipment.shipmentDate || todayString() });
+      if (status === 'Cancelled') return cancelShipment?.(shipment.id);
+      return updateShipmentStatus?.(shipment.id, status, { shipmentDate: shipment.shipmentDate || todayString() });
+    });
+  }
+
   return (
     <section className="page sales-orders-page">
       <div className="page-header">
@@ -513,6 +651,71 @@ export default function SalesOrders({
                   </article>
                 );
               })}
+
+              <div className="section-heading">
+                <div>
+                  <h3>出荷</h3>
+                  <span>受注から出荷を作成し、Shipped時に在庫と引当を確定します。</span>
+                </div>
+                <div className="mail-action-row">
+                  <button type="button" className="primary-button" disabled={!editingId || shipmentBusy === 'order'} onClick={createFullShipment}>全量出荷登録</button>
+                  <button type="button" className="ghost-button" disabled={!editingId || shipmentBusy === 'order'} onClick={createPartialShipment}>一部出荷登録</button>
+                </div>
+              </div>
+              {!editingId && <p className="notice-text">出荷登録は受注を保存してから実行できます。</p>}
+              <div className="price-preview">
+                <div><span>受注数量</span><strong>{formShipmentSummary.ordered.toLocaleString('ja-JP')}</strong></div>
+                <div><span>出荷済</span><strong>{formShipmentSummary.shipped.toLocaleString('ja-JP')}</strong></div>
+                <div><span>出荷予定</span><strong>{formShipmentSummary.pending.toLocaleString('ja-JP')}</strong></div>
+                <div><span>残数量</span><strong className={formShipmentSummary.remaining > 0 ? '' : 'notice-text'}>{formShipmentSummary.remaining.toLocaleString('ja-JP')}</strong></div>
+                <div><span>出荷状況</span><strong>{shipmentStatusLabel(formShipmentSummary.status)}</strong></div>
+              </div>
+              {formShipmentSummary.lines.map(({ line, ordered, shipped, pending, remaining }) => (
+                <article className="karte-mini-card" key={`shipment-plan-${line.id}`}>
+                  <div className="history-meta">
+                    <strong>{line.productName || productMap.get(line.productId)?.name || '商品未設定'}</strong>
+                    <span>{shipped.toLocaleString('ja-JP')} / {ordered.toLocaleString('ja-JP')} {line.unit || ''}</span>
+                  </div>
+                  <div className="date-grid">
+                    <div><span>出荷済</span><strong>{shipped.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                    <div><span>出荷予定</span><strong>{pending.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                    <div><span>残数量</span><strong>{remaining.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                    <label className="field-label">一部出荷数量<input inputMode="decimal" value={shipmentQuantityByLine[line.id] || ''} onChange={(event) => setShipmentQuantityByLine((current) => ({ ...current, [line.id]: event.target.value }))} placeholder="例: 10" /></label>
+                  </div>
+                </article>
+              ))}
+              <div className="timeline-list">
+                {formShipments.length > 0 ? formShipments.map((shipment) => (
+                  <div className="timeline-item" key={shipment.id}>
+                    <strong>{shipment.shipmentNumber} / {shipmentDocumentStatusLabel(shipment.status)}</strong>
+                    <span>{formatDate(shipment.shipmentDate)} / {shipment.shipmentLines.reduce((sum, line) => sum + numberValue(line.quantity), 0).toLocaleString('ja-JP')}</span>
+                    <div className="mail-action-row">
+                      <button type="button" className="ghost-button" disabled={shipment.status === 'Shipped' || shipment.status === 'Cancelled' || shipmentBusy === 'order'} onClick={() => changeShipmentStatus(shipment, 'Picking')}>Picking</button>
+                      <button type="button" className="ghost-button" disabled={shipment.status === 'Shipped' || shipment.status === 'Cancelled' || shipmentBusy === 'order'} onClick={() => changeShipmentStatus(shipment, 'Ready')}>Ready</button>
+                      <button type="button" className="primary-button" disabled={shipment.status === 'Shipped' || shipment.status === 'Cancelled' || shipmentBusy === 'order'} onClick={() => changeShipmentStatus(shipment, 'Shipped')}>Shipped</button>
+                      <button type="button" className="ghost-button danger" disabled={shipment.status === 'Cancelled' || shipmentBusy === 'order'} onClick={() => changeShipmentStatus(shipment, 'Cancelled')}>取消</button>
+                    </div>
+                    <div className="timeline-list">
+                      {shipment.shipmentLines.map((shipmentLine) => {
+                        const lot = inventoryLots.find((item) => item.id === shipmentLine.inventoryLotId);
+                        const sourceLine = form.salesOrderLines.find((item) => item.id === shipmentLine.salesOrderLineId);
+                        return (
+                          <div className="timeline-item" key={shipmentLine.id}>
+                            <strong>{sourceLine?.productName || productMap.get(shipmentLine.productId)?.name || shipmentLine.productId}</strong>
+                            <span>{[
+                              shipmentLine.lotSnapshot?.inventoryCode || lot?.inventoryCode,
+                              shipmentLine.lotSnapshot?.lotNumber || lot?.lotNumber,
+                              shipmentLine.expirySnapshot || lot?.expiryDate,
+                              lot?.location,
+                              `${shipmentLine.quantity.toLocaleString('ja-JP')} ${shipmentLine.unit || lot?.unit || sourceLine?.unit || ''}`,
+                            ].filter(Boolean).join(' / ')}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )) : <p className="notice-text">出荷履歴はまだありません。</p>}
+              </div>
               <label className="field-label">メモ<textarea value={form.memo} onChange={(event) => updateField('memo', event.target.value)} /></label>
             </div>
 
@@ -529,6 +732,12 @@ export default function SalesOrders({
                 <div><span>受注数量</span><strong>{formReservationSummary.ordered.toLocaleString('ja-JP')}</strong></div>
                 <div><span>不足数量</span><strong className={formReservationSummary.shortage > 0 ? 'danger-text' : ''}>{formReservationSummary.shortage.toLocaleString('ja-JP')}</strong></div>
                 <div><span>引当率</span><strong>{formReservationSummary.rate}%</strong></div>
+              </div>
+              <div className="price-preview">
+                <div><span>出荷状況</span><strong>{shipmentStatusLabel(formShipmentSummary.status)}</strong></div>
+                <div><span>出荷済</span><strong>{formShipmentSummary.shipped.toLocaleString('ja-JP')}</strong></div>
+                <div><span>出荷予定</span><strong>{formShipmentSummary.pending.toLocaleString('ja-JP')}</strong></div>
+                <div><span>残数量</span><strong>{formShipmentSummary.remaining.toLocaleString('ja-JP')}</strong></div>
               </div>
               <div className="sample-form">
                 <h3>スナップショット</h3>
@@ -574,6 +783,7 @@ export default function SalesOrders({
             <div className="lead-badges">
               <span className="info-badge">{order.status}</span>
               <span className="info-badge">{reservationStatusLabel(reservationSummaryByOrder.get(order.id)?.status)}</span>
+              <span className="info-badge">{shipmentStatusLabel(shipmentSummaryByOrder.get(order.id)?.status)}</span>
               <span className="info-badge ready">{money(order.grandTotal)}</span>
             </div>
             <p>{order.subject || '-'}</p>

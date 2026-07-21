@@ -15,6 +15,7 @@ import { useProducts } from './modules/products/hooks/useProducts.js';
 import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { buildSalesOrderDraft, useSalesOrders } from './modules/salesOrders/hooks/useSalesOrders.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
+import { useShipments } from './modules/shipments/hooks/useShipments.js';
 import { useIssuers } from './modules/settings/hooks/useIssuers.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
 import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
@@ -43,6 +44,7 @@ const ProductDetail = lazy(() => import('./modules/products/pages/ProductDetail.
 const Products = lazy(() => import('./modules/products/pages/Products.jsx'));
 const SalesOrders = lazy(() => import('./modules/salesOrders/pages/SalesOrders.jsx'));
 const SettingsPage = lazy(() => import('./modules/settings/pages/SettingsPage.jsx'));
+const Shipments = lazy(() => import('./modules/shipments/pages/Shipments.jsx'));
 const Suppliers = lazy(() => import('./modules/suppliers/pages/Suppliers.jsx'));
 
 function isImportPath() {
@@ -189,6 +191,14 @@ function AuthenticatedApp() {
     releaseLineReservations,
     reallocateLineFefo,
   } = useSalesOrders(userId);
+  const {
+    records: shipments,
+    createShipmentFromOrder,
+    updateShipmentStatus,
+    shipShipment,
+    cancelShipment,
+    reload: reloadShipments,
+  } = useShipments(userId);
   const {
     records: issuers,
     addRecord: addIssuer,
@@ -624,6 +634,7 @@ function AuthenticatedApp() {
             quotes={quotes}
             invoices={invoices}
             salesOrders={salesOrders}
+            shipments={shipments}
             issuers={issuers}
             addIssuer={addIssuer}
             updateIssuer={updateIssuer}
@@ -641,6 +652,11 @@ function AuthenticatedApp() {
             reserveLineLot={reserveLineLot}
             releaseLineReservations={releaseLineReservations}
             reallocateLineFefo={reallocateLineFefo}
+            createShipmentFromOrder={createShipmentFromOrder}
+            updateShipmentStatus={updateShipmentStatus}
+            shipShipment={shipShipment}
+            cancelShipment={cancelShipment}
+            reloadShipments={reloadShipments}
             reloadInventory={reloadInventory}
             openProductDetail={openProductDetail}
             openInventoryPage={openInventoryPage}
@@ -756,6 +772,7 @@ function ActivePage({
   quotes,
   invoices,
   salesOrders,
+  shipments,
   issuers,
   addIssuer,
   updateIssuer,
@@ -773,6 +790,11 @@ function ActivePage({
   reserveLineLot,
   releaseLineReservations,
   reallocateLineFefo,
+  createShipmentFromOrder,
+  updateShipmentStatus,
+  shipShipment,
+  cancelShipment,
+  reloadShipments,
   reloadInventory,
   openProductDetail,
   openInventoryPage,
@@ -918,6 +940,7 @@ function ActivePage({
         quotes={quotes}
         invoices={invoices}
         salesOrders={salesOrders}
+        shipments={shipments}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -930,7 +953,7 @@ function ActivePage({
         setActivePage={setActivePage}
         onCreateQuote={onCreateQuote}
         onCreateInvoice={onCreateInvoice}
-        onCreateSalesOrder={onCreateSalesOrder}
+          onCreateSalesOrder={onCreateSalesOrder}
         user={user}
       />
     );
@@ -970,6 +993,7 @@ function ActivePage({
     return (
       <SalesOrders
         salesOrders={salesOrders}
+        shipments={shipments}
         addSalesOrder={addSalesOrder}
         updateSalesOrder={updateSalesOrder}
         removeSalesOrder={removeSalesOrder}
@@ -985,12 +1009,31 @@ function ActivePage({
         reserveLineLot={reserveLineLot}
         releaseLineReservations={releaseLineReservations}
         reallocateLineFefo={reallocateLineFefo}
+        createShipmentFromOrder={createShipmentFromOrder}
+        updateShipmentStatus={updateShipmentStatus}
+        shipShipment={shipShipment}
+        cancelShipment={cancelShipment}
+        reloadShipments={reloadShipments}
         reloadInventory={reloadInventory}
         initialDraft={salesOrderDraft}
         onDraftHandled={() => setSalesOrderDraft(null)}
         onOpenKarte={openCustomerKarte}
         onOpenProject={() => setActivePage('Pipeline')}
         user={user}
+      />
+    );
+  }
+
+  if (activePage === 'Shipments') {
+    return (
+      <Shipments
+        shipments={shipments}
+        salesOrders={salesOrders}
+        customers={customers}
+        products={products}
+        inventoryLots={inventoryLots}
+        updateShipmentStatus={updateShipmentStatus}
+        onOpenSalesOrder={() => setActivePage('SalesOrders')}
       />
     );
   }
@@ -1217,6 +1260,7 @@ function ActivePage({
           samples,
           quotes,
           salesOrders,
+          shipments,
           invoices,
           issuers,
           adoptions,

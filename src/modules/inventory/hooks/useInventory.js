@@ -57,6 +57,7 @@ const LOT_STATUS_TO_STATUS = {
 const MOVEMENT_TYPE_TO_LABEL = {
   receipt: '入庫',
   shipment: '出庫',
+  shipment_cancel: '出荷取消',
   sample: '出庫',
   return_in: '入庫',
   return_out: '出庫',
