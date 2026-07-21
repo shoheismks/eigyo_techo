@@ -219,6 +219,27 @@ export default function SettingsPage({
             <label className="field-label">既定PDFテンプレート<select value={issuerForm.defaultPdfTemplate || 'standard'} onChange={(event) => updateIssuerForm('defaultPdfTemplate', event.target.value)}>{PDF_TEMPLATE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
           </div>
           <label className="field-label">振込先<textarea value={issuerForm.bankAccount || ''} onChange={(event) => updateIssuerForm('bankAccount', event.target.value)} /></label>
+          <div className="sample-form">
+            <div className="section-heading">
+              <div>
+                <h3>請求書設定</h3>
+                <span>請求書PDFと支払情報の既定値です。</span>
+              </div>
+            </div>
+            <div className="date-grid">
+              <label className="field-label">既定支払期限日数<input inputMode="numeric" value={issuerForm.defaultInvoiceDueDays || ''} onChange={(event) => updateIssuerForm('defaultInvoiceDueDays', event.target.value)} /></label>
+              <label className="field-label">税端数処理<select value={issuerForm.invoiceRoundingMode || 'round'} onChange={(event) => updateIssuerForm('invoiceRoundingMode', event.target.value)}><option value="round">四捨五入</option><option value="floor">切り捨て</option><option value="ceil">切り上げ</option></select></label>
+              <label className="field-label">請求書番号ルール<input value={issuerForm.invoiceNumberRule || ''} onChange={(event) => updateIssuerForm('invoiceNumberRule', event.target.value)} /></label>
+              <label className="field-label">金融機関名<input value={issuerForm.defaultBankName || ''} onChange={(event) => updateIssuerForm('defaultBankName', event.target.value)} /></label>
+              <label className="field-label">支店名<input value={issuerForm.defaultBankBranch || ''} onChange={(event) => updateIssuerForm('defaultBankBranch', event.target.value)} /></label>
+              <label className="field-label">口座種別<input value={issuerForm.defaultBankAccountType || ''} onChange={(event) => updateIssuerForm('defaultBankAccountType', event.target.value)} /></label>
+              <label className="field-label">口座番号<input value={issuerForm.defaultBankAccountNumber || ''} onChange={(event) => updateIssuerForm('defaultBankAccountNumber', event.target.value)} /></label>
+              <label className="field-label">口座名義<input value={issuerForm.defaultBankAccountHolder || ''} onChange={(event) => updateIssuerForm('defaultBankAccountHolder', event.target.value)} /></label>
+            </div>
+            <label className="field-label">振込手数料負担文言<input value={issuerForm.defaultTransferFeeText || ''} onChange={(event) => updateIssuerForm('defaultTransferFeeText', event.target.value)} /></label>
+            <label className="field-label">既定請求書備考<textarea value={issuerForm.defaultInvoiceRemarks || ''} onChange={(event) => updateIssuerForm('defaultInvoiceRemarks', event.target.value)} /></label>
+            {!issuerForm.registrationNumber && <p className="notice-text">適格請求書として使う場合は登録番号を設定し、税理士等へ確認してください。</p>}
+          </div>
           <label className="field-label">既定支払条件<input value={issuerForm.defaultPaymentTerms || ''} onChange={(event) => updateIssuerForm('defaultPaymentTerms', event.target.value)} /></label>
           <label className="field-label">既定納品条件<input value={issuerForm.defaultDeliveryTerms || ''} onChange={(event) => updateIssuerForm('defaultDeliveryTerms', event.target.value)} /></label>
           <label className="field-label">既定備考<textarea value={issuerForm.defaultRemarks || ''} onChange={(event) => updateIssuerForm('defaultRemarks', event.target.value)} /></label>

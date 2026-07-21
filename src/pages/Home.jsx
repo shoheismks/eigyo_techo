@@ -40,6 +40,7 @@ export default function Home({
   customers,
   samples = [],
   quotes = [],
+  invoices = [],
   complaints = [],
   events = [],
   setActivePage,
@@ -51,7 +52,7 @@ export default function Home({
   const today = todayString();
   const weekEnd = addDaysString(today, 6);
   const scoredCustomers = customers.map(withScore);
-  const notifications = buildNotifications({ customers: scoredCustomers, samples, quotes, complaints, events });
+  const notifications = buildNotifications({ customers: scoredCustomers, samples, quotes, invoices, complaints, events });
   const activeEvents = events.filter((event) => !['完了', '中止'].includes(event.status));
   const todayEvents = activeEvents
     .filter((event) => eventDate(event) === today)
@@ -105,6 +106,10 @@ export default function Home({
   const quoteLost = quoteDecided.filter((quote) => quote.status === '失注').length;
   const quoteAdoptionRate = quoteDecided.length > 0 ? `${Math.round((quoteAccepted / quoteDecided.length) * 100)}%` : '0%';
   const quoteLostRate = quoteDecided.length > 0 ? `${Math.round((quoteLost / quoteDecided.length) * 100)}%` : '0%';
+  const activeInvoices = invoices.filter((invoice) => !['入金済み', '取消'].includes(invoice.status));
+  const overdueInvoices = activeInvoices.filter((invoice) => invoice.dueDate && invoice.dueDate < today && Number(invoice.unpaidAmount || 0) > 0);
+  const dueSoonInvoices = activeInvoices.filter((invoice) => invoice.dueDate && invoice.dueDate >= today && invoice.dueDate <= weekEnd && Number(invoice.unpaidAmount || 0) > 0);
+  const unpaidInvoiceTotal = activeInvoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.unpaidAmount || 0)), 0);
 
   const statusCounts = PIPELINE_STATUSES.reduce((summary, status) => {
     summary[status] = scoredCustomers.filter((customer) => customer.status === status).length;

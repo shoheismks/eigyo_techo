@@ -55,6 +55,7 @@ const KARTE_TABS = [
   { id: 'overview', label: '概要' },
   { id: 'projects', label: '案件' },
   { id: 'quotes', label: '見積' },
+  { id: 'invoices', label: '請求書' },
   { id: 'sales', label: '販売実績' },
   { id: 'products', label: '商品' },
   { id: 'samples', label: 'サンプル' },
@@ -515,6 +516,7 @@ export default function CustomerKarte({
   attachments,
   samples = [],
   quotes = [],
+  invoices = [],
   issuers = [],
   updateCustomer,
   addProject,
@@ -537,6 +539,7 @@ export default function CustomerKarte({
   updateInventory,
   setActivePage,
   onCreateQuote,
+  onCreateInvoice,
   user,
 }) {
   const [analysis, setAnalysis] = useState(null);
@@ -576,6 +579,10 @@ export default function CustomerKarte({
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
     [attachments, businessCards, complaints, contacts, customerId, customers, products, inventories, samples, quotes, adoptions, events],
+  );
+  const customerInvoices = useMemo(
+    () => invoices.filter((invoice) => invoice.customerId === customerId && !invoice.isDeleted),
+    [customerId, invoices],
   );
   const quoteInventoryOptions = useMemo(
     () =>
@@ -1582,6 +1589,7 @@ export default function CustomerKarte({
           {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
           <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
           <button className="primary-button karte-main-action" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
+          <button className="primary-button karte-main-action" type="button" onClick={() => onCreateInvoice?.({ customerId: customer.id })}>請求書作成</button>
           <button className="primary-button karte-main-action" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
           {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
         </div>
@@ -1870,6 +1878,7 @@ export default function CustomerKarte({
           inventories={inventories}
           issuers={issuers}
           quotes={quotes}
+          invoices={invoices}
           samples={samples}
           complaints={complaints}
           events={events}
@@ -1880,6 +1889,7 @@ export default function CustomerKarte({
           defaultCustomerId={customer.id}
           setActivePage={setActivePage}
           onCreateQuote={onCreateQuote}
+          onCreateInvoice={onCreateInvoice}
         />
 
         <Section title="商談履歴" count={karte.dealHistories.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setHistoryForm(emptyHistoryForm)}>＋追加</button>}>
@@ -2634,6 +2644,11 @@ export default function CustomerKarte({
             onEditQuote={handleEditQuote}
             onDuplicateQuote={handleDuplicateQuote}
             onRegenerateQuote={handleRegenerateQuote}
+            onCreateInvoice={onCreateInvoice}
+          />
+          <InvoiceMiniList
+            invoices={customerInvoices}
+            onOpenInvoices={() => setActivePage('Invoices')}
           />
           {karte.estimates.length === 0 && <AddCard title="見積を追加" description="見積PDFまで作成して履歴に保存します" onClick={() => setQuoteForm(createQuoteForm(customer.id, user, quotes))} />}
         </Section>
@@ -2925,6 +2940,7 @@ export default function CustomerKarte({
             </div>
             <div className="karte-side-actions">
               <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
+              <button className="primary-button" type="button" onClick={() => onCreateInvoice?.({ customerId: customer.id })}>請求書作成</button>
               <button className="primary-button" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
               <button className="ghost-button" type="button" onClick={startAddContact}>担当者追加</button>
               <button className="ghost-button" type="button" onClick={startAddSample}>サンプル追加</button>
@@ -3318,6 +3334,7 @@ function QuoteListV1({
   onEditQuote,
   onDuplicateQuote,
   onRegenerateQuote,
+  onCreateInvoice,
 }) {
   if (!quotes.length) return null;
 
@@ -3449,10 +3466,62 @@ function QuoteListV1({
               <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); onRegenerateQuote?.(quote); }}>
                 PDF再出力
               </button>
+              <button className="primary-button" type="button" onClick={(event) => { event.stopPropagation(); onCreateInvoice?.({ quoteId: quote.id }); }}>
+                請求書作成
+              </button>
             </div>
           </article>
         );
       })}
+    </div>
+  );
+}
+
+function InvoiceMiniList({ invoices = [], onOpenInvoices }) {
+  if (!invoices.length) {
+    return (
+      <div className="karte-card-list sample-card-list">
+        <button className="karte-add-card" type="button" onClick={onOpenInvoices}>
+          <strong>＋請求書を追加</strong>
+          <span>見積または成約確認書をもとに請求書を作成します</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="karte-card-list sample-card-list">
+      <div className="section-heading">
+        <div>
+          <h3>請求書</h3>
+          <span>{invoices.length}件</span>
+        </div>
+        <button className="ghost-button compact-action-button" type="button" onClick={onOpenInvoices}>請求書一覧</button>
+      </div>
+      {invoices.slice(0, 5).map((invoice) => (
+        <article className="karte-mini-card quote-card" key={invoice.id}>
+          <div className="history-meta">
+            <span>{invoice.invoiceNumber || '請求書番号未設定'}</span>
+            <small>{invoice.status || '-'}</small>
+          </div>
+          <dl className="company-details">
+            <div><dt>件名</dt><dd>{invoice.subject || '-'}</dd></div>
+            <div><dt>請求日</dt><dd>{formatDate(invoice.invoiceDate || invoice.issueDate)}</dd></div>
+            <div><dt>支払期限</dt><dd>{formatDate(invoice.dueDate)}</dd></div>
+            <div><dt>請求額</dt><dd>{formatPrice(invoice.grandTotal) || '-'} 円</dd></div>
+            <div><dt>入金額</dt><dd>{formatPrice(invoice.paidAmount) || '-'} 円</dd></div>
+            <div><dt>未入金</dt><dd>{formatPrice(invoice.unpaidAmount) || '-'} 円</dd></div>
+          </dl>
+          <div className="mail-action-row">
+            {invoice.invoicePdfUrl && (
+              <a className="ghost-button external-button" href={invoice.invoicePdfUrl} target="_blank" rel="noreferrer">
+                PDFを開く
+              </a>
+            )}
+            <button className="ghost-button" type="button" onClick={onOpenInvoices}>編集・入金登録</button>
+          </div>
+        </article>
+      ))}
     </div>
   );
 }

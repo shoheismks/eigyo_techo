@@ -42,6 +42,7 @@ export default function Suppliers({
   inventories = [],
   issuers = [],
   quotes = [],
+  invoices = [],
   samples = [],
   complaints = [],
   events = [],
@@ -55,6 +56,7 @@ export default function Suppliers({
   setActivePage,
   onOpenKarte,
   onCreateQuote,
+  onCreateInvoice,
   userId,
 }) {
   const [keyword, setKeyword] = useState('');
@@ -257,6 +259,7 @@ export default function Suppliers({
         inventories={inventories}
         issuers={issuers}
         quotes={quotes}
+        invoices={invoices}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -267,6 +270,7 @@ export default function Suppliers({
         setActivePage={setActivePage}
         onOpenKarte={onOpenKarte}
         onCreateQuote={onCreateQuote}
+        onCreateInvoice={onCreateInvoice}
       />
 
       <section className="result-stack suppliers-list-section">

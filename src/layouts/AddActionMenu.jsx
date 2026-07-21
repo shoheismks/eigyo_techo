@@ -2,6 +2,7 @@ const actions = [
   { key: 'business-card', label: '名刺を撮影', description: 'カメラで名刺を追加', tone: 'primary' },
   { key: 'deal', label: '商談メモ', description: '今すぐ商談内容を記録', tone: 'primary' },
   { key: 'quote', label: '見積作成', description: '顧客と商品を選んで見積PDFを作成', tone: 'primary' },
+  { key: 'invoice', label: '請求書作成', description: '見積・成約確認書をもとに請求書を作成', tone: 'primary' },
   { key: 'company', label: '会社を追加', description: '検索・補完から取引先登録' },
   { key: 'complaint', label: 'クレーム記録', description: '対応内容と期限を残す' },
   { key: 'product', label: '商品追加', description: '商品マスターを登録' },

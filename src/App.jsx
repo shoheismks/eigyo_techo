@@ -10,12 +10,14 @@ import { useCustomers } from './modules/customers/hooks/useCustomers.js';
 import { useProjects } from './modules/deals/hooks/useProjects.js';
 import { useEvents } from './modules/calendar/hooks/useEvents.js';
 import { useInventory } from './modules/inventory/hooks/useInventory.js';
+import { useInvoices } from './modules/invoices/hooks/useInvoices.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
 import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
 import { useIssuers } from './modules/settings/hooks/useIssuers.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
 import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
+import { buildInvoiceDraftFromQuote } from './modules/invoices/services/invoicePdfService.js';
 import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
 import Login from './pages/Login.jsx';
 
@@ -31,6 +33,7 @@ const Customers = lazy(() => import('./modules/customers/pages/Customers.jsx'));
 const Home = lazy(() => import('./pages/Home.jsx'));
 const HelpPage = lazy(() => import('./modules/settings/pages/HelpPage.jsx'));
 const ImportPage = lazy(() => import('./modules/customers/pages/ImportPage.jsx'));
+const Invoices = lazy(() => import('./modules/invoices/pages/Invoices.jsx'));
 const LeadSearch = lazy(() => import('./modules/customers/pages/LeadSearch.jsx'));
 const MailAI = lazy(() => import('./pages/MailAI.jsx'));
 const Pipeline = lazy(() => import('./pages/Pipeline.jsx'));
@@ -121,6 +124,7 @@ function AuthenticatedApp() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [quoteDraft, setQuoteDraft] = useState(null);
+  const [invoiceDraft, setInvoiceDraft] = useState(null);
 
   const {
     customers,
@@ -158,6 +162,12 @@ function AuthenticatedApp() {
     updateRecord: updateQuote,
     removeRecord: removeQuote,
   } = useQuotes(userId);
+  const {
+    records: invoices,
+    addRecord: addInvoice,
+    updateRecord: updateInvoice,
+    removeRecord: removeInvoice,
+  } = useInvoices(userId);
   const {
     records: issuers,
     addRecord: addIssuer,
@@ -331,6 +341,34 @@ function AuthenticatedApp() {
     }
   }
 
+  function openInvoiceForm(initial = {}) {
+    const safeInitial = initial || {};
+    const sourceQuote = safeInitial.quoteId
+      ? quotes.find((quote) => quote.id === safeInitial.quoteId)
+      : null;
+
+    if (sourceQuote) {
+      const customer = customers.find((item) => item.id === sourceQuote.customerId);
+      const contact = contacts.find((item) => item.id === sourceQuote.contactIds?.[0] || item.id === safeInitial.contactId);
+      const project = projects.find((item) => item.id === sourceQuote.projectId || item.id === safeInitial.projectId);
+      const issuer = issuers.find((item) => item.id === sourceQuote.issuerId);
+      setInvoiceDraft(buildInvoiceDraftFromQuote({
+        quote: sourceQuote,
+        customer,
+        contact,
+        project,
+        issuer,
+        invoices,
+        user,
+      }));
+      setActivePage('Invoices');
+      return;
+    }
+
+    setInvoiceDraft(safeInitial);
+    setActivePage('Invoices');
+  }
+
   function handleAddAction(actionKey) {
     const nextPageByAction = {
       company: 'LeadSearch',
@@ -339,10 +377,16 @@ function AuthenticatedApp() {
       complaint: 'Complaints',
       supplier: 'Suppliers',
       quote: null,
+      invoice: null,
     };
 
     if (actionKey === 'quote') {
       openQuoteForm({});
+      return;
+    }
+
+    if (actionKey === 'invoice') {
+      openInvoiceForm({});
       return;
     }
 
@@ -469,6 +513,7 @@ function AuthenticatedApp() {
             importError={importError}
             setActivePage={setActivePage}
             onCreateQuote={openQuoteForm}
+            onCreateInvoice={openInvoiceForm}
             addCustomer={addCustomer}
             isSaved={isSaved}
             customers={customers}
@@ -500,6 +545,7 @@ function AuthenticatedApp() {
             updateSample={updateSample}
             removeSample={removeSample}
             quotes={quotes}
+            invoices={invoices}
             issuers={issuers}
             addIssuer={addIssuer}
             updateIssuer={updateIssuer}
@@ -507,6 +553,9 @@ function AuthenticatedApp() {
             addQuote={addQuote}
             updateQuote={updateQuote}
             removeQuote={removeQuote}
+            addInvoice={addInvoice}
+            updateInvoice={updateInvoice}
+            removeInvoice={removeInvoice}
             openProductDetail={openProductDetail}
             selectedProduct={selectedProduct}
             contacts={contacts}
@@ -576,6 +625,7 @@ function ActivePage({
   importError,
   setActivePage,
   onCreateQuote,
+  onCreateInvoice,
   addCustomer,
   isSaved,
   customers,
@@ -607,6 +657,7 @@ function ActivePage({
   updateSample,
   removeSample,
   quotes,
+  invoices,
   issuers,
   addIssuer,
   updateIssuer,
@@ -614,6 +665,9 @@ function ActivePage({
   addQuote,
   updateQuote,
   removeQuote,
+  addInvoice,
+  updateInvoice,
+  removeInvoice,
   openProductDetail,
   selectedProduct,
   contacts,
@@ -656,6 +710,7 @@ function ActivePage({
         customers={customers}
         samples={samples}
         quotes={quotes}
+        invoices={invoices}
         complaints={complaints}
         events={events}
         setActivePage={setActivePage}
@@ -704,6 +759,7 @@ function ActivePage({
           adoptions={adoptions}
           samples={samples}
           quotes={quotes}
+          invoices={invoices}
           suppliers={suppliers}
           issuers={issuers}
           projects={projects}
@@ -725,6 +781,7 @@ function ActivePage({
           updateSample={updateSample}
           addQuote={addQuote}
           updateQuote={updateQuote}
+          onCreateInvoice={onCreateInvoice}
           addInventory={addInventory}
           updateInventory={updateInventory}
           removeInventory={removeInventory}
@@ -749,6 +806,7 @@ function ActivePage({
         issuers={issuers}
         inventories={inventories}
         quotes={quotes}
+        invoices={invoices}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -760,6 +818,7 @@ function ActivePage({
         updateCustomer={updateCustomer}
         setActivePage={setActivePage}
         onCreateQuote={onCreateQuote}
+        onCreateInvoice={onCreateInvoice}
         user={user}
       />
     );
@@ -775,6 +834,7 @@ function ActivePage({
         products={products}
         inventories={inventories}
         quotes={quotes}
+        invoices={invoices}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -787,6 +847,26 @@ function ActivePage({
         setActivePage={setActivePage}
         onOpenKarte={openCustomerKarte}
         onCreateQuote={onCreateQuote}
+        onCreateInvoice={onCreateInvoice}
+      />
+    );
+  }
+
+  if (activePage === 'Invoices') {
+    return (
+      <Invoices
+        invoices={invoices}
+        addInvoice={addInvoice}
+        updateInvoice={updateInvoice}
+        removeInvoice={removeInvoice}
+        customers={customers}
+        contacts={contacts}
+        projects={projects}
+        quotes={quotes}
+        issuers={issuers}
+        initialDraft={invoiceDraft}
+        onDraftHandled={() => setInvoiceDraft(null)}
+        user={user}
       />
     );
   }
@@ -810,6 +890,7 @@ function ActivePage({
         adoptions={adoptions}
         samples={samples}
         quotes={quotes}
+        invoices={invoices}
         projects={projects}
         customers={customers}
         suppliers={suppliers}
@@ -854,6 +935,7 @@ function ActivePage({
         products={products}
         inventories={inventories}
         quotes={quotes}
+        invoices={invoices}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -864,6 +946,7 @@ function ActivePage({
         setActivePage={setActivePage}
         onOpenKarte={openCustomerKarte}
         onCreateQuote={onCreateQuote}
+        onCreateInvoice={onCreateInvoice}
         userId={userId}
       />
     );
@@ -959,6 +1042,7 @@ function ActivePage({
           complaints,
           samples,
           quotes,
+          invoices,
           issuers,
           adoptions,
           attachments,
@@ -975,6 +1059,7 @@ function ActivePage({
           complaints: { records: complaints, add: addComplaint, update: updateComplaint },
           samples: { records: samples, add: addSample, update: updateSample },
           quotes: { records: quotes, add: addQuote, update: updateQuote },
+          invoices: { records: invoices, add: addInvoice, update: updateInvoice },
           issuers: { records: issuers, add: addIssuer, update: updateIssuer },
           adoptions: { records: adoptions, add: addAdoption, update: updateAdoption },
           attachments: { records: attachments, add: addAttachment, update: updateAttachment },

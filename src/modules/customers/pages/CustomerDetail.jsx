@@ -116,6 +116,7 @@ export default function CustomerDetail({
   contacts = [],
   inventories = [],
   quotes = [],
+  invoices = [],
   samples = [],
   complaints = [],
   events = [],
@@ -125,6 +126,7 @@ export default function CustomerDetail({
   removeProject,
   onOpenKarte,
   onCreateQuote,
+  onCreateInvoice,
   updateCustomer,
   setActivePage,
 }) {
@@ -379,6 +381,7 @@ export default function CustomerDetail({
         inventories={inventories}
         issuers={issuers}
         quotes={quotes}
+        invoices={invoices}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -390,6 +393,7 @@ export default function CustomerDetail({
         setActivePage={setActivePage}
         onOpenKarte={onOpenKarte}
         onCreateQuote={onCreateQuote}
+        onCreateInvoice={onCreateInvoice}
       />
 
       <section className={`detail-section ${customer.isDoNotContact ? 'ng-panel' : ''}`}>

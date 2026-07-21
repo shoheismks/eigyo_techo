@@ -27,6 +27,7 @@ export default function Pipeline({
   inventories = [],
   issuers = [],
   quotes = [],
+  invoices = [],
   samples = [],
   complaints = [],
   events = [],
@@ -39,6 +40,7 @@ export default function Pipeline({
   setActivePage,
   onOpenKarte,
   onCreateQuote,
+  onCreateInvoice,
 }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '');
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -131,6 +133,7 @@ export default function Pipeline({
         inventories={inventories}
         issuers={issuers}
         quotes={quotes}
+        invoices={invoices}
         samples={samples}
         complaints={complaints}
         events={events}
@@ -141,6 +144,7 @@ export default function Pipeline({
         setActivePage={setActivePage}
         onOpenKarte={onOpenKarte}
         onCreateQuote={onCreateQuote}
+        onCreateInvoice={onCreateInvoice}
       />
 
       <section className="pipeline-desktop">

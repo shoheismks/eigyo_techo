@@ -23,7 +23,14 @@ function pushNotification(items, notification) {
   });
 }
 
-export function buildNotifications({ customers = [], samples = [], quotes = [], complaints = [], events = [] }) {
+export function buildNotifications({
+  customers = [],
+  samples = [],
+  quotes = [],
+  invoices = [],
+  complaints = [],
+  events = [],
+}) {
   const today = todayKey();
   const customersById = new Map(customers.map((customer) => [customer.id, customer]));
   const items = [];
@@ -89,6 +96,36 @@ export function buildNotifications({ customers = [], samples = [], quotes = [], 
         customerName: getCustomerName(customersById, quote.customerId),
         date: quote.validUntil,
         tone: 'danger',
+      });
+    }
+  });
+
+  invoices.forEach((invoice) => {
+    if (!invoice.dueDate || ['入金済み', '取消'].includes(invoice.status)) return;
+    const unpaidAmount = Math.max(0, Number(invoice.unpaidAmount || 0));
+    if (unpaidAmount <= 0) return;
+
+    if (invoice.dueDate < today) {
+      pushNotification(items, {
+        id: `invoice-overdue-${invoice.id}`,
+        type: '請求期限切れ',
+        title: `${invoice.invoiceNumber || '請求書'} の支払期限を過ぎています`,
+        customerId: invoice.customerId,
+        customerName: invoice.billingName || getCustomerName(customersById, invoice.customerId),
+        date: invoice.dueDate,
+        tone: 'danger',
+      });
+    }
+
+    if (invoice.dueDate === today) {
+      pushNotification(items, {
+        id: `invoice-due-today-${invoice.id}`,
+        type: '本日支払期限',
+        title: `${invoice.invoiceNumber || '請求書'} の支払期限です`,
+        customerId: invoice.customerId,
+        customerName: invoice.billingName || getCustomerName(customersById, invoice.customerId),
+        date: invoice.dueDate,
+        tone: 'today',
       });
     }
   });

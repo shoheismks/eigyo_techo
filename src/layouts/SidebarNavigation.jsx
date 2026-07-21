@@ -13,11 +13,13 @@ const customerPages = [
   'Import',
 ];
 const productPages = ['Products', 'ProductDetail'];
+const pipelinePages = ['Pipeline', 'Invoices'];
 
 const navItems = [
   { key: 'Home', label: 'ホーム', helper: 'ダッシュボード' },
   { key: 'Customers', label: '取引先', helper: '顧客・担当者・名刺' },
   { key: 'Pipeline', label: '案件', helper: '商談・フォロー' },
+  { key: 'Invoices', label: '請求書', helper: '請求・入金確認' },
   { key: 'Products', label: '商品', helper: '商品マスター' },
   { key: 'Suppliers', label: '仕入先', helper: '仕入先管理' },
   { key: 'Calendar', label: 'カレンダー', helper: 'フォロー予定' },
@@ -29,12 +31,12 @@ const navItems = [
 function activeGroupFor(page) {
   if (customerPages.includes(page)) return 'Customers';
   if (productPages.includes(page)) return 'Products';
+  if (pipelinePages.includes(page)) return page === 'Invoices' ? 'Invoices' : 'Pipeline';
   if (page === 'Suppliers') return 'Suppliers';
   if (page === 'Calendar') return 'Calendar';
   if (page === 'Analytics') return 'Analytics';
   if (page === 'Settings') return 'Settings';
   if (page === 'Help') return 'Help';
-  if (page === 'Pipeline') return 'Pipeline';
   return 'Home';
 }
 

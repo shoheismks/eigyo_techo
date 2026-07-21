@@ -245,6 +245,7 @@ function buildProjectTimeline({
   inventories = [],
   issuers = [],
   quotes = [],
+  invoices = [],
   samples = [],
   complaints = [],
   events = [],
@@ -459,6 +460,7 @@ export default function ProjectPanel({
   setActivePage,
   onOpenKarte,
   onCreateQuote,
+  onCreateInvoice,
 }) {
   const [keyword, setKeyword] = useState('');
   const [editingProject, setEditingProject] = useState(null);
@@ -659,6 +661,16 @@ export default function ProjectPanel({
     });
   }
 
+  function createInvoiceForProject(project) {
+    const relatedQuote = quotes.find((quote) => isQuoteRelatedToProject(quote, project));
+    onCreateInvoice?.({
+      quoteId: relatedQuote?.id || '',
+      projectId: project.id,
+      customerId: project.customerId || '',
+      supplierId: project.supplierId || '',
+    });
+  }
+
   function toggleFormArray(field, value) {
     setForm((current) => ({ ...current, [field]: toggleArrayValue(current[field] ?? [], value) }));
   }
@@ -763,6 +775,7 @@ export default function ProjectPanel({
             {project.customerId && <button type="button" className="ghost-button" onClick={() => onOpenKarte?.(project.customerId)}>取引先</button>}
             {project.supplierId && <button type="button" className="ghost-button" onClick={() => setActivePage?.('Suppliers')}>仕入先</button>}
             <button type="button" className="ghost-button" onClick={() => createQuoteForProject(project)}>見積作成</button>
+            <button type="button" className="ghost-button" onClick={() => createInvoiceForProject(project)}>請求書</button>
             <button type="button" className="ghost-button" onClick={() => startEdit(project)}>編集</button>
             <button type="button" className="ghost-button" onClick={() => duplicateProject(project)}>複製</button>
             <button type="button" className="ghost-button" onClick={() => finishProject(project)}>終了</button>
@@ -797,6 +810,7 @@ export default function ProjectPanel({
             <p>{project.memo || 'メモなし'}</p>
             <div className="card-actions">
               <button type="button" className="primary-button" onClick={() => createQuoteForProject(project)}>見積作成</button>
+              <button type="button" className="ghost-button" onClick={() => createInvoiceForProject(project)}>請求書</button>
               <button type="button" className="ghost-button" onClick={() => startEdit(project)}>編集</button>
               <button type="button" className="ghost-button" onClick={() => duplicateProject(project)}>複製</button>
               <button type="button" className="ghost-button" onClick={() => finishProject(project)}>終了</button>

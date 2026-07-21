@@ -1857,6 +1857,27 @@
   margin-bottom: 18px;
 }
 
+.invoice-editor-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.invoice-editor-grid > aside {
+  align-self: start;
+}
+
+.invoices-page .price-preview {
+  position: sticky;
+  top: 16px;
+}
+
+@media (min-width: 768px) {
+  .invoice-editor-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(320px, .8fr);
+    align-items: start;
+  }
+}
+
 .sample-picker-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
