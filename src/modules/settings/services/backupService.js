@@ -19,6 +19,7 @@ const DATASET_KEYS = [
   'quotes',
   'salesOrders',
   'shipments',
+  'deliveryNotes',
   'invoices',
   'issuers',
   'adoptions',

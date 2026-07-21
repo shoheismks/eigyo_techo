@@ -30,8 +30,11 @@ export default function Shipments({
   customers = [],
   products = [],
   inventoryLots = [],
+  deliveryNotes = [],
   updateShipmentStatus,
   onOpenSalesOrder,
+  onOpenDeliveryNotes,
+  onCreateDeliveryNote,
 }) {
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -40,6 +43,7 @@ export default function Shipments({
   const orderMap = useMemo(() => new Map(salesOrders.map((order) => [order.id, order])), [salesOrders]);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const lotMap = useMemo(() => new Map(inventoryLots.map((lot) => [lot.id, lot])), [inventoryLots]);
+  const deliveryNoteMap = useMemo(() => new Map(deliveryNotes.filter((note) => !note.isDeleted).map((note) => [note.shipmentId, note])), [deliveryNotes]);
 
   const visibleShipments = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -80,6 +84,10 @@ export default function Shipments({
     updateShipmentStatus?.(shipment.id, status, { shipmentDate: shipment.shipmentDate });
   }
 
+  function hasDeliveryNote(shipment) {
+    return deliveryNoteMap.has(shipment.id);
+  }
+
   return (
     <section className="page shipments-page">
       <div className="page-header">
@@ -108,9 +116,14 @@ export default function Shipments({
             <>
               <button type="button" className="ghost-button" onClick={() => setSelectedId(shipment.id)}>詳細</button>
               {shipment.salesOrderId && <button type="button" className="ghost-button" onClick={() => onOpenSalesOrder?.(shipment.salesOrderId)}>受注</button>}
+              {shipment.status === 'Shipped' && (
+                <button type="button" className="ghost-button" onClick={() => (hasDeliveryNote(shipment) ? onOpenDeliveryNotes?.(shipment.id) : onCreateDeliveryNote?.(shipment.id))}>
+                  {hasDeliveryNote(shipment) ? '納品書' : '納品書作成'}
+                </button>
+              )}
             </>
           )}
-          actionWidth="170px"
+          actionWidth="260px"
           columns={columns}
           minWidth={1300}
           rows={visibleShipments}
@@ -142,6 +155,11 @@ export default function Shipments({
                 <div className="mail-action-row" onClick={(event) => event.stopPropagation()}>
                   <button type="button" className="ghost-button" onClick={() => setSelectedId(shipment.id)}>詳細</button>
                   {shipment.salesOrderId && <button type="button" className="ghost-button" onClick={() => onOpenSalesOrder?.(shipment.salesOrderId)}>受注</button>}
+                  {shipment.status === 'Shipped' && (
+                    <button type="button" className="ghost-button" onClick={() => (hasDeliveryNote(shipment) ? onOpenDeliveryNotes?.(shipment.id) : onCreateDeliveryNote?.(shipment.id))}>
+                      {hasDeliveryNote(shipment) ? '納品書' : '納品書作成'}
+                    </button>
+                  )}
                 </div>
               </article>
             );
@@ -174,6 +192,11 @@ export default function Shipments({
                 <button type="button" className="ghost-button" disabled={selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Ready')}>Ready</button>
                 <button type="button" className="primary-button" disabled={selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Shipped')}>Shipped</button>
                 <button type="button" className="ghost-button danger" disabled={selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Cancelled')}>取消</button>
+                {selectedShipment.status === 'Shipped' && (
+                  <button type="button" className="primary-button" onClick={() => (hasDeliveryNote(selectedShipment) ? onOpenDeliveryNotes?.(selectedShipment.id) : onCreateDeliveryNote?.(selectedShipment.id))}>
+                    {hasDeliveryNote(selectedShipment) ? '納品書を開く' : '納品書作成'}
+                  </button>
+                )}
               </div>
               <section className="sample-form">
                 <h3>ピッキングリスト</h3>

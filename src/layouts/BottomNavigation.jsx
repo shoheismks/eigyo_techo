@@ -10,7 +10,7 @@ const customerPages = [
   'MailAI',
   'Import',
 ];
-const pipelinePages = ['Pipeline', 'SalesOrders', 'Shipments', 'Invoices'];
+const pipelinePages = ['Pipeline', 'SalesOrders', 'Shipments', 'DeliveryNotes', 'Invoices'];
 const productPages = ['Products', 'ProductDetail', 'Inventory'];
 
 const tabs = [

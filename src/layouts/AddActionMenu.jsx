@@ -3,6 +3,7 @@ const actions = [
   { key: 'deal', label: '商談メモ', description: '今すぐ商談内容を記録', tone: 'primary' },
   { key: 'quote', label: '見積作成', description: '顧客と商品を選んで見積PDFを作成', tone: 'primary' },
   { key: 'salesOrder', label: '受注作成', description: '見積・成約確認書から受注を登録', tone: 'primary' },
+  { key: 'deliveryNote', label: '納品書', description: '出荷済データから納品書PDFを作成', tone: 'primary' },
   { key: 'invoice', label: '請求書作成', description: '見積・成約確認書をもとに請求書を作成', tone: 'primary' },
   { key: 'inventory', label: '在庫登録', description: '商品、ロット、賞味期限、保管場所を登録', tone: 'primary' },
   { key: 'company', label: '会社を追加', description: '検索・補完から取引先登録' },

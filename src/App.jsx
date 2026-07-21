@@ -16,6 +16,7 @@ import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuo
 import { buildSalesOrderDraft, useSalesOrders } from './modules/salesOrders/hooks/useSalesOrders.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
 import { useShipments } from './modules/shipments/hooks/useShipments.js';
+import { useDeliveryNotes } from './modules/deliveryNotes/hooks/useDeliveryNotes.js';
 import { useIssuers } from './modules/settings/hooks/useIssuers.js';
 import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
 import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
@@ -37,6 +38,7 @@ const HelpPage = lazy(() => import('./modules/settings/pages/HelpPage.jsx'));
 const ImportPage = lazy(() => import('./modules/customers/pages/ImportPage.jsx'));
 const Invoices = lazy(() => import('./modules/invoices/pages/Invoices.jsx'));
 const InventoryPage = lazy(() => import('./modules/inventory/pages/InventoryPage.jsx'));
+const DeliveryNotes = lazy(() => import('./modules/deliveryNotes/pages/DeliveryNotes.jsx'));
 const LeadSearch = lazy(() => import('./modules/customers/pages/LeadSearch.jsx'));
 const MailAI = lazy(() => import('./pages/MailAI.jsx'));
 const Pipeline = lazy(() => import('./pages/Pipeline.jsx'));
@@ -199,6 +201,14 @@ function AuthenticatedApp() {
     cancelShipment,
     reload: reloadShipments,
   } = useShipments(userId);
+  const {
+    records: deliveryNotes,
+    addRecord: addDeliveryNote,
+    updateRecord: updateDeliveryNote,
+    removeRecord: removeDeliveryNote,
+    createDeliveryNoteFromShipment,
+    reload: reloadDeliveryNotes,
+  } = useDeliveryNotes(userId);
   const {
     records: issuers,
     addRecord: addIssuer,
@@ -434,6 +444,20 @@ function AuthenticatedApp() {
     setActivePage('SalesOrders');
   }
 
+  async function handleCreateDeliveryNoteFromShipment(input) {
+    const shipmentId = typeof input === 'string' ? input : input?.shipmentId;
+    const priceVisible = typeof input === 'object' ? Boolean(input?.priceVisible) : false;
+    const issueDate = typeof input === 'object' ? input?.issueDate || '' : '';
+    if (!shipmentId) {
+      setActivePage('DeliveryNotes');
+      return null;
+    }
+    const result = await createDeliveryNoteFromShipment({ shipmentId, priceVisible, issueDate });
+    await reloadDeliveryNotes();
+    setActivePage('DeliveryNotes');
+    return result;
+  }
+
   function handleAddAction(actionKey) {
     const nextPageByAction = {
       company: 'LeadSearch',
@@ -444,6 +468,7 @@ function AuthenticatedApp() {
       quote: null,
       invoice: null,
       salesOrder: null,
+      deliveryNote: 'DeliveryNotes',
       inventory: null,
     };
 
@@ -459,6 +484,11 @@ function AuthenticatedApp() {
 
     if (actionKey === 'salesOrder') {
       openSalesOrderForm({});
+      return;
+    }
+
+    if (actionKey === 'deliveryNote') {
+      setActivePage('DeliveryNotes');
       return;
     }
 
@@ -635,6 +665,7 @@ function AuthenticatedApp() {
             invoices={invoices}
             salesOrders={salesOrders}
             shipments={shipments}
+            deliveryNotes={deliveryNotes}
             issuers={issuers}
             addIssuer={addIssuer}
             updateIssuer={updateIssuer}
@@ -657,6 +688,11 @@ function AuthenticatedApp() {
             shipShipment={shipShipment}
             cancelShipment={cancelShipment}
             reloadShipments={reloadShipments}
+            reloadDeliveryNotes={reloadDeliveryNotes}
+            createDeliveryNoteFromShipment={handleCreateDeliveryNoteFromShipment}
+            addDeliveryNote={addDeliveryNote}
+            updateDeliveryNote={updateDeliveryNote}
+            removeDeliveryNote={removeDeliveryNote}
             reloadInventory={reloadInventory}
             openProductDetail={openProductDetail}
             openInventoryPage={openInventoryPage}
@@ -773,6 +809,7 @@ function ActivePage({
   invoices,
   salesOrders,
   shipments,
+  deliveryNotes,
   issuers,
   addIssuer,
   updateIssuer,
@@ -795,6 +832,11 @@ function ActivePage({
   shipShipment,
   cancelShipment,
   reloadShipments,
+  reloadDeliveryNotes,
+  createDeliveryNoteFromShipment,
+  addDeliveryNote,
+  updateDeliveryNote,
+  removeDeliveryNote,
   reloadInventory,
   openProductDetail,
   openInventoryPage,
@@ -1032,8 +1074,28 @@ function ActivePage({
         customers={customers}
         products={products}
         inventoryLots={inventoryLots}
+        deliveryNotes={deliveryNotes}
         updateShipmentStatus={updateShipmentStatus}
         onOpenSalesOrder={() => setActivePage('SalesOrders')}
+        onOpenDeliveryNotes={() => setActivePage('DeliveryNotes')}
+        onCreateDeliveryNote={createDeliveryNoteFromShipment}
+      />
+    );
+  }
+
+  if (activePage === 'DeliveryNotes') {
+    return (
+      <DeliveryNotes
+        deliveryNotes={deliveryNotes}
+        shipments={shipments}
+        salesOrders={salesOrders}
+        customers={customers}
+        products={products}
+        issuers={issuers}
+        createDeliveryNoteFromShipment={createDeliveryNoteFromShipment}
+        updateDeliveryNote={updateDeliveryNote}
+        removeDeliveryNote={removeDeliveryNote}
+        user={user}
       />
     );
   }
@@ -1261,6 +1323,7 @@ function ActivePage({
           quotes,
           salesOrders,
           shipments,
+          deliveryNotes,
           invoices,
           issuers,
           adoptions,
@@ -1279,6 +1342,7 @@ function ActivePage({
           samples: { records: samples, add: addSample, update: updateSample },
           quotes: { records: quotes, add: addQuote, update: updateQuote },
           salesOrders: { records: salesOrders, add: addSalesOrder, update: updateSalesOrder },
+          deliveryNotes: { records: deliveryNotes, add: addDeliveryNote, update: updateDeliveryNote },
           invoices: { records: invoices, add: addInvoice, update: updateInvoice },
           issuers: { records: issuers, add: addIssuer, update: updateIssuer },
           adoptions: { records: adoptions, add: addAdoption, update: updateAdoption },

@@ -637,3 +637,14 @@
 - 関連データ: `sales_orders`, `sales_order_lines`, `inventory_lots`, `inventory_reservations`, `inventory_movements`, `customers`, `products`。
 - 今回対象外: 納品書PDF、送り状発行、配送会社API連携、請求書連携、帳票センター。
 - 今後の拡張: 納品書、送り状、出荷承認、配送会社API、請求書自動作成、WMS連携。
+## 納品書
+
+- ステータス: 開発中
+- 目的: 出荷済データから顧客向け納品書を作成し、PDFとして保存・再発行する。
+- 画面: `DeliveryNotes` 納品書一覧/詳細、`Shipments` の出荷済データからの納品書作成導線。
+- 入力: 出荷データ、価格表示ON/OFF、発行日、納品日。
+- 出力: 納品書PDF、納品書一覧、納品明細。
+- 保存先: Supabase `delivery_notes`, `delivery_note_lines`。PDFは `app-attachments` Storage。
+- 関連データ: `shipments`, `shipment_lines`, `sales_orders`, `sales_order_lines`, `customers`, `products`, `issuers`。
+- 今後の拡張: 送付履歴、納品差異、納品書メール添付、帳票センター連携。
+- 詳細: `docs/SALES_ORDER_PHASE4.md`

@@ -10,6 +10,7 @@ const pageTitles = {
   CustomerKarte: '顧客カルテ',
   CustomerDetail: '顧客編集',
   Pipeline: '案件',
+  DeliveryNotes: '納品書',
   Invoices: '請求書',
   Products: '商品',
   Inventory: '在庫管理',
