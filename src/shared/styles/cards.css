@@ -1563,6 +1563,14 @@
   text-align: center;
 }
 
+.calendar-week-labels .calendar-week-label-sunday {
+  color: #ff9ca8;
+}
+
+.calendar-week-labels .calendar-week-label-saturday {
+  color: #8fc6ff;
+}
+
 .calendar-day {
   min-height: 142px;
   border: 1px solid var(--line);
@@ -1591,9 +1599,43 @@
   margin-bottom: 8px;
 }
 
+.calendar-date-label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
 .calendar-day-head strong {
   color: var(--white);
   font-size: 0.86rem;
+}
+
+.calendar-date-label small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.calendar-day.calendar-day-sunday .calendar-day-head strong,
+.calendar-day.calendar-day-holiday .calendar-day-head strong,
+.calendar-day.calendar-day-holiday .calendar-date-label small,
+.calendar-current-title.calendar-title-holiday,
+.calendar-title-holiday-name {
+  color: #ff9ca8;
+}
+
+.calendar-day.calendar-day-saturday:not(.calendar-day-holiday) .calendar-day-head strong,
+.calendar-current-title.calendar-title-saturday:not(.calendar-title-holiday) {
+  color: #8fc6ff;
+}
+
+.calendar-day.calendar-day-holiday {
+  background: linear-gradient(180deg, rgba(255, 107, 123, 0.11), rgba(255, 255, 255, 0.035));
+}
+
+.calendar-day.calendar-day-saturday:not(.calendar-day-holiday) {
+  background: linear-gradient(180deg, rgba(47, 128, 237, 0.1), rgba(255, 255, 255, 0.035));
 }
 
 .calendar-day-head span {
@@ -1702,6 +1744,12 @@
   font-size: 1.05rem;
   font-weight: 900;
   text-align: center;
+}
+
+.calendar-title-holiday-name {
+  display: block;
+  font-size: 0.72rem;
+  margin-top: 2px;
 }
 
 .calendar-stepper .ghost-button {

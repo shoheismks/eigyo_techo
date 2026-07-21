@@ -6,6 +6,7 @@ import {
   emptyEvent,
   normalizeEvent,
 } from '../hooks/useEvents.js';
+import { getCalendarDateMeta } from '../services/japaneseHolidayService.js';
 
 const VIEW_LABELS = {
   month: '月',
@@ -81,6 +82,30 @@ function formatDateLabel(dateKey) {
   const date = new Date(`${dateKey}T00:00:00`);
   if (Number.isNaN(date.getTime())) return dateKey;
   return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function calendarDateAriaLabel(day, eventsCount = 0) {
+  const meta = getCalendarDateMeta(day.dateKey);
+  const dateLabel = formatDateLabel(day.dateKey);
+  const weekdayLabel = ['日', '月', '火', '水', '木', '金', '土'][meta.weekday] || '';
+  return [
+    dateLabel,
+    weekdayLabel && `${weekdayLabel}曜日`,
+    meta.holidayName,
+    eventsCount > 0 ? `予定${eventsCount}件` : '予定なし',
+  ].filter(Boolean).join('、');
+}
+
+function calendarDayClassName(day, today) {
+  const meta = getCalendarDateMeta(day.dateKey);
+  return [
+    'calendar-day',
+    day.dateKey === today ? 'today' : '',
+    !day.inCurrentMonth ? 'muted' : '',
+    meta.isSunday ? 'calendar-day-sunday' : '',
+    meta.isSaturday ? 'calendar-day-saturday' : '',
+    meta.isHoliday ? 'calendar-day-holiday' : '',
+  ].filter(Boolean).join(' ');
 }
 
 function formatWeekTitle(dateKey) {
@@ -350,7 +375,12 @@ export default function CalendarPage({
             <button className="ghost-button" type="button" onClick={() => setBaseDate(today)}>今日</button>
             <button className="ghost-button" type="button" onClick={moveNext}>{nextLabel()}</button>
           </div>
-          <strong className="calendar-current-title">{calendarTitle}</strong>
+          <strong className={`calendar-current-title ${getCalendarDateMeta(baseDate).isHoliday || getCalendarDateMeta(baseDate).isSunday ? 'calendar-title-holiday' : ''} ${getCalendarDateMeta(baseDate).isSaturday ? 'calendar-title-saturday' : ''}`}>
+            {calendarTitle}
+            {viewMode === 'day' && getCalendarDateMeta(baseDate).holidayName && (
+              <span className="calendar-title-holiday-name">{getCalendarDateMeta(baseDate).holidayName}</span>
+            )}
+          </strong>
           <div className="calendar-date-actions">
             <input type="date" value={baseDate} onChange={(event) => setBaseDate(event.target.value || today)} />
             <button className="primary-button compact-button" type="button" onClick={() => openAdd(baseDate)}>
@@ -405,15 +435,21 @@ export default function CalendarPage({
       ) : (
         <section className="calendar-grid-panel">
           <div className="calendar-week-labels">
-            {['日', '月', '火', '水', '木', '金', '土'].map((label) => <span key={label}>{label}</span>)}
+            {['日', '月', '火', '水', '木', '金', '土'].map((label, index) => (
+              <span className={index === 0 ? 'calendar-week-label-sunday' : index === 6 ? 'calendar-week-label-saturday' : ''} key={label}>
+                {label}
+              </span>
+            ))}
           </div>
           <div className={`calendar-grid ${viewMode === 'week' ? 'week-view' : ''}`}>
             {visibleDays.map((day) => {
               const dayEvents = eventsForDay(day.dateKey);
               const limit = viewMode === 'week' ? 8 : 4;
+              const dateMeta = getCalendarDateMeta(day.dateKey);
               return (
                 <article
-                  className={`calendar-day ${day.dateKey === today ? 'today' : ''} ${!day.inCurrentMonth ? 'muted' : ''}`}
+                  aria-label={calendarDateAriaLabel(day, dayEvents.length)}
+                  className={calendarDayClassName(day, today)}
                   key={day.dateKey}
                   onClick={(clickEvent) => {
                     if (clickEvent.target instanceof Element && clickEvent.target.closest('.calendar-event')) return;
@@ -421,7 +457,10 @@ export default function CalendarPage({
                   }}
                 >
                   <div className="calendar-day-head">
-                    <strong>{day.label}</strong>
+                    <div className="calendar-date-label">
+                      <strong>{day.label}</strong>
+                      {dateMeta.holidayName && <small>{dateMeta.holidayName}</small>}
+                    </div>
                     {dayEvents.length > 0 && <span>{dayEvents.length}</span>}
                   </div>
                   <div className="calendar-day-events">
