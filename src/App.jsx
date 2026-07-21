@@ -145,6 +145,11 @@ function AuthenticatedApp() {
     addRecord: addInventory,
     updateRecord: updateInventory,
     removeRecord: removeInventory,
+    inventoryLots,
+    inventoryMovements,
+    inventoryReservations,
+    stocktakes,
+    stocktakeLines,
   } = useInventory(userId);
   const {
     records: adoptions,
@@ -1080,6 +1085,11 @@ function ActivePage({
           customers,
           products,
           inventories,
+          inventoryLots,
+          inventoryMovements,
+          inventoryReservations,
+          stocktakes,
+          stocktakeLines,
           contacts,
           businessCards,
           suppliers,

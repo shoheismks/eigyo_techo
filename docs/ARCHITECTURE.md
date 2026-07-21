@@ -294,3 +294,21 @@ docs
 - フォロー期限切れ
 
 一覧画面では詳細データを読み込まず、必要な集計値のみ取得する。
+---
+
+## 追記: 在庫正規化アーキテクチャ
+
+在庫管理は旧 `inventories` から以下の正規化構造へ段階移行する。
+
+```text
+Product
+└ Inventory Lot
+   ├ Inventory Movement
+   ├ Inventory Reservation
+   └ Stocktake Line
+
+Stocktake
+└ Stocktake Line
+```
+
+UI互換のため、フロントでは `useInventory` が新テーブルを読み込み、既存画面へは従来の `inventories` 配列形式で提供する。新規入庫、出庫、棚卸、引当はRPCを経由する。旧 `inventories` は移行期間中のみ残す。

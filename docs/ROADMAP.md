@@ -267,3 +267,15 @@
 | 引当管理 | 未着手 | 将来、案件/見積単位の正式引当へ拡張 |
 | 正規化履歴テーブル | 未着手 | 将来 `inventory_movements` へ分離 |
 | 法務承認フロー | 未着手 | 専門家確認と承認履歴管理 |
+---
+
+## 追記: 在庫データ正規化
+
+| 項目 | 状態 | メモ |
+| --- | --- | --- |
+| inventory_lots | 完了 | ロット単位の正データ |
+| inventory_movements | 完了 | 入庫・出庫・棚卸・引当履歴 |
+| inventory_reservations | 開発中 | UI本格連携は次フェーズ |
+| stocktakes / stocktake_lines | 開発中 | 棚卸確定RPCと履歴保存 |
+| 旧inventories廃止 | 未着手 | 整合確認後の別migrationで対応 |
+| WMS/ERP/バーコード連携 | 未着手 | 正規化後の拡張候補 |

@@ -599,3 +599,16 @@
 - 保存先: `inventories`。追加項目は `reserved_quantity`, `location`, `safety_stock`, `manufacture_date`, `received_date`, `voucher_number`, `handler_name`, `movement_history`。
 - 関連データ: `products`, `suppliers`, `projects`, `quotes`, `invoices`
 - 今後の拡張: 正規化された `inventory_movements` テーブル、引当管理、バーコード/QR、棚卸承認、WMS/ERP連携。
+---
+
+## 追記: 在庫データ正規化
+
+- ステータス: 開発中
+- 目的: 旧 `inventories` と `movement_history` に集約していた在庫情報を、ロット、移動履歴、引当、棚卸へ分割し、受注・出荷・監査に耐える構造にする。
+- 画面: 在庫管理、商品詳細、Home、見積、案件詳細
+- 入力: 入庫、出庫、棚卸、引当、引当解除、ロット、賞味期限、保管場所、仕入先、伝票番号、担当者
+- 出力: 商品別在庫集計、ロット別在庫、使用可能在庫、入出庫履歴、棚卸履歴、在庫アラート
+- 保存先: `inventory_lots`, `inventory_movements`, `inventory_reservations`, `stocktakes`, `stocktake_lines`
+- 関連データ: `products`, `suppliers`, `customers`, `projects`, `quotes`, `invoices`
+- 今後の拡張: 受注、出荷、WMS/ERP、バーコード、QR、棚卸一括入力、監査ログ連携。
+- 互換方針: 旧 `inventories` は移行期間中のみ残す。新テーブルを正とし、旧 `movement_history` への書き込みは段階的に停止する。
