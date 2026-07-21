@@ -6,12 +6,13 @@ import SidebarNavigation from './SidebarNavigation.jsx';
 
 const pageTitles = {
   Home: 'ホーム',
-  Customers: '取引先',
+  Customers: '顧客',
   CustomerKarte: '顧客カルテ',
-  CustomerDetail: '取引先編集',
+  CustomerDetail: '顧客編集',
   Pipeline: '案件',
   Invoices: '請求書',
   Products: '商品',
+  Inventory: '在庫管理',
   ProductDetail: '商品編集',
   Suppliers: '仕入先',
   Calendar: 'カレンダー',
@@ -54,7 +55,6 @@ export default function AppLayout({
   function handleSearchSubmit(event) {
     event.preventDefault();
     const normalizedQuery = searchQuery.trim();
-
     if (normalizedQuery) {
       onGlobalSearch?.(normalizedQuery);
     }
@@ -88,6 +88,9 @@ export default function AppLayout({
               </button>
               <button type="button" className="primary-button compact-button" onClick={() => handleAction('company')}>
                 追加
+              </button>
+              <button type="button" className="ghost-button compact-button" onClick={() => handleAction('inventory')}>
+                在庫
               </button>
               <button type="button" className="ghost-button compact-button" onClick={() => handleAction('business-card')}>
                 名刺

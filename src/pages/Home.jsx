@@ -41,6 +41,7 @@ export default function Home({
   samples = [],
   quotes = [],
   invoices = [],
+  inventories = [],
   complaints = [],
   events = [],
   setActivePage,
@@ -110,6 +111,19 @@ export default function Home({
   const overdueInvoices = activeInvoices.filter((invoice) => invoice.dueDate && invoice.dueDate < today && Number(invoice.unpaidAmount || 0) > 0);
   const dueSoonInvoices = activeInvoices.filter((invoice) => invoice.dueDate && invoice.dueDate >= today && invoice.dueDate <= weekEnd && Number(invoice.unpaidAmount || 0) > 0);
   const unpaidInvoiceTotal = activeInvoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.unpaidAmount || 0)), 0);
+  const inventoryToday = todayString();
+  const inventorySoon = addDaysString(inventoryToday, 30);
+  const inventoryOutOfStock = inventories.filter((inventory) => Number(inventory.quantity || 0) <= 0).length;
+  const inventoryBelowSafety = inventories.filter((inventory) => Number(inventory.safetyStock || 0) > 0 && Number(inventory.quantity || 0) <= Number(inventory.safetyStock || 0)).length;
+  const inventoryExpiringSoon = inventories.filter((inventory) => inventory.expiryDate && inventory.expiryDate >= inventoryToday && inventory.expiryDate <= inventorySoon).length;
+  const inboundToday = inventories.reduce((sum, inventory) => {
+    const history = Array.isArray(inventory.movementHistory) ? inventory.movementHistory : [];
+    return sum + history.filter((item) => item.type === '入庫' && String(item.date || '').slice(0, 10) === inventoryToday).length;
+  }, 0);
+  const outboundToday = inventories.reduce((sum, inventory) => {
+    const history = Array.isArray(inventory.movementHistory) ? inventory.movementHistory : [];
+    return sum + history.filter((item) => item.type === '出庫' && String(item.date || '').slice(0, 10) === inventoryToday).length;
+  }, 0);
 
   const statusCounts = PIPELINE_STATUSES.reduce((summary, status) => {
     summary[status] = scoredCustomers.filter((customer) => customer.status === status).length;
@@ -146,6 +160,22 @@ export default function Home({
         <DashboardMetric label="見積提出" value={statusCounts['見積提出'] ?? 0} tone="purple" />
         <DashboardMetric label="成約" value={statusCounts['成約'] ?? 0} tone="gold" />
         <DashboardMetric label="失注" value={statusCounts['失注'] ?? 0} tone="red" />
+      </section>
+
+      <section className="section-block inventory-dashboard-section">
+        <div className="section-heading">
+          <h2>在庫アラート</h2>
+          <button className="text-button" onClick={() => setActivePage('Inventory')}>
+            在庫管理へ
+          </button>
+        </div>
+        <div className="dashboard-metrics inventory-metrics">
+          <DashboardMetric label="在庫切れ" value={inventoryOutOfStock} tone={inventoryOutOfStock > 0 ? 'red' : 'blue'} />
+          <DashboardMetric label="安全在庫以下" value={inventoryBelowSafety} tone={inventoryBelowSafety > 0 ? 'orange' : 'blue'} />
+          <DashboardMetric label="賞味期限30日以内" value={inventoryExpiringSoon} tone={inventoryExpiringSoon > 0 ? 'gold' : 'blue'} />
+          <DashboardMetric label="本日入庫" value={inboundToday} tone="blue" />
+          <DashboardMetric label="本日出庫" value={outboundToday} tone="blue" />
+        </div>
       </section>
 
       <section className="section-block notification-section">

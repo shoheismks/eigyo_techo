@@ -1871,10 +1871,130 @@
   top: 16px;
 }
 
+.inventory-hero {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.inventory-tabs {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  overflow-x: auto;
+  padding: 8px;
+}
+
+.inventory-tabs button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-weight: 700;
+  min-height: 42px;
+  padding: 8px 12px;
+}
+
+.inventory-tabs button.active {
+  background: rgba(37, 99, 235, 0.18);
+  border-color: rgba(96, 165, 250, 0.72);
+  color: var(--text);
+}
+
+.inventory-filter-panel,
+.inventory-list-section,
+.inventory-list-section .desktop-table-shell,
+.inventory-common-table {
+  max-width: none;
+  width: 100%;
+}
+
+.inventory-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.inventory-form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.inventory-thumb {
+  align-items: center;
+  aspect-ratio: 1;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 11px;
+  justify-content: center;
+  object-fit: cover;
+  width: 46px;
+}
+
+.desktop-data-table tr.inventory-danger td {
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.desktop-data-table tr.inventory-warning td {
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.desktop-data-table tr.inventory-expiring td {
+  background: rgba(234, 179, 8, 0.12);
+}
+
+.inventory-card.inventory-danger {
+  border-color: rgba(248, 113, 113, 0.85);
+}
+
+.inventory-card.inventory-warning {
+  border-color: rgba(251, 146, 60, 0.85);
+}
+
+.inventory-card.inventory-expiring {
+  border-color: rgba(250, 204, 21, 0.75);
+}
+
+.summary-card {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.summary-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summary-card strong {
+  color: var(--text);
+  font-size: 20px;
+}
+
+.inventory-summary-cards .metric-card,
+.inventory-metrics .metric-card {
+  text-align: left;
+}
+
 @media (min-width: 768px) {
   .invoice-editor-grid {
     grid-template-columns: minmax(0, 1.6fr) minmax(320px, .8fr);
     align-items: start;
+  }
+
+  .inventory-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

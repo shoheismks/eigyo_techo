@@ -588,3 +588,14 @@
 - 保存先: `invoices`, `invoice_lines`, `invoice_payments`, `invoice_history`, Supabase Storage `app-attachments`。
 - 関連データ: `customers`, `contacts`, `projects`, `quotes`, `issuers`, `products`。
 - 今後の拡張: メール送付、督促メール、会計ソフト連携、権限別発行承認、電子保存対応。
+
+## 追加: 在庫管理UI/UX改善
+
+- ステータス: 開発中
+- 目的: 在庫登録、入庫、出庫、棚卸、入出庫履歴の入口を独立させ、現場担当者が迷わず操作できるようにする。
+- 画面: `InventoryPage`, `Products`, `ProductDetail`, `Home`
+- 入力: 商品、数量、単位、ロット番号、賞味期限、製造日、保管場所、仕入先、仕入単価、入庫日、伝票番号、担当者、入出庫理由、棚卸差異、メモ。
+- 出力: 在庫一覧、現在庫、引当在庫、使用可能在庫、在庫切れ、安全在庫以下、賞味期限警告、本日入庫/出庫、入出庫履歴。
+- 保存先: `inventories`。追加項目は `reserved_quantity`, `location`, `safety_stock`, `manufacture_date`, `received_date`, `voucher_number`, `handler_name`, `movement_history`。
+- 関連データ: `products`, `suppliers`, `projects`, `quotes`, `invoices`
+- 今後の拡張: 正規化された `inventory_movements` テーブル、引当管理、バーコード/QR、棚卸承認、WMS/ERP連携。

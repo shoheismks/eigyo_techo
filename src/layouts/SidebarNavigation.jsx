@@ -13,25 +13,47 @@ const customerPages = [
   'Import',
 ];
 const productPages = ['Products', 'ProductDetail'];
-const pipelinePages = ['Pipeline', 'Invoices'];
+const pipelinePages = ['Pipeline'];
+const inventoryPages = ['Inventory'];
 
-const navItems = [
-  { key: 'Home', label: 'ホーム', helper: 'ダッシュボード' },
-  { key: 'Customers', label: '取引先', helper: '顧客・担当者・名刺' },
-  { key: 'Pipeline', label: '案件', helper: '商談・フォロー' },
-  { key: 'Invoices', label: '請求書', helper: '請求・入金確認' },
-  { key: 'Products', label: '商品', helper: '商品マスター' },
-  { key: 'Suppliers', label: '仕入先', helper: '仕入先管理' },
-  { key: 'Calendar', label: 'カレンダー', helper: 'フォロー予定' },
-  { key: 'Analytics', label: '分析', helper: '営業状況' },
-  { key: 'Settings', label: '設定', helper: '同期・ログアウト' },
-  { key: 'Help', label: 'ヘルプ', helper: '操作マニュアル' },
+const navGroups = [
+  {
+    label: '営業',
+    items: [
+      { key: 'Home', label: 'ダッシュボード', helper: '今日やること' },
+      { key: 'Customers', label: '顧客', helper: '取引先・担当者' },
+      { key: 'Pipeline', label: '案件', helper: '商談・フォロー' },
+      { key: 'Calendar', label: 'カレンダー', helper: '予定管理' },
+    ],
+  },
+  {
+    label: '販売',
+    items: [
+      { key: 'Products', label: '商品', helper: '商品マスター' },
+      { key: 'Inventory', label: '在庫管理', helper: '入庫・出庫・棚卸' },
+      { key: 'Pipeline', label: '見積', helper: '見積作成' },
+      { key: 'Pipeline', label: '成約確認書', helper: '約款・確認書' },
+      { key: 'Invoices', label: '請求書', helper: '請求・入金確認' },
+    ],
+  },
+  {
+    label: 'マスター',
+    items: [
+      { key: 'Suppliers', label: '仕入先', helper: '仕入先管理' },
+      { key: 'Settings', label: '発行元', helper: '帳票発行元' },
+      { key: 'Settings', label: '設定', helper: '同期・ログアウト' },
+      { key: 'Analytics', label: '分析', helper: '営業状況' },
+      { key: 'Help', label: 'ヘルプ', helper: '操作マニュアル' },
+    ],
+  },
 ];
 
 function activeGroupFor(page) {
   if (customerPages.includes(page)) return 'Customers';
   if (productPages.includes(page)) return 'Products';
-  if (pipelinePages.includes(page)) return page === 'Invoices' ? 'Invoices' : 'Pipeline';
+  if (pipelinePages.includes(page)) return 'Pipeline';
+  if (inventoryPages.includes(page)) return 'Inventory';
+  if (page === 'Invoices') return 'Invoices';
   if (page === 'Suppliers') return 'Suppliers';
   if (page === 'Calendar') return 'Calendar';
   if (page === 'Analytics') return 'Analytics';
@@ -51,17 +73,22 @@ export default function SidebarNavigation({ activePage, onNavigate, user }) {
         <span>{user?.email || 'Signed in'}</span>
       </div>
 
-      <div className="sidebar-nav-list">
-        {navItems.map((item) => (
-          <button
-            type="button"
-            key={item.key}
-            className={activeGroup === item.key ? 'active' : ''}
-            onClick={() => onNavigate(item.key)}
-          >
-            <span>{item.label}</span>
-            <small>{item.helper}</small>
-          </button>
+      <div className="sidebar-nav-list grouped-sidebar-nav">
+        {navGroups.map((group) => (
+          <section className="sidebar-nav-group" key={group.label}>
+            <p>{group.label}</p>
+            {group.items.map((item) => (
+              <button
+                type="button"
+                key={`${group.label}-${item.label}`}
+                className={activeGroup === item.key ? 'active' : ''}
+                onClick={() => onNavigate(item.key)}
+              >
+                <span>{item.label}</span>
+                <small>{item.helper}</small>
+              </button>
+            ))}
+          </section>
         ))}
       </div>
     </aside>

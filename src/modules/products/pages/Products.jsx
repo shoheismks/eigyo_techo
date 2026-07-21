@@ -17,7 +17,24 @@ function uniqueValues(products, field) {
   return [...new Set(products.map((product) => product[field]).filter(Boolean))].sort();
 }
 
-export default function Products({ products, removeProduct, onOpenProductDetail }) {
+function productInventorySummary(product, inventories) {
+  const productInventories = inventories.filter((inventory) => inventory.productId === product.id);
+  const total = productInventories.reduce((sum, inventory) => sum + Number(inventory.quantity || 0), 0);
+  const unit = productInventories[0]?.unit || product.costUnit || product.sellingPriceUnit || '';
+  return {
+    count: productInventories.length,
+    total,
+    unit,
+  };
+}
+
+export default function Products({
+  products,
+  inventories = [],
+  removeProduct,
+  onOpenProductDetail,
+  onOpenInventory,
+}) {
   const [keyword, setKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(ALL);
   const [temperatureFilter, setTemperatureFilter] = useState(ALL);
@@ -77,10 +94,13 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
       { key: 'temperatureZone', label: '温度帯', width: '90px', minWidth: '90px', render: (product) => product.temperatureZone || '-' },
       { key: 'packageStyle', label: '荷姿', minWidth: '90px', render: (product) => product.packageStyle || '-' },
       {
-        key: 'costPrice',
-        label: '原価',
-        minWidth: '110px',
-        render: (product) => `${formatPrice(product.costPrice) || '-'}${product.costPrice !== '' ? `/${product.costUnit}` : ''}`,
+        key: 'stock',
+        label: '現在庫',
+        minWidth: '120px',
+        render: (product) => {
+          const stock = productInventorySummary(product, inventories);
+          return `${stock.total.toLocaleString('ja-JP')} ${stock.unit}`;
+        },
       },
       {
         key: 'desiredSellingPrice',
@@ -103,7 +123,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
           ].filter(Boolean).join(', ') || 'なし',
       },
     ],
-    [],
+    [inventories],
   );
 
   function resetPaging(handler) {
@@ -113,13 +133,22 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
     };
   }
 
+  function openInbound(productId) {
+    onOpenInventory?.({ tab: 'inbound', productId });
+  }
+
+  function openOutbound(productId) {
+    const inventory = inventories.find((item) => item.productId === productId);
+    onOpenInventory?.({ tab: 'outbound', productId, inventoryId: inventory?.id || '' });
+  }
+
   return (
     <main className="page products-page">
       <section className="page-header">
         <div>
           <p className="eyebrow">Products</p>
           <h1>商品マスター</h1>
-          <p>PCでは価格・粗利・資料有無を比較しやすいテーブルで表示します。</p>
+          <p>商品情報と在庫導線をまとめて確認できます。在庫登録は各商品行の「＋入庫」から直接開始できます。</p>
         </div>
       </section>
 
@@ -139,7 +168,7 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
           キーワード
           <input
             value={keyword}
-            placeholder="商品名、メーカー、産地、タグ、メモで検索"
+            placeholder="商品名、商品コード、メーカー、産地、タグ、メモで検索"
             onChange={resetPaging((event) => setKeyword(event.target.value))}
           />
         </label>
@@ -184,16 +213,18 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
         {visibleProducts.length > 0 ? (
           <>
             <DesktopTable
-              actionWidth="110px"
+              actionWidth="260px"
               actions={(product) => (
                 <>
                   <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>編集</button>
+                  <button className="ghost-button" onClick={() => openInbound(product.id)}>＋入庫</button>
+                  <button className="ghost-button" onClick={() => openOutbound(product.id)}>－出庫</button>
                   <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>削除</button>
                 </>
               )}
               className="products-common-table"
               columns={desktopColumns}
-              minWidth={1250}
+              minWidth={1450}
               onRowClick={(product) => setSelectedPreviewId(product.id)}
               rows={visibleProducts}
               selectedRowId={selectedPreviewProduct?.id}
@@ -204,8 +235,10 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
                 <ProductCard
                   key={product.id}
                   product={product}
+                  inventories={inventories}
                   removeProduct={removeProduct}
                   onOpenProductDetail={onOpenProductDetail}
+                  onOpenInventory={onOpenInventory}
                 />
               ))}
             </div>
@@ -230,7 +263,10 @@ export default function Products({ products, removeProduct, onOpenProductDetail 
   );
 }
 
-function ProductCard({ product, removeProduct, onOpenProductDetail }) {
+function ProductCard({ product, inventories, removeProduct, onOpenProductDetail, onOpenInventory }) {
+  const stock = productInventorySummary(product, inventories);
+  const inventory = inventories.find((item) => item.productId === product.id);
+
   return (
     <article className="product-card">
       <div className="product-card-main">
@@ -239,6 +275,7 @@ function ProductCard({ product, removeProduct, onOpenProductDetail }) {
             className="product-thumb"
             src={product.imageFile.url}
             alt={`${product.name}の商品画像`}
+            loading="lazy"
           />
         ) : (
           <div className="product-thumb placeholder">No Image</div>
@@ -252,34 +289,13 @@ function ProductCard({ product, removeProduct, onOpenProductDetail }) {
       </div>
 
       <dl className="company-details">
-        <div>
-          <dt>商品コード</dt>
-          <dd>{product.productCode || '未入力'}</dd>
-        </div>
-        <div>
-          <dt>メーカー</dt>
-          <dd>{product.manufacturerName || '未入力'}</dd>
-        </div>
-        <div>
-          <dt>産地</dt>
-          <dd>{product.origin || '未入力'}</dd>
-        </div>
-        <div>
-          <dt>荷姿</dt>
-          <dd>{product.packageStyle || '未入力'}</dd>
-        </div>
-        <div>
-          <dt>原価</dt>
-          <dd>{formatPrice(product.costPrice) || '未入力'}{product.costPrice !== '' ? `/${product.costUnit}` : ''}</dd>
-        </div>
-        <div>
-          <dt>希望販売価格</dt>
-          <dd>{formatPrice(product.desiredSellingPrice) || '未入力'}{product.desiredSellingPrice !== '' ? `/${product.sellingPriceUnit}` : ''}</dd>
-        </div>
-        <div>
-          <dt>粗利率</dt>
-          <dd>{product.grossMarginRate || '未入力'}</dd>
-        </div>
+        <div><dt>商品コード</dt><dd>{product.productCode || '未入力'}</dd></div>
+        <div><dt>メーカー</dt><dd>{product.manufacturerName || '未入力'}</dd></div>
+        <div><dt>産地</dt><dd>{product.origin || '未入力'}</dd></div>
+        <div><dt>荷姿</dt><dd>{product.packageStyle || '未入力'}</dd></div>
+        <div><dt>現在庫</dt><dd>{stock.total.toLocaleString('ja-JP')} {stock.unit}</dd></div>
+        <div><dt>希望販売価格</dt><dd>{formatPrice(product.desiredSellingPrice) || '未入力'}{product.desiredSellingPrice !== '' ? `/${product.sellingPriceUnit}` : ''}</dd></div>
+        <div><dt>粗利率</dt><dd>{product.grossMarginRate || '未入力'}</dd></div>
       </dl>
 
       <div className="lead-badges">
@@ -299,6 +315,12 @@ function ProductCard({ product, removeProduct, onOpenProductDetail }) {
       <div className="card-actions">
         <button className="ghost-button" onClick={() => onOpenProductDetail(product.id)}>
           詳細・編集
+        </button>
+        <button className="ghost-button" onClick={() => onOpenInventory?.({ tab: 'inbound', productId: product.id })}>
+          ＋入庫
+        </button>
+        <button className="ghost-button" onClick={() => onOpenInventory?.({ tab: 'outbound', productId: product.id, inventoryId: inventory?.id || '' })}>
+          －出庫
         </button>
         <button className="ghost-button danger" onClick={() => removeProduct(product.id)}>
           削除

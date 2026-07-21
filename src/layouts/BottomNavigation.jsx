@@ -11,7 +11,7 @@ const customerPages = [
   'Import',
 ];
 const pipelinePages = ['Pipeline', 'Invoices'];
-const productPages = ['Products', 'ProductDetail'];
+const productPages = ['Products', 'ProductDetail', 'Inventory'];
 
 const tabs = [
   { key: 'Home', label: 'ホーム', icon: '⌂' },

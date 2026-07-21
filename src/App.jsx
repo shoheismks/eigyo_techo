@@ -34,6 +34,7 @@ const Home = lazy(() => import('./pages/Home.jsx'));
 const HelpPage = lazy(() => import('./modules/settings/pages/HelpPage.jsx'));
 const ImportPage = lazy(() => import('./modules/customers/pages/ImportPage.jsx'));
 const Invoices = lazy(() => import('./modules/invoices/pages/Invoices.jsx'));
+const InventoryPage = lazy(() => import('./modules/inventory/pages/InventoryPage.jsx'));
 const LeadSearch = lazy(() => import('./modules/customers/pages/LeadSearch.jsx'));
 const MailAI = lazy(() => import('./pages/MailAI.jsx'));
 const Pipeline = lazy(() => import('./pages/Pipeline.jsx'));
@@ -125,6 +126,7 @@ function AuthenticatedApp() {
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [quoteDraft, setQuoteDraft] = useState(null);
   const [invoiceDraft, setInvoiceDraft] = useState(null);
+  const [inventoryAction, setInventoryAction] = useState(null);
 
   const {
     customers,
@@ -242,6 +244,11 @@ function AuthenticatedApp() {
   function openProductDetail(productId) {
     setSelectedProductId(productId === 'new' ? '' : productId);
     setActivePage('ProductDetail');
+  }
+
+  function openInventoryPage(initial = {}) {
+    setInventoryAction(initial || null);
+    setActivePage('Inventory');
   }
 
   function buildProductQuoteLine(productId, inventoryId = '', proposal = {}) {
@@ -378,6 +385,7 @@ function AuthenticatedApp() {
       supplier: 'Suppliers',
       quote: null,
       invoice: null,
+      inventory: null,
     };
 
     if (actionKey === 'quote') {
@@ -387,6 +395,11 @@ function AuthenticatedApp() {
 
     if (actionKey === 'invoice') {
       openInvoiceForm({});
+      return;
+    }
+
+    if (actionKey === 'inventory') {
+      openInventoryPage({ tab: 'inbound' });
       return;
     }
 
@@ -514,6 +527,8 @@ function AuthenticatedApp() {
             setActivePage={setActivePage}
             onCreateQuote={openQuoteForm}
             onCreateInvoice={openInvoiceForm}
+            inventoryAction={inventoryAction}
+            setInventoryAction={setInventoryAction}
             addCustomer={addCustomer}
             isSaved={isSaved}
             customers={customers}
@@ -557,6 +572,7 @@ function AuthenticatedApp() {
             updateInvoice={updateInvoice}
             removeInvoice={removeInvoice}
             openProductDetail={openProductDetail}
+            openInventoryPage={openInventoryPage}
             selectedProduct={selectedProduct}
             contacts={contacts}
             addContact={addContact}
@@ -626,6 +642,8 @@ function ActivePage({
   setActivePage,
   onCreateQuote,
   onCreateInvoice,
+  inventoryAction,
+  setInventoryAction,
   addCustomer,
   isSaved,
   customers,
@@ -669,6 +687,7 @@ function ActivePage({
   updateInvoice,
   removeInvoice,
   openProductDetail,
+  openInventoryPage,
   selectedProduct,
   contacts,
   addContact,
@@ -711,6 +730,7 @@ function ActivePage({
         samples={samples}
         quotes={quotes}
         invoices={invoices}
+        inventories={inventories}
         complaints={complaints}
         events={events}
         setActivePage={setActivePage}
@@ -875,8 +895,32 @@ function ActivePage({
     return (
       <Products
         products={products}
+        inventories={inventories}
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
+        onOpenInventory={openInventoryPage}
+      />
+    );
+  }
+
+  if (activePage === 'Inventory') {
+    return (
+      <InventoryPage
+        inventories={inventories}
+        products={products}
+        suppliers={suppliers}
+        projects={projects}
+        quotes={quotes}
+        invoices={invoices}
+        addInventory={addInventory}
+        updateInventory={updateInventory}
+        removeInventory={removeInventory}
+        initialAction={inventoryAction}
+        onInitialHandled={() => setInventoryAction(null)}
+        onOpenProductDetail={openProductDetail}
+        onCreateQuote={onCreateQuote}
+        user={user}
+        userId={userId}
       />
     );
   }
@@ -904,6 +948,7 @@ function ActivePage({
         removeInventory={removeInventory}
         setActivePage={setActivePage}
         onCreateQuote={onCreateQuote}
+        onOpenInventory={openInventoryPage}
         userId={userId}
       />
     );

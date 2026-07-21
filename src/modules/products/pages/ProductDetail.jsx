@@ -17,6 +17,7 @@ import {
   INVENTORY_TYPES,
   INVENTORY_UNITS,
   emptyInventory,
+  inventoryAvailableQuantity,
   inventoryLabel,
   isValidInventoryCode,
   normalizeInventoryCode,
@@ -98,6 +99,7 @@ export default function ProductDetail({
   removeInventory,
   setActivePage,
   onCreateQuote,
+  onOpenInventory,
   userId = '',
 }) {
   const [form, setForm] = useState(() =>
@@ -150,6 +152,13 @@ export default function ProductDetail({
         .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))),
     [form.id, inventories],
   );
+  const inventorySummary = useMemo(() => {
+    const total = relatedInventories.reduce((sum, inventory) => sum + Number(inventory.quantity || 0), 0);
+    const reserved = relatedInventories.reduce((sum, inventory) => sum + Number(inventory.reservedQuantity || 0), 0);
+    const available = relatedInventories.reduce((sum, inventory) => sum + inventoryAvailableQuantity(inventory), 0);
+    const unit = relatedInventories[0]?.unit || form.costUnit || form.sellingPriceUnit || '';
+    return { total, reserved, available, unit };
+  }, [form.costUnit, form.sellingPriceUnit, relatedInventories]);
   const filteredInventories = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
 
@@ -443,6 +452,30 @@ export default function ProductDetail({
         <h1>{isNew ? '商品追加' : '商品詳細'}</h1>
         <p>商品情報、価格、添付ファイルをSupabaseに同期して管理します。</p>
       </section>
+
+      {!isNew && (
+        <section className="detail-section inventory-product-summary">
+          <div className="section-heading">
+            <h2>在庫サマリー</h2>
+            <div className="mail-action-row">
+              <button type="button" className="primary-button compact-button" onClick={() => onOpenInventory?.({ tab: 'inbound', productId: form.id })}>
+                ＋在庫登録
+              </button>
+              <button type="button" className="ghost-button compact-button" onClick={() => onOpenInventory?.({ tab: 'outbound', productId: form.id, inventoryId: relatedInventories[0]?.id || '' })}>
+                －出庫
+              </button>
+              <button type="button" className="ghost-button compact-button" onClick={() => onOpenInventory?.({ tab: 'stocktake', productId: form.id, inventoryId: relatedInventories[0]?.id || '' })}>
+                棚卸
+              </button>
+            </div>
+          </div>
+          <div className="dashboard-metrics inventory-summary-cards">
+            <div className="metric-card blue"><span>現在庫</span><strong>{inventorySummary.total.toLocaleString('ja-JP')} {inventorySummary.unit}</strong></div>
+            <div className="metric-card orange"><span>引当在庫</span><strong>{inventorySummary.reserved.toLocaleString('ja-JP')} {inventorySummary.unit}</strong></div>
+            <div className="metric-card gold"><span>使用可能在庫</span><strong>{inventorySummary.available.toLocaleString('ja-JP')} {inventorySummary.unit}</strong></div>
+          </div>
+        </section>
+      )}
 
       <form onSubmit={handleSubmit}>
         {(saveMessage || saveError) && (
