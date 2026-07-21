@@ -415,6 +415,7 @@ function normalizeReservation(row = {}, userId = '') {
     customerId: row.customerId ?? row.customer_id ?? '',
     projectId: row.projectId ?? row.project_id ?? '',
     orderId: row.orderId ?? row.order_id ?? '',
+    salesOrderLineId: row.salesOrderLineId ?? row.sales_order_line_id ?? '',
     quoteId: row.quoteId ?? row.quote_id ?? '',
     reservedQuantity: normalizeNumber(row.reservedQuantity ?? row.reserved_quantity ?? ''),
     fulfilledQuantity: normalizeNumber(row.fulfilledQuantity ?? row.fulfilled_quantity ?? ''),

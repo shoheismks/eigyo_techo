@@ -370,6 +370,16 @@ erDiagram
 
 ---
 
+## 追加: 受注管理 Phase 2
+
+- 詳細仕様: `docs/SALES_ORDER_PHASE2.md`
+- `sales_orders` 追加項目: `priority`, `reservation_status`, `reserved_total`, `shortage_total`
+- `sales_order_lines` 追加項目: `reserved_quantity`, `shortage_quantity`, `reservation_status`
+- `inventory_reservations` 追加項目: `sales_order_line_id`
+- 引当は `reserve_sales_order_line_fefo`, `reserve_sales_order_line_lot`, `release_sales_order_line_reservations`, `reallocate_sales_order_line_fefo`, `reserve_sales_order_fefo`, `reserve_sales_orders_fefo` RPCで実行する。
+- FEFO順は賞味期限、入庫日、作成日の順とし、期限切れ、隔離、使用可能在庫0、削除ロットは対象外とする。
+- RLSは既存方針どおり `authenticated` かつ `auth.uid() = user_id` を維持する。
+
 ## Step26 追記: 在庫・見積PDF・営業データ集約
 
 ### 追加予定テーブル: inventories

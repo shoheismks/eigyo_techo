@@ -143,6 +143,21 @@ OpenAI APIは以下のAI機能に利用する。
 
 ---
 
+## 受注在庫引当RPC
+
+受注管理 Phase 2では、在庫引当・解除をSupabase RPCで実行する。
+
+- `reserve_sales_order_line_fefo`: 受注明細の不足分をFEFOで引当する。
+- `reserve_sales_order_line_lot`: 指定ロットから受注明細へ引当する。
+- `release_sales_order_line_reservations`: 受注明細の引当を解除する。
+- `reallocate_sales_order_line_fefo`: 既存引当を解除せず、不足分をFEFOで追加引当する。
+- `reserve_sales_order_fefo`: 1受注内の全明細をFEFOで引当する。
+- `reserve_sales_orders_fefo`: 優先度、納品予定日、受注日の順で一括引当する。
+
+フロントエンドはこれらのRPCを呼び出し、`inventory_lots`, `inventory_reservations`, `inventory_movements` を直接連続更新しない。
+
+詳細は `docs/SALES_ORDER_PHASE2.md` を参照する。
+
 ## Step26 追記: inventory module / quotePdfService / dashboardService
 
 ### inventory module

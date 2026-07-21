@@ -21,6 +21,46 @@ function money(value) {
   return `${formatPrice(value) || '0'}円`;
 }
 
+const PRIORITY_OPTIONS = [
+  { value: 1, label: '1 最優先' },
+  { value: 2, label: '2 高' },
+  { value: 3, label: '3 通常' },
+  { value: 4, label: '4 低' },
+  { value: 5, label: '5 最低' },
+];
+
+const RESERVATION_STATUS_LABELS = {
+  unreserved: '未引当',
+  partial: '一部引当',
+  reserved: '全量引当',
+  shortage: '不足',
+};
+
+function numberValue(value) {
+  const parsed = Number(String(value ?? '').replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function netReserved(reservation) {
+  if (!['active', 'partially_fulfilled'].includes(reservation.status)) return 0;
+  return Math.max(0, numberValue(reservation.reservedQuantity) - numberValue(reservation.fulfilledQuantity) - numberValue(reservation.releasedQuantity));
+}
+
+function isUsableLot(lot) {
+  const today = todayString();
+  if (lot.status !== 'active') return false;
+  if (lot.expiryDate && lot.expiryDate < today) return false;
+  return numberValue(lot.availableQuantity) > 0;
+}
+
+function lotAvailableQuantity(lot) {
+  return Math.max(0, numberValue(lot.availableQuantity) || (numberValue(lot.quantity) - numberValue(lot.reservedQuantity)));
+}
+
+function reservationStatusLabel(status) {
+  return RESERVATION_STATUS_LABELS[status] || status || '未引当';
+}
+
 function customerName(customer) {
   return customer?.companyName || customer?.name || '-';
 }
@@ -63,6 +103,14 @@ export default function SalesOrders({
   projects = [],
   quotes = [],
   issuers = [],
+  products = [],
+  inventoryLots = [],
+  inventoryReservations = [],
+  reserveLineFefo,
+  reserveLineLot,
+  releaseLineReservations,
+  reallocateLineFefo,
+  reloadInventory,
   initialDraft = null,
   onDraftHandled,
   onOpenKarte,
@@ -76,11 +124,15 @@ export default function SalesOrders({
   const [form, setForm] = useState(() => makeManualDraft({ orders: salesOrders, issuers, user }));
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [reservationBusy, setReservationBusy] = useState('');
+  const [selectedLotByLine, setSelectedLotByLine] = useState({});
+  const [reservationQuantityByLine, setReservationQuantityByLine] = useState({});
 
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const contactMap = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const issuerMap = useMemo(() => new Map(issuers.map((issuer) => [issuer.id, issuer])), [issuers]);
+  const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
 
   useEffect(() => {
     if (!initialDraft) return;
@@ -118,6 +170,58 @@ export default function SalesOrders({
     return salesOrders.find((order) => !order.isDeleted && order.id !== form.id && sourceKey(order) === key);
   }, [form, salesOrders]);
 
+  const activeReservations = useMemo(
+    () => inventoryReservations.filter((reservation) => ['active', 'partially_fulfilled'].includes(reservation.status)),
+    [inventoryReservations],
+  );
+
+  const reservationSummaryByOrder = useMemo(() => {
+    const result = new Map();
+    salesOrders.forEach((order) => {
+      const ordered = order.salesOrderLines.reduce((sum, line) => sum + numberValue(line.quantity), 0);
+      const reserved = activeReservations
+        .filter((reservation) => reservation.orderId === order.id)
+        .reduce((sum, reservation) => sum + netReserved(reservation), 0);
+      const shortage = Math.max(0, ordered - reserved);
+      const status = ordered <= 0
+        ? 'unreserved'
+        : reserved >= ordered
+          ? 'reserved'
+          : reserved > 0
+            ? 'partial'
+            : 'unreserved';
+      result.set(order.id, { ordered, reserved, shortage, status, rate: ordered > 0 ? Math.round((reserved / ordered) * 100) : 0 });
+    });
+    return result;
+  }, [activeReservations, salesOrders]);
+
+  const formReservationSummary = useMemo(() => {
+    const lines = form.salesOrderLines.map((line) => {
+      const lineReservations = activeReservations.filter((reservation) => reservation.orderId === form.id && reservation.salesOrderLineId === line.id);
+      const productLots = inventoryLots.filter((lot) => lot.productId === line.productId && isUsableLot(lot));
+      const ordered = numberValue(line.quantity);
+      const reserved = lineReservations.reduce((sum, reservation) => sum + netReserved(reservation), 0);
+      const available = productLots.reduce((sum, lot) => sum + lotAvailableQuantity(lot), 0);
+      const unreserved = Math.max(0, ordered - reserved);
+      const shortage = Math.max(0, unreserved - available);
+      const status = ordered <= 0
+        ? 'unreserved'
+        : reserved >= ordered
+          ? 'reserved'
+          : reserved > 0
+            ? 'partial'
+            : unreserved > available
+              ? 'shortage'
+              : 'unreserved';
+      return { line, ordered, reserved, unreserved, available, shortage, status, reservations: lineReservations, lots: productLots };
+    });
+    const ordered = lines.reduce((sum, item) => sum + item.ordered, 0);
+    const reserved = lines.reduce((sum, item) => sum + item.reserved, 0);
+    const available = lines.reduce((sum, item) => sum + item.available, 0);
+    const shortage = lines.reduce((sum, item) => sum + item.shortage, 0);
+    return { lines, ordered, reserved, available, shortage, rate: ordered > 0 ? Math.round((reserved / ordered) * 100) : 0 };
+  }, [activeReservations, form.id, form.salesOrderLines, inventoryLots]);
+
   const columns = [
     { key: 'salesOrderNumber', label: '受注番号', minWidth: '160px', render: (order) => <strong>{order.salesOrderNumber || '-'}</strong> },
     { key: 'customer', label: '顧客', minWidth: '220px', render: (order) => customerName(customerMap.get(order.customerId)) },
@@ -125,6 +229,11 @@ export default function SalesOrders({
     { key: 'source', label: '元帳票', minWidth: '180px', render: sourceLabel },
     { key: 'orderDate', label: '受注日', minWidth: '110px', render: (order) => formatDate(order.orderDate) },
     { key: 'expectedDeliveryDate', label: '納品予定', minWidth: '110px', render: (order) => formatDate(order.expectedDeliveryDate) },
+    { key: 'priority', label: '優先度', minWidth: '100px', render: (order) => PRIORITY_OPTIONS.find((item) => item.value === Number(order.priority || 3))?.label || '3 通常' },
+    { key: 'reservationStatus', label: '引当状況', minWidth: '130px', render: (order) => {
+      const summary = reservationSummaryByOrder.get(order.id);
+      return `${reservationStatusLabel(summary?.status)} ${summary?.rate || 0}%`;
+    } },
     { key: 'grandTotal', label: '受注金額', minWidth: '120px', render: (order) => money(order.grandTotal) },
     { key: 'status', label: 'ステータス', minWidth: '110px', render: (order) => order.status || '-' },
     { key: 'updatedAt', label: '更新日', minWidth: '130px', render: (order) => formatDate(order.updatedAt) },
@@ -237,6 +346,45 @@ export default function SalesOrders({
     }
   }
 
+  async function runReservationAction(lineId, action) {
+    if (!editingId) {
+      setMessage('在庫引当は受注を保存してから実行してください。');
+      return;
+    }
+    setReservationBusy(lineId);
+    setMessage('');
+    try {
+      await action();
+      await reloadInventory?.();
+      setMessage('在庫引当を更新しました。');
+    } catch (error) {
+      setMessage(error.message || '在庫引当に失敗しました。');
+    } finally {
+      setReservationBusy('');
+    }
+  }
+
+  function autoReserveLine(line) {
+    return runReservationAction(line.id, () => reserveLineFefo?.(form.id, line.id, reservationQuantityByLine[line.id] || null));
+  }
+
+  function reserveSelectedLot(line) {
+    const lotId = selectedLotByLine[line.id];
+    if (!lotId) {
+      setMessage('引当するロットを選択してください。');
+      return;
+    }
+    return runReservationAction(line.id, () => reserveLineLot?.(form.id, line.id, lotId, reservationQuantityByLine[line.id] || null));
+  }
+
+  function releaseLine(line) {
+    return runReservationAction(line.id, () => releaseLineReservations?.(form.id, line.id, null, reservationQuantityByLine[line.id] || null));
+  }
+
+  function reallocateLine(line) {
+    return runReservationAction(line.id, () => reallocateLineFefo?.(form.id, line.id, reservationQuantityByLine[line.id] || null));
+  }
+
   return (
     <section className="page sales-orders-page">
       <div className="page-header">
@@ -283,6 +431,7 @@ export default function SalesOrders({
                 <label className="field-label">担当者<select value={form.contactId} onChange={(event) => updateField('contactId', event.target.value)}><option value="">未選択</option>{relatedContacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name}</option>)}</select></label>
                 <label className="field-label">案件<select value={form.projectId} onChange={(event) => updateField('projectId', event.target.value)}><option value="">未選択</option>{projects.map((project) => <option value={project.id} key={project.id}>{project.title || project.projectCode}</option>)}</select></label>
                 <label className="field-label">発行元<select value={form.issuerId} onChange={(event) => updateField('issuerId', event.target.value)}><option value="">未選択</option>{issuers.filter((issuer) => issuer.isActive !== false).map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}</select></label>
+                <label className="field-label">優先度<select value={form.priority || 3} onChange={(event) => updateField('priority', Number(event.target.value))}>{PRIORITY_OPTIONS.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></label>
                 <label className="field-label">受注日<input type="date" value={form.orderDate} onChange={(event) => updateField('orderDate', event.target.value)} /></label>
                 <label className="field-label">納品予定日<input type="date" value={form.expectedDeliveryDate} onChange={(event) => updateField('expectedDeliveryDate', event.target.value)} /></label>
               </div>
@@ -315,6 +464,55 @@ export default function SalesOrders({
                   <label className="field-label">備考<input value={line.memo} onChange={(event) => updateLine(line.id, 'memo', event.target.value)} /></label>
                 </article>
               ))}
+
+              <div className="section-heading">
+                <div>
+                  <h3>在庫引当</h3>
+                  <span>FEFO自動引当、ロット指定引当、引当解除を受注明細ごとに実行します。</span>
+                </div>
+              </div>
+              {!editingId && <p className="notice-text">在庫引当は受注を保存してから実行できます。</p>}
+              {formReservationSummary.lines.map(({ line, ordered, reserved, unreserved, available, shortage, status, reservations, lots }) => {
+                const product = productMap.get(line.productId);
+                return (
+                  <article className="karte-mini-card" key={`reserve-${line.id}`}>
+                    <div className="history-meta">
+                      <strong>{line.productName || product?.name || '商品未設定'}</strong>
+                      <span className={shortage > 0 ? 'form-error-message' : 'notice-text'}>{reservationStatusLabel(status)}</span>
+                    </div>
+                    <div className="date-grid">
+                      <div><span>受注数量</span><strong>{ordered.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                      <div><span>引当済</span><strong>{reserved.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                      <div><span>未引当</span><strong>{unreserved.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                      <div><span>使用可能在庫</span><strong>{available.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                      <div><span>不足数量</span><strong className={shortage > 0 ? 'danger-text' : ''}>{shortage.toLocaleString('ja-JP')} {line.unit || ''}</strong></div>
+                    </div>
+                    <div className="date-grid">
+                      <label className="field-label">引当数量<input inputMode="decimal" value={reservationQuantityByLine[line.id] || ''} onChange={(event) => setReservationQuantityByLine((current) => ({ ...current, [line.id]: event.target.value }))} placeholder="空欄なら未引当分" /></label>
+                      <label className="field-label">ロット指定<select value={selectedLotByLine[line.id] || ''} onChange={(event) => setSelectedLotByLine((current) => ({ ...current, [line.id]: event.target.value }))}><option value="">FEFO自動</option>{lots.map((lot) => <option value={lot.id} key={lot.id}>{[lot.inventoryCode, lot.lotNumber && `LOT ${lot.lotNumber}`, lot.expiryDate && `賞味 ${lot.expiryDate}`, `${lotAvailableQuantity(lot).toLocaleString('ja-JP')}${lot.unit || ''}`].filter(Boolean).join(' / ')}</option>)}</select></label>
+                    </div>
+                    <div className="mail-action-row">
+                      <button type="button" className="primary-button" disabled={!editingId || reservationBusy === line.id} onClick={() => autoReserveLine(line)}>自動引当</button>
+                      <button type="button" className="ghost-button" disabled={!editingId || reservationBusy === line.id} onClick={() => reserveSelectedLot(line)}>ロット指定</button>
+                      <button type="button" className="ghost-button" disabled={!editingId || reservationBusy === line.id} onClick={() => reallocateLine(line)}>再引当</button>
+                      <button type="button" className="ghost-button danger" disabled={!editingId || reservationBusy === line.id || reservations.length === 0} onClick={() => releaseLine(line)}>解除</button>
+                    </div>
+                    {reservations.length > 0 && (
+                      <div className="timeline-list">
+                        {reservations.map((reservation) => {
+                          const lot = inventoryLots.find((item) => item.id === reservation.inventoryLotId);
+                          return (
+                            <div className="timeline-item" key={reservation.id}>
+                              <strong>{netReserved(reservation).toLocaleString('ja-JP')} {reservation.unit || lot?.unit || line.unit}</strong>
+                              <span>{[lot?.inventoryCode, lot?.lotNumber && `LOT ${lot.lotNumber}`, lot?.expiryDate && `賞味 ${lot.expiryDate}`].filter(Boolean).join(' / ') || 'ロット情報なし'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
               <label className="field-label">メモ<textarea value={form.memo} onChange={(event) => updateField('memo', event.target.value)} /></label>
             </div>
 
@@ -323,6 +521,14 @@ export default function SalesOrders({
                 <div><span>税抜小計</span><strong>{money(normalizeSalesOrder(form).subtotal)}</strong></div>
                 <div><span>消費税</span><strong>{money(normalizeSalesOrder(form).taxAmount)}</strong></div>
                 <div><span>税込合計</span><strong>{money(normalizeSalesOrder(form).grandTotal)}</strong></div>
+              </div>
+              <div className="price-preview">
+                <div><span>現在庫</span><strong>{formReservationSummary.lines.reduce((sum, item) => sum + item.available + item.reserved, 0).toLocaleString('ja-JP')}</strong></div>
+                <div><span>引当済</span><strong>{formReservationSummary.reserved.toLocaleString('ja-JP')}</strong></div>
+                <div><span>使用可能在庫</span><strong>{formReservationSummary.available.toLocaleString('ja-JP')}</strong></div>
+                <div><span>受注数量</span><strong>{formReservationSummary.ordered.toLocaleString('ja-JP')}</strong></div>
+                <div><span>不足数量</span><strong className={formReservationSummary.shortage > 0 ? 'danger-text' : ''}>{formReservationSummary.shortage.toLocaleString('ja-JP')}</strong></div>
+                <div><span>引当率</span><strong>{formReservationSummary.rate}%</strong></div>
               </div>
               <div className="sample-form">
                 <h3>スナップショット</h3>
@@ -351,7 +557,7 @@ export default function SalesOrders({
         actionWidth="320px"
         className="sales-orders-common-table"
         columns={columns}
-        minWidth={1420}
+        minWidth={1660}
         rows={visibleOrders}
         selectedRowId={editingId}
         onRowClick={startEdit}
@@ -367,6 +573,7 @@ export default function SalesOrders({
             </div>
             <div className="lead-badges">
               <span className="info-badge">{order.status}</span>
+              <span className="info-badge">{reservationStatusLabel(reservationSummaryByOrder.get(order.id)?.status)}</span>
               <span className="info-badge ready">{money(order.grandTotal)}</span>
             </div>
             <p>{order.subject || '-'}</p>

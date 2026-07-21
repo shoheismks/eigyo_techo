@@ -24,6 +24,10 @@ export const emptySalesOrder = {
   subject: '',
   orderDate: '',
   expectedDeliveryDate: '',
+  priority: 3,
+  reservationStatus: 'unreserved',
+  reservedTotal: 0,
+  shortageTotal: 0,
   status: '下書き',
   currency: 'JPY',
   subtotal: 0,
@@ -61,6 +65,9 @@ export function emptySalesOrderLine() {
     amount: '',
     taxAmount: '',
     taxIncludedAmount: '',
+    reservedQuantity: 0,
+    shortageQuantity: 0,
+    reservationStatus: 'unreserved',
     memo: '',
     sourceLineSnapshot: null,
   };
@@ -107,6 +114,9 @@ function normalizeLine(line = {}, index = 0, userId = '', orderId = '') {
     amount,
     taxAmount,
     taxIncludedAmount: amount + taxAmount,
+    reservedQuantity: line.reservedQuantity ?? line.reserved_quantity ?? 0,
+    shortageQuantity: line.shortageQuantity ?? line.shortage_quantity ?? Math.max(0, quantity - numberOrZero(line.reservedQuantity ?? line.reserved_quantity)),
+    reservationStatus: line.reservationStatus ?? line.reservation_status ?? 'unreserved',
     memo: line.memo ?? '',
     sourceLineSnapshot: line.sourceLineSnapshot ?? line.source_line_snapshot ?? null,
   };
@@ -143,6 +153,10 @@ export function normalizeSalesOrder(order = {}, userId = '') {
     subject: order.subject ?? '',
     orderDate: order.orderDate ?? order.order_date ?? todayString(),
     expectedDeliveryDate: order.expectedDeliveryDate ?? order.expected_delivery_date ?? '',
+    priority: Number(order.priority ?? 3),
+    reservationStatus: order.reservationStatus ?? order.reservation_status ?? 'unreserved',
+    reservedTotal: order.reservedTotal ?? order.reserved_total ?? 0,
+    shortageTotal: order.shortageTotal ?? order.shortage_total ?? 0,
     status: SALES_ORDER_STATUSES.includes(order.status) ? order.status : '下書き',
     currency: order.currency || 'JPY',
     subtotal: order.subtotal ?? totals.subtotal,
@@ -181,6 +195,10 @@ function orderToRow(order) {
     subject: order.subject,
     order_date: order.orderDate || null,
     expected_delivery_date: order.expectedDeliveryDate || null,
+    priority: order.priority || 3,
+    reservation_status: order.reservationStatus || 'unreserved',
+    reserved_total: order.reservedTotal || 0,
+    shortage_total: order.shortageTotal || 0,
     status: order.status,
     currency: order.currency,
     subtotal: order.subtotal,
@@ -219,6 +237,9 @@ function lineToRow(line, order) {
     amount: line.amount,
     tax_amount: line.taxAmount,
     tax_included_amount: line.taxIncludedAmount,
+    reserved_quantity: line.reservedQuantity || 0,
+    shortage_quantity: line.shortageQuantity || 0,
+    reservation_status: line.reservationStatus || 'unreserved',
     memo: line.memo,
     source_line_snapshot: line.sourceLineSnapshot,
     created_at: order.createdAt,
@@ -259,6 +280,10 @@ function rowToOrder(row, lines = [], history = [], userId = '') {
     subject: row.subject,
     orderDate: row.order_date,
     expectedDeliveryDate: row.expected_delivery_date,
+    priority: row.priority,
+    reservationStatus: row.reservation_status,
+    reservedTotal: row.reserved_total,
+    shortageTotal: row.shortage_total,
     status: row.status,
     currency: row.currency,
     subtotal: row.subtotal,
@@ -549,5 +574,69 @@ export function useSalesOrders(userId = '') {
     updateRecord(id, { isDeleted: true, status: '取消', deletedAt: new Date().toISOString() });
   }
 
-  return { records: sortedRecords, addRecord, updateRecord, removeRecord, reload, syncState, syncError };
+  async function runReservationRpc(functionName, params) {
+    if (!canUseCloud()) {
+      throw new Error('Supabase接続時のみ在庫引当を実行できます。');
+    }
+    setSyncState('syncing');
+    const { data, error } = await supabase.rpc(functionName, params);
+    if (error) {
+      setSyncError(getLocalSyncReason(error.message));
+      throw error;
+    }
+    await reload(++writeSequenceRef.current);
+    return data;
+  }
+
+  function reserveLineFefo(orderId, lineId, quantity = null) {
+    return runReservationRpc('reserve_sales_order_line_fefo', {
+      p_sales_order_id: orderId,
+      p_sales_order_line_id: lineId,
+      p_quantity: quantity === '' ? null : quantity,
+      p_notes: null,
+    });
+  }
+
+  function reserveLineLot(orderId, lineId, lotId, quantity = null) {
+    return runReservationRpc('reserve_sales_order_line_lot', {
+      p_sales_order_id: orderId,
+      p_sales_order_line_id: lineId,
+      p_inventory_lot_id: lotId,
+      p_quantity: quantity === '' ? null : quantity,
+      p_notes: null,
+    });
+  }
+
+  function releaseLineReservations(orderId, lineId, reservationId = null, quantity = null) {
+    return runReservationRpc('release_sales_order_line_reservations', {
+      p_sales_order_id: orderId,
+      p_sales_order_line_id: lineId,
+      p_reservation_id: reservationId || null,
+      p_release_quantity: quantity === '' ? null : quantity,
+      p_notes: null,
+    });
+  }
+
+  function reallocateLineFefo(orderId, lineId, quantity = null) {
+    return runReservationRpc('reallocate_sales_order_line_fefo', {
+      p_sales_order_id: orderId,
+      p_sales_order_line_id: lineId,
+      p_quantity: quantity === '' ? null : quantity,
+      p_notes: null,
+    });
+  }
+
+  return {
+    records: sortedRecords,
+    addRecord,
+    updateRecord,
+    removeRecord,
+    reserveLineFefo,
+    reserveLineLot,
+    releaseLineReservations,
+    reallocateLineFefo,
+    reload,
+    syncState,
+    syncError,
+  };
 }

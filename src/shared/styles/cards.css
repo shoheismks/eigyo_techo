@@ -867,6 +867,10 @@
   font-weight: 900;
 }
 
+.danger-text {
+  color: #ffbec7;
+}
+
 @media (min-width: 768px) {
   .customer-editor-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

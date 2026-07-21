@@ -148,6 +148,7 @@ function AuthenticatedApp() {
     addRecord: addInventory,
     updateRecord: updateInventory,
     removeRecord: removeInventory,
+    reload: reloadInventory,
     inventoryLots,
     inventoryMovements,
     inventoryReservations,
@@ -183,6 +184,10 @@ function AuthenticatedApp() {
     addRecord: addSalesOrder,
     updateRecord: updateSalesOrder,
     removeRecord: removeSalesOrder,
+    reserveLineFefo,
+    reserveLineLot,
+    releaseLineReservations,
+    reallocateLineFefo,
   } = useSalesOrders(userId);
   const {
     records: issuers,
@@ -632,6 +637,11 @@ function AuthenticatedApp() {
             addSalesOrder={addSalesOrder}
             updateSalesOrder={updateSalesOrder}
             removeSalesOrder={removeSalesOrder}
+            reserveLineFefo={reserveLineFefo}
+            reserveLineLot={reserveLineLot}
+            releaseLineReservations={releaseLineReservations}
+            reallocateLineFefo={reallocateLineFefo}
+            reloadInventory={reloadInventory}
             openProductDetail={openProductDetail}
             openInventoryPage={openInventoryPage}
             selectedProduct={selectedProduct}
@@ -759,6 +769,11 @@ function ActivePage({
   addSalesOrder,
   updateSalesOrder,
   removeSalesOrder,
+  reserveLineFefo,
+  reserveLineLot,
+  releaseLineReservations,
+  reallocateLineFefo,
+  reloadInventory,
   openProductDetail,
   openInventoryPage,
   selectedProduct,
@@ -963,6 +978,14 @@ function ActivePage({
         projects={projects}
         quotes={quotes}
         issuers={issuers}
+        products={products}
+        inventoryLots={inventoryLots}
+        inventoryReservations={inventoryReservations}
+        reserveLineFefo={reserveLineFefo}
+        reserveLineLot={reserveLineLot}
+        releaseLineReservations={releaseLineReservations}
+        reallocateLineFefo={reallocateLineFefo}
+        reloadInventory={reloadInventory}
         initialDraft={salesOrderDraft}
         onDraftHandled={() => setSalesOrderDraft(null)}
         onOpenKarte={openCustomerKarte}
