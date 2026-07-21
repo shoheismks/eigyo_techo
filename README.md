@@ -173,6 +173,7 @@ https://eigyo-techo.vercel.app/import?companyName=選択した会社名
 - [DATA_RULE.md](docs/DATA_RULE.md)
 - [ADMIN.md](docs/ADMIN.md)
 - [ROADMAP.md](docs/ROADMAP.md)
+- [SALES_ORDER_PHASE1.md](docs/SALES_ORDER_PHASE1.md)
 - [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
 - [TRIAL_OPERATION.md](docs/TRIAL_OPERATION.md)
 - [CHANGELOG.md](CHANGELOG.md)

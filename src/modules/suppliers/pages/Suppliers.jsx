@@ -57,6 +57,7 @@ export default function Suppliers({
   onOpenKarte,
   onCreateQuote,
   onCreateInvoice,
+  onCreateSalesOrder,
   userId,
 }) {
   const [keyword, setKeyword] = useState('');
@@ -271,6 +272,7 @@ export default function Suppliers({
         onOpenKarte={onOpenKarte}
         onCreateQuote={onCreateQuote}
         onCreateInvoice={onCreateInvoice}
+        onCreateSalesOrder={onCreateSalesOrder}
       />
 
       <section className="result-stack suppliers-list-section">

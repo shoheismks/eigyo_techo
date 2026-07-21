@@ -461,6 +461,7 @@ export default function ProjectPanel({
   onOpenKarte,
   onCreateQuote,
   onCreateInvoice,
+  onCreateSalesOrder,
 }) {
   const [keyword, setKeyword] = useState('');
   const [editingProject, setEditingProject] = useState(null);
@@ -671,6 +672,16 @@ export default function ProjectPanel({
     });
   }
 
+  function createSalesOrderForProject(project) {
+    const relatedQuote = quotes.find((quote) => isQuoteRelatedToProject(quote, project));
+    onCreateSalesOrder?.({
+      quoteId: relatedQuote?.id || '',
+      projectId: project.id,
+      customerId: project.customerId || '',
+      supplierId: project.supplierId || '',
+    });
+  }
+
   function toggleFormArray(field, value) {
     setForm((current) => ({ ...current, [field]: toggleArrayValue(current[field] ?? [], value) }));
   }
@@ -751,6 +762,14 @@ export default function ProjectPanel({
 
           {editingProject && editingDashboard && (
             <ProjectDecisionDashboard dashboard={editingDashboard} />
+          )}
+
+          {editingProject && (
+            <div className="mail-action-row">
+              <button type="button" className="primary-button" onClick={() => createSalesOrderForProject(editingProject)}>
+                この案件で受注作成
+              </button>
+            </div>
           )}
 
           {editingProject && (

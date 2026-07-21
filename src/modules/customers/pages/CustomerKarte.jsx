@@ -540,6 +540,7 @@ export default function CustomerKarte({
   setActivePage,
   onCreateQuote,
   onCreateInvoice,
+  onCreateSalesOrder,
   user,
 }) {
   const [analysis, setAnalysis] = useState(null);
@@ -1589,6 +1590,7 @@ export default function CustomerKarte({
           {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
           <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
           <button className="primary-button karte-main-action" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
+          <button className="primary-button karte-main-action" type="button" onClick={() => onCreateSalesOrder?.({ customerId: customer.id })}>受注作成</button>
           <button className="primary-button karte-main-action" type="button" onClick={() => onCreateInvoice?.({ customerId: customer.id })}>請求書作成</button>
           <button className="primary-button karte-main-action" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
           {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
@@ -1890,6 +1892,7 @@ export default function CustomerKarte({
           setActivePage={setActivePage}
           onCreateQuote={onCreateQuote}
           onCreateInvoice={onCreateInvoice}
+          onCreateSalesOrder={onCreateSalesOrder}
         />
 
         <Section title="商談履歴" count={karte.dealHistories.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setHistoryForm(emptyHistoryForm)}>＋追加</button>}>
@@ -2635,7 +2638,7 @@ export default function CustomerKarte({
             </label>
           </div>
           <QuoteListV1
-            quotes={visibleQuotes}
+          quotes={visibleQuotes}
             products={products}
             inventories={inventories}
             suppliers={suppliers}
@@ -2645,6 +2648,7 @@ export default function CustomerKarte({
             onDuplicateQuote={handleDuplicateQuote}
             onRegenerateQuote={handleRegenerateQuote}
             onCreateInvoice={onCreateInvoice}
+            onCreateSalesOrder={onCreateSalesOrder}
           />
           <InvoiceMiniList
             invoices={customerInvoices}
@@ -3335,6 +3339,7 @@ function QuoteListV1({
   onDuplicateQuote,
   onRegenerateQuote,
   onCreateInvoice,
+  onCreateSalesOrder,
 }) {
   if (!quotes.length) return null;
 
@@ -3466,6 +3471,14 @@ function QuoteListV1({
               <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); onRegenerateQuote?.(quote); }}>
                 PDF再出力
               </button>
+              <button className="primary-button" type="button" onClick={(event) => { event.stopPropagation(); onCreateSalesOrder?.({ quoteId: quote.id, sourceType: 'quote' }); }}>
+                受注作成
+              </button>
+              {(quote.confirmationPdfUrl || quote.acceptedAt) && (
+                <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); onCreateSalesOrder?.({ confirmationQuoteId: quote.id, sourceType: 'confirmation' }); }}>
+                  成約から受注
+                </button>
+              )}
               <button className="primary-button" type="button" onClick={(event) => { event.stopPropagation(); onCreateInvoice?.({ quoteId: quote.id }); }}>
                 請求書作成
               </button>

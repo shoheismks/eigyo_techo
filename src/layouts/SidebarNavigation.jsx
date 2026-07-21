@@ -14,6 +14,7 @@ const customerPages = [
 ];
 const productPages = ['Products', 'ProductDetail'];
 const pipelinePages = ['Pipeline'];
+const salesOrderPages = ['SalesOrders'];
 const inventoryPages = ['Inventory'];
 
 const navGroups = [
@@ -33,6 +34,7 @@ const navGroups = [
       { key: 'Inventory', label: '在庫管理', helper: '入庫・出庫・棚卸' },
       { key: 'Pipeline', label: '見積', helper: '見積作成' },
       { key: 'Pipeline', label: '成約確認書', helper: '約款・確認書' },
+      { key: 'SalesOrders', label: '受注', helper: '受注一覧・詳細' },
       { key: 'Invoices', label: '請求書', helper: '請求・入金確認' },
     ],
   },
@@ -52,6 +54,7 @@ function activeGroupFor(page) {
   if (customerPages.includes(page)) return 'Customers';
   if (productPages.includes(page)) return 'Products';
   if (pipelinePages.includes(page)) return 'Pipeline';
+  if (salesOrderPages.includes(page)) return 'SalesOrders';
   if (inventoryPages.includes(page)) return 'Inventory';
   if (page === 'Invoices') return 'Invoices';
   if (page === 'Suppliers') return 'Suppliers';

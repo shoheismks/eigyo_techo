@@ -41,6 +41,7 @@ export default function Pipeline({
   onOpenKarte,
   onCreateQuote,
   onCreateInvoice,
+  onCreateSalesOrder,
 }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '');
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -145,6 +146,7 @@ export default function Pipeline({
         onOpenKarte={onOpenKarte}
         onCreateQuote={onCreateQuote}
         onCreateInvoice={onCreateInvoice}
+        onCreateSalesOrder={onCreateSalesOrder}
       />
 
       <section className="pipeline-desktop">
