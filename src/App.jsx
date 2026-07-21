@@ -11,6 +11,7 @@ import { useProjects } from './modules/deals/hooks/useProjects.js';
 import { useEvents } from './modules/calendar/hooks/useEvents.js';
 import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useInvoices } from './modules/invoices/hooks/useInvoices.js';
+import { useBrands } from './modules/products/hooks/useBrands.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
 import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { buildSalesOrderDraft, useSalesOrders } from './modules/salesOrders/hooks/useSalesOrders.js';
@@ -147,6 +148,12 @@ function AuthenticatedApp() {
     syncState,
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
+  const {
+    records: brands,
+    addRecord: addBrand,
+    updateRecord: updateBrand,
+    removeRecord: removeBrand,
+  } = useBrands(userId);
   const {
     records: inventories,
     addRecord: addInventory,
@@ -301,6 +308,8 @@ function AuthenticatedApp() {
       productCode: product.productCode || '',
       productName: [product.productCode, product.name].filter(Boolean).join(' / ') || product.name || '',
       description: [product.productCode, product.name].filter(Boolean).join(' / ') || product.name || '',
+      brandId: product.brandId || '',
+      brandName: product.brandName || '',
       category: product.category || '',
       manufacturerName: product.manufacturerName || '',
       origin: product.origin || '',
@@ -637,6 +646,7 @@ function AuthenticatedApp() {
             selectedCustomer={selectedCustomer}
             selectedCustomerId={selectedCustomerId}
             products={products}
+            brands={brands}
             inventories={inventories}
             inventoryLots={inventoryLots}
             inventoryMovements={inventoryMovements}
@@ -649,6 +659,9 @@ function AuthenticatedApp() {
             addProduct={addProduct}
             updateProduct={updateProduct}
             removeProduct={removeProduct}
+            addBrand={addBrand}
+            updateBrand={updateBrand}
+            removeBrand={removeBrand}
             adoptions={adoptions}
             addAdoption={addAdoption}
             updateAdoption={updateAdoption}
@@ -781,6 +794,7 @@ function ActivePage({
   selectedCustomer,
   selectedCustomerId,
   products,
+  brands,
   inventories,
   inventoryLots = [],
   inventoryMovements = [],
@@ -793,6 +807,9 @@ function ActivePage({
   addProduct,
   updateProduct,
   removeProduct,
+  addBrand,
+  updateBrand,
+  removeBrand,
   adoptions,
   addAdoption,
   updateAdoption,
@@ -1126,6 +1143,7 @@ function ActivePage({
     return (
       <Products
         products={products}
+        brands={brands}
         inventories={inventories}
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
@@ -1161,6 +1179,7 @@ function ActivePage({
       <ProductDetail
         product={selectedProduct}
         products={products}
+        brands={brands}
         inventories={inventories}
         adoptions={adoptions}
         samples={samples}
@@ -1171,6 +1190,7 @@ function ActivePage({
         suppliers={suppliers}
         addProduct={addProduct}
         updateProduct={updateProduct}
+        addBrand={addBrand}
         updateAdoption={updateAdoption}
         updateSample={updateSample}
         updateQuote={updateQuote}
@@ -1311,6 +1331,7 @@ function ActivePage({
         backupDatasets={{
           customers,
           products,
+          brands,
           inventories,
           inventoryLots,
           inventoryMovements,
@@ -1336,6 +1357,7 @@ function ActivePage({
         restoreHandlers={{
           customers: { records: customers, add: addCustomer, update: updateCustomer },
           products: { records: products, add: addProduct, update: updateProduct },
+          brands: { records: brands, add: addBrand, update: updateBrand },
           inventories: { records: inventories, add: addInventory, update: updateInventory },
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },

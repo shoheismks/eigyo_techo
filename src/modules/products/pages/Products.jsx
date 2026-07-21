@@ -30,6 +30,7 @@ function productInventorySummary(product, inventories) {
 
 export default function Products({
   products,
+  brands = [],
   inventories = [],
   removeProduct,
   onOpenProductDetail,
@@ -39,11 +40,17 @@ export default function Products({
   const [categoryFilter, setCategoryFilter] = useState(ALL);
   const [temperatureFilter, setTemperatureFilter] = useState(ALL);
   const [manufacturerFilter, setManufacturerFilter] = useState(ALL);
+  const [brandFilter, setBrandFilter] = useState(ALL);
+  const [sortKey, setSortKey] = useState('updated');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedPreviewId, setSelectedPreviewId] = useState('');
 
   const manufacturers = useMemo(
     () => uniqueValues(products, 'manufacturerName'),
+    [products],
+  );
+  const brandNames = useMemo(
+    () => uniqueValues(products, 'brandName'),
     [products],
   );
 
@@ -56,6 +63,7 @@ export default function Products({
         [
           product.name,
           product.productCode,
+          product.brandName,
           product.category,
           product.manufacturerName,
           product.origin,
@@ -68,10 +76,24 @@ export default function Products({
       const matchesCategory = categoryFilter === ALL || product.category === categoryFilter;
       const matchesTemperature = temperatureFilter === ALL || product.temperatureZone === temperatureFilter;
       const matchesManufacturer = manufacturerFilter === ALL || product.manufacturerName === manufacturerFilter;
+      const matchesBrand = brandFilter === ALL || product.brandName === brandFilter;
 
-      return matchesKeyword && matchesCategory && matchesTemperature && matchesManufacturer;
+      return matchesKeyword && matchesCategory && matchesTemperature && matchesManufacturer && matchesBrand;
+    }).sort((a, b) => {
+      if (sortKey === 'brand') {
+        return String(a.brandName || '').localeCompare(String(b.brandName || ''), 'ja') ||
+          String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+      }
+      if (sortKey === 'name') {
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+      }
+      if (sortKey === 'category') {
+        return String(a.category || '').localeCompare(String(b.category || ''), 'ja') ||
+          String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+      }
+      return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
     });
-  }, [categoryFilter, keyword, manufacturerFilter, products, temperatureFilter]);
+  }, [brandFilter, categoryFilter, keyword, manufacturerFilter, products, sortKey, temperatureFilter]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
   const selectedPreviewProduct =
@@ -88,6 +110,7 @@ export default function Products({
         render: (product) => <strong>{product.name}</strong>,
       },
       { key: 'productCode', label: '商品コード', minWidth: '130px', render: (product) => product.productCode || '-' },
+      { key: 'brandName', label: 'ブランド', minWidth: '160px', render: (product) => product.brandName || '-' },
       { key: 'category', label: 'カテゴリー', minWidth: '100px', render: (product) => product.category || '-' },
       { key: 'manufacturerName', label: 'メーカー', width: '16%', minWidth: '180px', render: (product) => product.manufacturerName || '-' },
       { key: 'origin', label: '産地', minWidth: '90px', render: (product) => product.origin || '-' },
@@ -202,6 +225,26 @@ export default function Products({
             ))}
           </select>
         </label>
+
+        <label className="field-label">
+          ブランド
+          <select value={brandFilter} onChange={resetPaging((event) => setBrandFilter(event.target.value))}>
+            <option>{ALL}</option>
+            {brandNames.map((brandName) => (
+              <option key={brandName}>{brandName}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field-label">
+          並び替え
+          <select value={sortKey} onChange={resetPaging((event) => setSortKey(event.target.value))}>
+            <option value="updated">更新順</option>
+            <option value="brand">ブランド別</option>
+            <option value="name">商品名順</option>
+            <option value="category">カテゴリー別</option>
+          </select>
+        </label>
       </section>
 
       <section className="result-stack">
@@ -235,6 +278,7 @@ export default function Products({
                 <ProductCard
                   key={product.id}
                   product={product}
+                  brands={brands}
                   inventories={inventories}
                   removeProduct={removeProduct}
                   onOpenProductDetail={onOpenProductDetail}
@@ -290,6 +334,7 @@ function ProductCard({ product, inventories, removeProduct, onOpenProductDetail,
 
       <dl className="company-details">
         <div><dt>商品コード</dt><dd>{product.productCode || '未入力'}</dd></div>
+        <div><dt>ブランド</dt><dd>{product.brandName || '未設定'}</dd></div>
         <div><dt>メーカー</dt><dd>{product.manufacturerName || '未入力'}</dd></div>
         <div><dt>産地</dt><dd>{product.origin || '未入力'}</dd></div>
         <div><dt>荷姿</dt><dd>{product.packageStyle || '未入力'}</dd></div>

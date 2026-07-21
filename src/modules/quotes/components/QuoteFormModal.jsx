@@ -120,6 +120,8 @@ function buildLineSnapshot(line = {}, product, inventory, defaultTaxRate = DEFAU
     productCode: product?.productCode || line.productCode || '',
     productName,
     description: productName,
+    brandId: product?.brandId || line.brandId || '',
+    brandName: product?.brandName || line.brandName || '',
     category: product?.category || line.category || '',
     manufacturerName: product?.manufacturerName || line.manufacturerName || '',
     origin: product?.origin || line.origin || '',
@@ -186,6 +188,7 @@ export default function QuoteFormModal({
     return products.filter((product) => [
       product.productCode,
       product.name,
+      product.brandName,
       product.manufacturerName,
       product.category,
     ].filter(Boolean).join(' ').toLowerCase().includes(keyword));
@@ -590,6 +593,7 @@ export default function QuoteFormModal({
                 <dl className="company-details">
                   <div><dt>商品コード</dt><dd>{line.productCode || '-'}</dd></div>
                   <div><dt>商品名</dt><dd>{line.productName || '-'}</dd></div>
+                  <div><dt>ブランド</dt><dd>{line.brandName || '-'}</dd></div>
                   <div><dt>温度帯</dt><dd>{line.temperatureZone || '-'}</dd></div>
                   <div><dt>金額</dt><dd>{formatPrice(calculatedLine?.amount) || '-'}</dd></div>
                   <div><dt>粗利</dt><dd>{formatPrice(calculatedLine?.grossMarginAmount) || '-'}</dd></div>

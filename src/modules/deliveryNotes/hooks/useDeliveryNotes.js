@@ -43,6 +43,8 @@ function normalizeLine(line = {}, userId = '', noteId = '') {
     productSnapshot,
     productCode: line.productCode ?? productSnapshot.productCode ?? '',
     productName: line.productName ?? productSnapshot.productName ?? '',
+    brandId: line.brandId ?? line.brand_id ?? productSnapshot.brandId ?? '',
+    brandName: line.brandName ?? line.brand_name ?? productSnapshot.brandName ?? '',
     specification: line.specification ?? productSnapshot.specification ?? '',
     temperatureZone: line.temperatureZone ?? productSnapshot.temperatureZone ?? '',
     quantity: line.quantity ?? '',

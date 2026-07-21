@@ -658,3 +658,15 @@
 - 保存先: Supabase `customers`。LocalStorageバックアップにも同じフィールドを保存。
 - 関連データ: `contacts`, `projects`, `quotes`, `sales_orders`, `shipments`, `delivery_notes` は実際の取引拠点の `customer_id` を維持する。
 - 今後の拡張: 帳票作成時の請求先／納品先選択UI、支社作成時の法人情報コピー範囲の詳細設定、企業グループ単位の分析レポート。
+
+## 追加: 商品ブランド管理
+
+- ステータス: 開発中
+- 目的: メーカー／仕入先とは別に商品ブランドを管理し、同一メーカーの複数ブランドやブランド別検索に対応する。
+- 画面: `Products`, `ProductDetail`, 見積作成, 受注, 出荷, 納品書, 設定/バックアップ。
+- 入力: ブランド名、メーカー関連情報、仕入先、国、説明、Webサイト、ロゴURL。
+- 出力: 商品一覧のブランド列、スマホカードのブランド表示、商品詳細のブランド情報、同一ブランド商品一覧。
+- 保存先: Supabase `brands`, `products.brand_id`, `products.brand_name`。LocalStorage fallback は `eigyo-techo-brands`。
+- 関連データ: `products`, `suppliers`, `quotes`, `sales_orders`, `invoices`, `delivery_notes`。
+- snapshot: 見積・受注・請求・納品書の明細には作成時点の `brandId` / `brandName` を保存し、後日のブランド変更で過去帳票を変えない。
+- 今後の拡張: ブランドロゴのStorage保存、ブランド統合、ブランド別売上分析、CSV/Excel専用インポート。

@@ -4,6 +4,7 @@ const BACKUP_VERSION = 1;
 const DATASET_KEYS = [
   'customers',
   'products',
+  'brands',
   'inventories',
   'inventoryLots',
   'inventoryMovements',

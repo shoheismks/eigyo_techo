@@ -111,6 +111,8 @@ function quoteLineToInvoiceLine(line = {}, defaultTaxRate = DEFAULT_INVOICE_TAX_
     inventoryId: line.inventoryId || '',
     productCode: line.productCode || '',
     productName: line.productName || line.description || '',
+    brandId: line.brandId || '',
+    brandName: line.brandName || '',
     specification: line.packageStyle || line.specification || line.category || '',
     quantity: line.quantity || '',
     unit: line.unit || 'kg',

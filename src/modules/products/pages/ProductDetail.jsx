@@ -11,6 +11,11 @@ import {
   normalizeProduct,
   parsePrice,
 } from '../hooks/useProducts.js';
+import {
+  findDuplicateBrand,
+  normalizeBrand,
+  normalizeBrandName,
+} from '../hooks/useBrands.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import {
   INVENTORY_STATUSES,
@@ -82,6 +87,7 @@ function productSnapshot(product) {
 export default function ProductDetail({
   product,
   products = [],
+  brands = [],
   inventories = [],
   adoptions = [],
   samples = [],
@@ -91,6 +97,7 @@ export default function ProductDetail({
   suppliers = [],
   addProduct,
   updateProduct,
+  addBrand,
   updateAdoption,
   updateSample,
   updateQuote,
@@ -152,6 +159,40 @@ export default function ProductDetail({
         .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))),
     [form.id, inventories],
   );
+  const activeBrands = useMemo(
+    () =>
+      brands
+        .filter((brand) => brand.isActive !== false && !brand.deletedAt)
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ja')),
+    [brands],
+  );
+  const relatedBrand = useMemo(
+    () =>
+      activeBrands.find((brand) => brand.id === form.brandId) ||
+      activeBrands.find((brand) => brand.name === form.brandName) ||
+      null,
+    [activeBrands, form.brandId, form.brandName],
+  );
+  const relatedBrandProducts = useMemo(
+    () =>
+      form.brandName
+        ? products
+            .filter((item) => item.id !== form.id && item.brandName === form.brandName)
+            .slice(0, 6)
+        : [],
+    [form.brandName, form.id, products],
+  );
+  const brandCandidates = useMemo(() => {
+    const manufacturer = String(form.manufacturerName || '').trim();
+    const supplierIds = new Set(relatedInventories.map((inventory) => inventory.supplierId).filter(Boolean));
+    const related = activeBrands.filter((brand) => (
+      !manufacturer ||
+      !brand.manufacturerId ||
+      brand.manufacturerId === manufacturer ||
+      supplierIds.has(brand.supplierId)
+    ));
+    return related.length ? related : activeBrands;
+  }, [activeBrands, form.manufacturerName, relatedInventories]);
   const inventorySummary = useMemo(() => {
     const total = relatedInventories.reduce((sum, inventory) => sum + Number(inventory.quantity || 0), 0);
     const reserved = relatedInventories.reduce((sum, inventory) => sum + Number(inventory.reservedQuantity || 0), 0);
@@ -272,6 +313,44 @@ export default function ProductDetail({
         .map((tag) => tag.trim())
         .filter(Boolean),
     );
+  }
+
+  function updateBrandName(value) {
+    const name = normalizeBrandName(value);
+    const matchedBrand = activeBrands.find((brand) => brand.name === name);
+    setSaveMessage('');
+    setSaveError('');
+    setForm((current) => ({
+      ...current,
+      brandId: matchedBrand?.id || '',
+      brandName: name,
+    }));
+  }
+
+  function clearBrand() {
+    setSaveMessage('');
+    setSaveError('');
+    setForm((current) => ({ ...current, brandId: '', brandName: '' }));
+  }
+
+  function createBrandFromInput() {
+    const name = normalizeBrandName(form.brandName);
+    if (!name || !addBrand) return;
+    const duplicate = findDuplicateBrand(activeBrands, name);
+    if (duplicate) {
+      setForm((current) => ({ ...current, brandId: duplicate.id, brandName: duplicate.name }));
+      setSaveMessage('既存ブランドを選択しました。');
+      return;
+    }
+
+    const brandId = addBrand(normalizeBrand({
+      name,
+      manufacturerId: form.manufacturerName || '',
+      country: form.origin || '',
+      userId,
+    }, userId));
+    setForm((current) => ({ ...current, brandId, brandName: name }));
+    setSaveMessage('ブランドを追加しました。');
   }
 
   function updateInventoryField(field, value) {
@@ -564,6 +643,61 @@ export default function ProductDetail({
               onChange={(event) => updateField('manufacturerName', event.target.value)}
             />
           </label>
+
+          <label className="field-label">
+            ブランド
+            <input
+              value={form.brandName}
+              list="product-brand-options"
+              placeholder="未設定可。入力して既存選択または新規追加"
+              onChange={(event) => updateBrandName(event.target.value)}
+            />
+            <datalist id="product-brand-options">
+              {brandCandidates.map((brand) => (
+                <option value={brand.name} key={brand.id} />
+              ))}
+            </datalist>
+            <span className="inline-helper">
+              ブランドはメーカー／仕入先とは別管理です。未登録ブランドはこの場で追加できます。
+            </span>
+          </label>
+
+          <div className="card-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={createBrandFromInput}
+              disabled={!form.brandName || Boolean(relatedBrand)}
+            >
+              ブランド新規登録
+            </button>
+            <button type="button" className="ghost-button" onClick={clearBrand}>
+              ブランド未設定
+            </button>
+          </div>
+
+          {relatedBrand && (
+            <div className="karte-mini-card">
+              <div className="section-heading">
+                <h3>{relatedBrand.name}</h3>
+                <span className="info-badge ready">Brand</span>
+              </div>
+              {relatedBrand.logoUrl && (
+                <img className="product-thumb" src={relatedBrand.logoUrl} alt={`${relatedBrand.name} logo`} loading="lazy" />
+              )}
+              <dl className="company-details">
+                <div><dt>メーカー</dt><dd>{relatedBrand.manufacturerId || form.manufacturerName || '-'}</dd></div>
+                <div><dt>仕入先</dt><dd>{suppliers.find((supplier) => supplier.id === relatedBrand.supplierId)?.name || '-'}</dd></div>
+                <div><dt>国</dt><dd>{relatedBrand.country || '-'}</dd></div>
+              </dl>
+              {relatedBrand.description && <p className="inline-helper">{relatedBrand.description}</p>}
+              {relatedBrandProducts.length > 0 && (
+                <p className="inline-helper">
+                  同一ブランドの商品: {relatedBrandProducts.map((item) => item.name).join('、')}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="date-grid">
             <label className="field-label">
