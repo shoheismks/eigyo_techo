@@ -74,6 +74,37 @@
     table-layout: auto;
   }
 
+  .office-tree-cell {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .office-tree-cell.depth-1 {
+    padding-left: 14px;
+  }
+
+  .office-tree-cell strong,
+  .office-tree-cell small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .office-tree-cell small {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .office-tree-branch {
+    color: var(--blue);
+    font-weight: 900;
+  }
+
   .desktop-data-table thead {
     display: table-header-group;
     position: static;

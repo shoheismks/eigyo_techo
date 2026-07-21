@@ -50,6 +50,14 @@ import {
 } from '../../../shared/utils/businessCode.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
+import {
+  displayCustomerOfficeName,
+  getChildOffices,
+  getCustomerGroupIds,
+  getParentCustomer,
+  getSiblingOffices,
+  officeTypeLabel,
+} from '../services/customerOfficeService.js';
 
 const KARTE_TABS = [
   { id: 'overview', label: '概要' },
@@ -517,6 +525,9 @@ export default function CustomerKarte({
   samples = [],
   quotes = [],
   invoices = [],
+  salesOrders = [],
+  shipments = [],
+  deliveryNotes = [],
   issuers = [],
   updateCustomer,
   addProject,
@@ -538,6 +549,7 @@ export default function CustomerKarte({
   addInventory,
   updateInventory,
   setActivePage,
+  onOpenKarte,
   onCreateQuote,
   onCreateInvoice,
   onCreateSalesOrder,
@@ -704,6 +716,25 @@ export default function CustomerKarte({
   }
 
   const { customer } = karte;
+  const parentOffice = getParentCustomer(customer, customers);
+  const childOffices = getChildOffices(customer, customers);
+  const siblingOffices = getSiblingOffices(customer, customers);
+  const groupCustomerIds = new Set(getCustomerGroupIds(customer.id, customers));
+  const groupProjects = projects.filter((project) => groupCustomerIds.has(project.customerId));
+  const groupQuotes = quotes.filter((quote) => groupCustomerIds.has(quote.customerId));
+  const groupSalesOrders = salesOrders.filter((order) => groupCustomerIds.has(order.customerId));
+  const groupShipments = shipments.filter((shipment) => groupCustomerIds.has(shipment.customerId));
+  const groupDeliveryNotes = deliveryNotes.filter((note) => groupCustomerIds.has(note.customerId));
+  const groupQuoteTotal = groupQuotes.reduce((sum, quote) => sum + (parsePrice(quote.grandTotal || quote.totalAmount) || 0), 0);
+  const groupSalesOrderTotal = groupSalesOrders.reduce((sum, order) => sum + (parsePrice(order.grandTotal || order.totalAmount) || 0), 0);
+  const groupShipmentQuantity = groupShipments.reduce((sum, shipment) => (
+    sum + (shipment.lines ?? shipment.shipmentLines ?? []).reduce((lineSum, line) => lineSum + (Number(line.quantity) || 0), 0)
+  ), 0);
+  const groupProductIds = new Set([
+    ...groupQuotes.flatMap((quote) => quote.productIds ?? []),
+    ...groupSalesOrders.flatMap((order) => order.productIds ?? []),
+    ...groupShipments.flatMap((shipment) => (shipment.lines ?? shipment.shipmentLines ?? []).map((line) => line.productId)),
+  ].filter(Boolean));
   const isHighRank = ['S', 'A'].includes(customer.customerRank || customer.rank);
   const hasComplaints =
     karte.complaints.length > 0 || karte.dealHistories.some((history) => history.hasComplaint);
@@ -1613,6 +1644,55 @@ export default function CustomerKarte({
             <strong>{item.value}</strong>
           </div>
         ))}
+      </section>
+
+      <section className="detail-section office-group-summary">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Company Group</p>
+            <h2>企業グループ</h2>
+          </div>
+          <span className="info-badge">{officeTypeLabel(customer.officeType)}</span>
+        </div>
+        {parentOffice ? (
+          <div className="office-group-links">
+            <button type="button" className="ghost-button" onClick={() => onOpenKarte?.(parentOffice.id)}>
+              本社カルテ: {displayCustomerOfficeName(parentOffice)}
+            </button>
+            {(customer.billingCustomerId || customer.shippingCustomerId) && (
+              <p className="inline-helper">
+                請求先: {displayCustomerOfficeName(customers.find((item) => item.id === customer.billingCustomerId) || customer)}
+                {' / '}
+                納品先: {displayCustomerOfficeName(customers.find((item) => item.id === customer.shippingCustomerId) || customer)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="inline-helper">この取引先は独立した本社として扱います。</p>
+        )}
+        <div className="karte-kpi-strip compact-kpi-strip">
+          <div className="karte-kpi-card"><span>配下拠点</span><strong>{childOffices.length}</strong></div>
+          <div className="karte-kpi-card"><span>案件</span><strong>{groupProjects.length}件</strong></div>
+          <div className="karte-kpi-card"><span>見積金額</span><strong>{formatPrice(groupQuoteTotal) || '0'}円</strong></div>
+          <div className="karte-kpi-card"><span>受注金額</span><strong>{formatPrice(groupSalesOrderTotal) || '0'}円</strong></div>
+          <div className="karte-kpi-card"><span>出荷数量</span><strong>{groupShipmentQuantity || 0}</strong></div>
+          <div className="karte-kpi-card"><span>取扱商品</span><strong>{groupProductIds.size}</strong></div>
+          <div className="karte-kpi-card"><span>納品書</span><strong>{groupDeliveryNotes.length}件</strong></div>
+        </div>
+        {(childOffices.length > 0 || siblingOffices.length > 0) && (
+          <div className="office-branch-list">
+            {childOffices.map((office) => (
+              <button type="button" className="ghost-button compact-action-button" key={office.id} onClick={() => onOpenKarte?.(office.id)}>
+                └ {displayCustomerOfficeName(office)}
+              </button>
+            ))}
+            {siblingOffices.map((office) => (
+              <button type="button" className="ghost-button compact-action-button" key={office.id} onClick={() => onOpenKarte?.(office.id)}>
+                同一企業: {displayCustomerOfficeName(office)}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="karte-workspace">

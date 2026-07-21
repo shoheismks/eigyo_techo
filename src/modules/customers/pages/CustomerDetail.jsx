@@ -7,6 +7,12 @@ import {
   isValidBusinessCode,
   normalizeBusinessCode,
 } from '../../../shared/utils/businessCode.js';
+import {
+  OFFICE_TYPE_OPTIONS,
+  displayCustomerOfficeName,
+  getParentCustomer,
+  officeTypeLabel,
+} from '../services/customerOfficeService.js';
 
 const DEAL_TYPES = ['メール', '電話', '商談', '訪問', '見積', 'その他'];
 const REPLY_TYPES = ['返信', '訂正', '補足', '次回アクション', '社内メモ'];
@@ -109,6 +115,7 @@ function HistoryReplies({ replies, onStartReply, depth = 1 }) {
 
 export default function CustomerDetail({
   customer,
+  customers = [],
   products,
   projects = [],
   suppliers = [],
@@ -149,6 +156,35 @@ export default function CustomerDetail({
 
   function updateField(field, value) {
     updateCustomer(customer.id, { [field]: value });
+  }
+
+  const headOfficeOptions = customers.filter(
+    (item) => item.id !== customer.id && !item.parentCustomerId && (item.officeType || 'head_office') === 'head_office',
+  );
+  const customerOptions = customers.filter((item) => item.id !== customer.id && !item.isDeleted);
+  const parentCustomer = getParentCustomer(customer, customers);
+  const billingCustomer = customers.find((item) => item.id === customer.billingCustomerId);
+  const shippingCustomer = customers.find((item) => item.id === customer.shippingCustomerId);
+
+  function updateOfficeType(value) {
+    updateCustomer(customer.id, {
+      officeType: value,
+      parentCustomerId: value === 'head_office' ? '' : customer.parentCustomerId,
+      isHeadOffice: value === 'head_office',
+    });
+  }
+
+  function copyParentCompanyInfo() {
+    if (!parentCustomer) return;
+
+    updateCustomer(customer.id, {
+      companyName: parentCustomer.companyName || customer.companyName,
+      companyKana: parentCustomer.companyKana || customer.companyKana,
+      corporateNumber: parentCustomer.corporateNumber || customer.corporateNumber,
+      industry: parentCustomer.industry || customer.industry,
+      website: parentCustomer.website || customer.website,
+      billingCustomerId: customer.billingCustomerId || parentCustomer.id,
+    });
   }
 
   function updateCustomerCode(value) {
@@ -266,6 +302,73 @@ export default function CustomerDetail({
           />
         </label>
         {codeError && <p className="form-error-message">{codeError}</p>}
+        <div className="detail-subsection office-detail-panel">
+          <h3>本社・支社／支店</h3>
+          <div className="date-grid">
+            <label className="field-label">
+              拠点区分
+              <select value={customer.officeType || 'head_office'} onChange={(event) => updateOfficeType(event.target.value)}>
+                {OFFICE_TYPE_OPTIONS.map((option) => (
+                  <option value={option.value} key={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field-label">
+              本社／親会社
+              <select
+                value={customer.parentCustomerId || ''}
+                disabled={(customer.officeType || 'head_office') === 'head_office'}
+                onChange={(event) => updateField('parentCustomerId', event.target.value)}
+              >
+                <option value="">未設定</option>
+                {headOfficeOptions.map((item) => (
+                  <option value={item.id} key={item.id}>{displayCustomerOfficeName(item)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="date-grid">
+            <label className="field-label">
+              支社名／支店名
+              <input value={customer.branchName || ''} onChange={(event) => updateField('branchName', event.target.value)} />
+            </label>
+            <label className="field-label">
+              拠点コード
+              <input value={customer.branchCode || ''} onChange={(event) => updateField('branchCode', event.target.value.trim())} />
+            </label>
+          </div>
+          <div className="date-grid">
+            <label className="field-label">
+              請求先
+              <select value={customer.billingCustomerId || ''} onChange={(event) => updateField('billingCustomerId', event.target.value)}>
+                <option value="">この拠点</option>
+                {customerOptions.map((item) => (
+                  <option value={item.id} key={item.id}>{displayCustomerOfficeName(item)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field-label">
+              標準納品先
+              <select value={customer.shippingCustomerId || ''} onChange={(event) => updateField('shippingCustomerId', event.target.value)}>
+                <option value="">この拠点</option>
+                {customerOptions.map((item) => (
+                  <option value={item.id} key={item.id}>{displayCustomerOfficeName(item)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="office-relation-summary">
+            <span>現在: {officeTypeLabel(customer.officeType)}</span>
+            {parentCustomer && <span>本社: {displayCustomerOfficeName(parentCustomer)}</span>}
+            {billingCustomer && <span>請求先: {displayCustomerOfficeName(billingCustomer)}</span>}
+            {shippingCustomer && <span>納品先: {displayCustomerOfficeName(shippingCustomer)}</span>}
+          </div>
+          {parentCustomer && (
+            <button type="button" className="ghost-button compact-action-button" onClick={copyParentCompanyInfo}>
+              本社の会社情報をコピー
+            </button>
+          )}
+        </div>
         <label className="field-label">
           会社名
           <input value={customer.companyName} onChange={(event) => updateField('companyName', event.target.value)} />

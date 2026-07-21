@@ -648,3 +648,13 @@
 - 関連データ: `shipments`, `shipment_lines`, `sales_orders`, `sales_order_lines`, `customers`, `products`, `issuers`。
 - 今後の拡張: 送付履歴、納品差異、納品書メール添付、帳票センター連携。
 - 詳細: `docs/SALES_ORDER_PHASE4.md`
+# 追記: 本社・支社／支店管理
+
+- ステータス: 実装済
+- 目的: 同じ企業の本社、支社、支店、営業所を独立した取引先として管理しつつ、企業グループとして確認できるようにする。
+- 画面: `Customers`, `CustomerDetail`, `CustomerKarte`
+- 入力: 拠点区分、本社／親会社、支社名／支店名、拠点コード、請求先、標準納品先。
+- 出力: 取引先一覧の階層表示、本社カルテの企業グループ概要、支社カルテの本社リンク、請求先／納品先の表示。
+- 保存先: Supabase `customers`。LocalStorageバックアップにも同じフィールドを保存。
+- 関連データ: `contacts`, `projects`, `quotes`, `sales_orders`, `shipments`, `delivery_notes` は実際の取引拠点の `customer_id` を維持する。
+- 今後の拡張: 帳票作成時の請求先／納品先選択UI、支社作成時の法人情報コピー範囲の詳細設定、企業グループ単位の分析レポート。

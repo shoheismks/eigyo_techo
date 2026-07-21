@@ -880,6 +880,22 @@
     grid-column: 1 / -1;
   }
 
+  .duplicate-candidates {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .office-detail-panel {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+    margin: 10px 0;
+  }
+
   .project-form-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

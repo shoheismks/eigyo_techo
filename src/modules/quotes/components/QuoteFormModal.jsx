@@ -50,7 +50,24 @@ function generateQuoteNumber(quotes = []) {
   return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
+function customerSnapshot(customer = {}) {
+  return customer ? {
+    id: customer.id || '',
+    customerCode: customer.customerCode || '',
+    companyName: customer.companyName || '',
+    branchName: customer.branchName || '',
+    officeType: customer.officeType || 'head_office',
+    address: customer.address || '',
+    phone: customer.phone || '',
+    email: customer.email || '',
+  } : null;
+}
+
 function createInitialQuote({ draft, quotes, user, issuers = [] }) {
+  const customers = draft?.customers ?? [];
+  const customer = customers.find((item) => item.id === draft?.customerId);
+  const billingCustomer = customers.find((item) => item.id === (draft?.billingCustomerId || customer?.billingCustomerId)) || customer;
+  const shippingCustomer = customers.find((item) => item.id === (draft?.shippingCustomerId || customer?.shippingCustomerId)) || customer;
   const issuer = issuers.find((item) => item.id === draft?.issuerId) || issuers.find((item) => item.isDefault && item.isActive) || issuers.find((item) => item.isActive);
   const defaultTaxRate = String(draft?.defaultTaxRate || issuer?.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE);
   const termsSnapshot = draft?.termsSnapshot || createTermsSnapshotFromIssuer(issuer);
@@ -60,6 +77,11 @@ function createInitialQuote({ draft, quotes, user, issuers = [] }) {
     quoteNumber: draft?.quoteNumber || generateQuoteNumber(quotes),
     issuerId: draft?.issuerId || issuer?.id || '',
     pdfTemplate: draft?.pdfTemplate || issuer?.defaultPdfTemplate || 'standard',
+    transactionCustomerSnapshot: draft?.transactionCustomerSnapshot || customerSnapshot(customer),
+    billingCustomerId: draft?.billingCustomerId || customer?.billingCustomerId || customer?.id || '',
+    billingCustomerSnapshot: draft?.billingCustomerSnapshot || customerSnapshot(billingCustomer),
+    shippingCustomerId: draft?.shippingCustomerId || customer?.shippingCustomerId || customer?.id || '',
+    shippingCustomerSnapshot: draft?.shippingCustomerSnapshot || customerSnapshot(shippingCustomer),
     issueDate: draft?.issueDate || todayString(),
     submittedDate: draft?.submittedDate || todayString(),
     validUntil: draft?.validUntil || addDaysString(todayString(), 14),
@@ -136,7 +158,7 @@ export default function QuoteFormModal({
   onClose,
   onSaved,
 }) {
-  const [form, setForm] = useState(() => createInitialQuote({ draft, quotes, user, issuers }));
+  const [form, setForm] = useState(() => createInitialQuote({ draft: { ...draft, customers }, quotes, user, issuers }));
   const [productSearch, setProductSearch] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [confirmationPreviewHtml, setConfirmationPreviewHtml] = useState('');
@@ -146,13 +168,13 @@ export default function QuoteFormModal({
 
   useEffect(() => {
     if (!open) return;
-    setForm(createInitialQuote({ draft, quotes, user, issuers }));
+    setForm(createInitialQuote({ draft: { ...draft, customers }, quotes, user, issuers }));
     setProductSearch('');
     setPreviewHtml('');
     setConfirmationPreviewHtml('');
     setSaveState('未保存');
     setError('');
-  }, [draft, open, quotes, user, issuers]);
+  }, [customers, draft, open, quotes, user, issuers]);
 
   const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
   const activeIssuers = issuers.filter((issuer) => issuer.isActive !== false);
@@ -199,6 +221,23 @@ export default function QuoteFormModal({
       }));
       return;
     }
+
+    if (field === 'customerId') {
+      const customer = customers.find((item) => item.id === value);
+      const billingCustomer = customers.find((item) => item.id === customer?.billingCustomerId) || customer;
+      const shippingCustomer = customers.find((item) => item.id === customer?.shippingCustomerId) || customer;
+      setForm((current) => ({
+        ...current,
+        customerId: value,
+        transactionCustomerSnapshot: customerSnapshot(customer),
+        billingCustomerId: customer?.billingCustomerId || customer?.id || '',
+        billingCustomerSnapshot: customerSnapshot(billingCustomer),
+        shippingCustomerId: customer?.shippingCustomerId || customer?.id || '',
+        shippingCustomerSnapshot: customerSnapshot(shippingCustomer),
+      }));
+      return;
+    }
+
     setForm((current) => ({ ...current, [field]: value }));
   }
 

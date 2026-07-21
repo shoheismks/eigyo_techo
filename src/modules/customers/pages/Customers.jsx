@@ -9,6 +9,15 @@ import {
   normalizeBusinessCode,
 } from '../../../shared/utils/businessCode.js';
 import { discoverContactInfo } from '../services/contactDiscoveryService.js';
+import {
+  OFFICE_TYPE_OPTIONS,
+  buildHierarchicalCustomers,
+  displayCustomerOfficeName,
+  getChildOffices,
+  getParentCustomer,
+  officeTypeLabel,
+  validateOfficeAssignment,
+} from '../services/customerOfficeService.js';
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 
 const ALL = 'すべて';
@@ -16,6 +25,7 @@ const PAGE_SIZE = 40;
 
 const INITIAL_CUSTOMER_FORM = {
   customerCode: '',
+  corporateNumber: '',
   companyName: '',
   companyKana: '',
   industry: '',
@@ -28,6 +38,12 @@ const INITIAL_CUSTOMER_FORM = {
   website: '',
   salesOwner: '',
   customerRank: 'D',
+  parentCustomerId: '',
+  officeType: 'head_office',
+  branchName: '',
+  branchCode: '',
+  billingCustomerId: '',
+  shippingCustomerId: '',
   status: '未接触',
   tagsText: '',
   nextFollowUpDate: '',
@@ -85,6 +101,7 @@ export default function Customers({
   const [areaFilter, setAreaFilter] = useState(ALL);
   const [complaintFilter, setComplaintFilter] = useState(ALL);
   const [followFilter, setFollowFilter] = useState(ALL);
+  const [officeFilter, setOfficeFilter] = useState(ALL);
   const [sortMode, setSortMode] = useState('created');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedPreviewId, setSelectedPreviewId] = useState('');
@@ -124,6 +141,29 @@ export default function Customers({
     [customers],
   );
 
+  const headOfficeOptions = useMemo(
+    () => customers.filter((customer) => !customer.parentCustomerId && (customer.officeType || 'head_office') === 'head_office'),
+    [customers],
+  );
+
+  const customerOptions = useMemo(
+    () => customers.filter((customer) => !customer.isDeleted),
+    [customers],
+  );
+
+  const duplicateCandidates = useMemo(() => {
+    const corporateNumber = customerForm.corporateNumber?.trim();
+    const companyName = customerForm.companyName.trim().toLowerCase();
+    if (!corporateNumber && !companyName) return [];
+
+    return customers
+      .filter((customer) => {
+        if (corporateNumber && customer.corporateNumber === corporateNumber) return true;
+        return companyName && customer.companyName.toLowerCase().includes(companyName);
+      })
+      .slice(0, 5);
+  }, [customerForm.companyName, customerForm.corporateNumber, customers]);
+
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const nextCustomers = customers.filter((customer) => {
@@ -140,9 +180,22 @@ export default function Customers({
         followFilter === ALL ||
         (followFilter === '期限切れ' && isOverdue(customer)) ||
         (followFilter === '予定あり' && Boolean(followDate(customer)));
+      const matchesOffice =
+        officeFilter === ALL ||
+        (officeFilter === 'head_office' && !customer.parentCustomerId) ||
+        (officeFilter === 'branch_only' && Boolean(customer.parentCustomerId)) ||
+        customer.officeType === officeFilter;
+      const parentCustomer = getParentCustomer(customer, customers);
+      const childOffices = getChildOffices(customer, customers);
       const searchableText = [
         customer.customerCode,
         customer.companyName,
+        customer.branchName,
+        customer.branchCode,
+        officeTypeLabel(customer.officeType),
+        parentCustomer?.companyName,
+        parentCustomer?.branchName,
+        ...childOffices.flatMap((office) => [office.companyName, office.branchName, office.branchCode]),
         customer.industry,
         customer.area,
         customer.address,
@@ -160,6 +213,7 @@ export default function Customers({
         matchesArea &&
         matchesComplaint &&
         matchesFollow &&
+        matchesOffice &&
         matchesSearch
       );
     });
@@ -174,12 +228,13 @@ export default function Customers({
       );
     }
 
-    return nextCustomers;
+    return buildHierarchicalCustomers(nextCustomers);
   }, [
     areaFilter,
     complaintFilter,
     customers,
     followFilter,
+    officeFilter,
     rankFilter,
     searchQuery,
     sortMode,
@@ -209,8 +264,22 @@ export default function Customers({
       {
         key: 'companyName',
         label: '会社名',
-        width: '18%',
-        render: (customer) => <strong>{customer.companyName}</strong>,
+        width: '20%',
+        render: (customer) => (
+          <div className={`office-tree-cell depth-${customer.officeDepth || 0}`}>
+            {customer.officeDepth > 0 && <span className="office-tree-branch">└</span>}
+            <strong>{displayCustomerOfficeName(customer)}</strong>
+            {getChildOffices(customer, customers).length > 0 && (
+              <small>{getChildOffices(customer, customers).length}拠点</small>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'officeType',
+        label: '拠点',
+        minWidth: '110px',
+        render: (customer) => officeTypeLabel(customer.officeType),
       },
       { key: 'industry', label: '業種', minWidth: '120px', render: (customer) => customer.industry || '-' },
       { key: 'area', label: '地域', minWidth: '100px', render: (customer) => customer.area || '-' },
@@ -252,7 +321,7 @@ export default function Customers({
         render: (customer) => (hasComplaint(customer) ? 'あり' : 'なし'),
       },
     ],
-    [],
+    [customers],
   );
 
   async function handleDiscoverContact(customer) {
@@ -292,7 +361,33 @@ export default function Customers({
   }
 
   function updateFormField(field, value) {
-    setCustomerForm((current) => ({ ...current, [field]: value }));
+    setCustomerForm((current) => {
+      if (field === 'officeType') {
+        return {
+          ...current,
+          officeType: value,
+          parentCustomerId: value === 'head_office' ? '' : current.parentCustomerId,
+          isHeadOffice: value === 'head_office',
+        };
+      }
+
+      return { ...current, [field]: value };
+    });
+  }
+
+  function copyParentCompanyInfo() {
+    const parent = customers.find((customer) => customer.id === customerForm.parentCustomerId);
+    if (!parent) return;
+
+    setCustomerForm((current) => ({
+      ...current,
+      companyName: parent.companyName || current.companyName,
+      companyKana: parent.companyKana || current.companyKana,
+      industry: parent.industry || current.industry,
+      website: parent.website || current.website,
+      corporateNumber: parent.corporateNumber || current.corporateNumber,
+      billingCustomerId: current.billingCustomerId || parent.id,
+    }));
   }
 
   function handleFormKeyDown(event) {
@@ -320,6 +415,24 @@ export default function Customers({
       return;
     }
 
+    const officeError = validateOfficeAssignment({
+      officeType: customerForm.officeType,
+      parentCustomerId: customerForm.parentCustomerId,
+    }, customers);
+    if (officeError) {
+      setFormError(officeError);
+      return;
+    }
+
+    const branchCode = customerForm.branchCode.trim();
+    if (
+      branchCode &&
+      customers.some((customer) => (customer.branchCode || '').toLowerCase() === branchCode.toLowerCase())
+    ) {
+      setFormError('拠点コードが重複しています。');
+      return;
+    }
+
     const now = new Date().toISOString();
     const customerId = crypto.randomUUID();
     const tags = parseTags(customerForm.tagsText);
@@ -327,6 +440,7 @@ export default function Customers({
     addCustomer({
       id: customerId,
       customerCode,
+      corporateNumber: customerForm.corporateNumber.trim(),
       companyName,
       companyKana: customerForm.companyKana.trim(),
       industry: customerForm.industry.trim(),
@@ -341,6 +455,13 @@ export default function Customers({
       importanceRank: customerForm.customerRank,
       customerRank: customerForm.customerRank,
       rank: customerForm.customerRank,
+      parentCustomerId: customerForm.officeType === 'head_office' ? '' : customerForm.parentCustomerId,
+      officeType: customerForm.officeType,
+      branchName: customerForm.branchName.trim(),
+      branchCode,
+      isHeadOffice: customerForm.officeType === 'head_office',
+      billingCustomerId: customerForm.billingCustomerId,
+      shippingCustomerId: customerForm.shippingCustomerId,
       status: customerForm.status || '未接触',
       tags,
       nextFollowUpDate: customerForm.nextFollowUpDate,
@@ -366,6 +487,7 @@ export default function Customers({
     setAreaFilter(ALL);
     setComplaintFilter(ALL);
     setFollowFilter(ALL);
+    setOfficeFilter(ALL);
     setSortMode('created');
     setVisibleCount((count) => Math.max(count, PAGE_SIZE));
     closeCreateModal();
@@ -435,6 +557,17 @@ export default function Customers({
           <select value={followFilter} onChange={resetPaging((event) => setFollowFilter(event.target.value))}>
             {[ALL, '期限切れ', '予定あり'].map((value) => (
               <option key={value}>{value}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          拠点区分
+          <select value={officeFilter} onChange={resetPaging((event) => setOfficeFilter(event.target.value))}>
+            <option value={ALL}>{ALL}</option>
+            <option value="head_office">本社のみ</option>
+            <option value="branch_only">支社・支店のみ</option>
+            {OFFICE_TYPE_OPTIONS.filter((option) => option.value !== 'head_office').map((option) => (
+              <option value={option.value} key={option.value}>{option.label}</option>
             ))}
           </select>
         </label>
@@ -584,6 +717,86 @@ export default function Customers({
                     <input value={customerForm.website} onChange={(event) => updateFormField('website', event.target.value)} />
                   </label>
                 </div>
+              </section>
+
+              <section className="customer-editor-section">
+                <h3>企業グループ・拠点</h3>
+                <div className="customer-editor-grid">
+                  <label className="field-label">
+                    法人番号
+                    <input value={customerForm.corporateNumber} onChange={(event) => updateFormField('corporateNumber', event.target.value.trim())} />
+                  </label>
+                  <label className="field-label">
+                    拠点区分
+                    <select value={customerForm.officeType} onChange={(event) => updateFormField('officeType', event.target.value)}>
+                      {OFFICE_TYPE_OPTIONS.map((option) => (
+                        <option value={option.value} key={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    本社／親会社
+                    <select
+                      value={customerForm.parentCustomerId}
+                      disabled={customerForm.officeType === 'head_office'}
+                      onChange={(event) => updateFormField('parentCustomerId', event.target.value)}
+                    >
+                      <option value="">未設定</option>
+                      {headOfficeOptions.map((customer) => (
+                        <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    支社名／支店名
+                    <input value={customerForm.branchName} onChange={(event) => updateFormField('branchName', event.target.value)} />
+                  </label>
+                  <label className="field-label">
+                    拠点コード
+                    <input value={customerForm.branchCode} onChange={(event) => updateFormField('branchCode', event.target.value.trim())} />
+                  </label>
+                  <label className="field-label">
+                    請求先
+                    <select value={customerForm.billingCustomerId} onChange={(event) => updateFormField('billingCustomerId', event.target.value)}>
+                      <option value="">取引先拠点と同じ</option>
+                      {customerOptions.map((customer) => (
+                        <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    標準納品先
+                    <select value={customerForm.shippingCustomerId} onChange={(event) => updateFormField('shippingCustomerId', event.target.value)}>
+                      <option value="">取引先拠点と同じ</option>
+                      {customerOptions.map((customer) => (
+                        <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="customer-editor-wide inline-helper">
+                    本社・支社は別々の取引先として保存します。商談や帳票は実際の取引拠点に紐づきます。
+                  </div>
+                  {customerForm.parentCustomerId && (
+                    <button type="button" className="ghost-button compact-action-button" onClick={copyParentCompanyInfo}>
+                      本社の会社情報をコピー
+                    </button>
+                  )}
+                </div>
+                {duplicateCandidates.length > 0 && (
+                  <div className="duplicate-candidates">
+                    <p className="inline-helper">既存の本社・支社候補があります。自動統合はしません。</p>
+                    {duplicateCandidates.map((candidate) => (
+                      <button
+                        type="button"
+                        className="ghost-button compact-action-button"
+                        key={candidate.id}
+                        onClick={() => updateFormField('parentCustomerId', candidate.parentCustomerId || candidate.id)}
+                      >
+                        {displayCustomerOfficeName(candidate)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <section className="customer-editor-section">

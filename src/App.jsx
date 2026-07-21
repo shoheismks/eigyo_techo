@@ -932,6 +932,7 @@ function ActivePage({
           samples={samples}
           quotes={quotes}
           invoices={invoices}
+          deliveryNotes={deliveryNotes}
           salesOrders={salesOrders}
           suppliers={suppliers}
           issuers={issuers}
@@ -962,6 +963,7 @@ function ActivePage({
           addAdoption={addAdoption}
           updateAdoption={updateAdoption}
           setActivePage={setActivePage}
+          onOpenKarte={openCustomerKarte}
           onCreateQuote={onCreateQuote}
           user={user}
         />
@@ -973,6 +975,7 @@ function ActivePage({
     return (
       <CustomerDetail
         customer={selectedCustomer}
+        customers={customers}
         products={products}
         contacts={contacts}
         projects={projects}

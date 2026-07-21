@@ -9,6 +9,7 @@ import {
   upsertRemoteCustomer,
   upsertRemoteCustomers,
 } from '../services/customerSyncService.js';
+import { normalizeOfficeFields } from '../services/customerOfficeService.js';
 import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 
 const STORAGE_KEY = 'eigyo-techo-customers';
@@ -59,6 +60,13 @@ const defaultCustomer = {
   nextFollowUpDate: '',
   salesOwner: '',
   defaultIssuerId: '',
+  parentCustomerId: '',
+  officeType: 'head_office',
+  branchName: '',
+  branchCode: '',
+  isHeadOffice: true,
+  billingCustomerId: '',
+  shippingCustomerId: '',
   importanceRank: '',
   referralSource: '',
   prospectRank: '',
@@ -139,12 +147,14 @@ function normalizeDealHistory(history = {}, userId = '') {
 
 function normalizeCustomer(customer = {}, userId = '') {
   const nextUserId = customer.userId ?? userId;
+  const officeFields = normalizeOfficeFields(customer);
   const baseCustomer = {
     ...defaultCustomer,
     ...customer,
     id: customer.id ?? crypto.randomUUID(),
     userId: nextUserId,
     customerCode: normalizeBusinessCode(customer.customerCode ?? customer.customer_code ?? ''),
+    ...officeFields,
     status: normalizeStatus(customer.status),
     createdAt: customer.createdAt ?? new Date().toISOString(),
     updatedAt: customer.updatedAt ?? new Date().toISOString(),
@@ -454,6 +464,13 @@ export function useCustomers(userId = '') {
 
   function removeCustomer(id) {
     setCustomers((current) => {
+      const hasChildren = current.some((customer) => customer.parentCustomerId === id);
+
+      if (hasChildren) {
+        setSyncError('配下拠点がある本社は削除できません。先に支社・支店の本社設定を解除してください。');
+        return current;
+      }
+
       const nextCustomers = current.filter((customer) => customer.id !== id);
       saveLocalCustomers(nextCustomers);
 

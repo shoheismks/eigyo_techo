@@ -50,6 +50,30 @@
   border-color: rgba(255, 107, 123, 0.58);
 }
 
+.office-group-summary {
+  margin-bottom: 14px;
+}
+
+.compact-kpi-strip {
+  margin-top: 10px;
+}
+
+.office-group-links,
+.office-branch-list,
+.office-relation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.office-relation-summary {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin: 8px 0;
+}
+
 .karte-main-action {
   box-shadow: 0 0 0 1px rgba(102, 163, 255, 0.25), 0 12px 30px rgba(40, 120, 255, 0.22);
 }
