@@ -38,6 +38,10 @@ function addDaysString(dateString, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function hasQuantityInput(lines = []) {
+  return lines.some((line) => String(line.quantity ?? '').trim() !== '');
+}
+
 function generateQuoteNumber(quotes = []) {
   const year = new Date().getFullYear();
   const prefix = `Q-${year}-`;
@@ -195,6 +199,7 @@ export default function QuoteFormModal({
   }, [productSearch, products]);
   const totals = useMemo(() => calculateQuoteTotals(form), [form]);
   const linesReady = (form.quoteLines ?? []).length > 0 && (form.quoteLines ?? []).every((line) => line.productId);
+  const showFinancialSummary = hasQuantityInput(form.quoteLines ?? []);
 
   if (!open) return null;
 
@@ -584,7 +589,7 @@ export default function QuoteFormModal({
                   <label className="field-label">在庫<select value={line.inventoryId || ''} onChange={(event) => updateLine(line.id, 'inventoryId', event.target.value)}><option value="">未選択</option>{lineInventories.map((inventory) => <option value={inventory.id} key={inventory.id}>{[inventory.inventoryCode, inventory.owner, inventory.lot, inventory.quantity && `${inventory.quantity}${inventory.unit || ''}`].filter(Boolean).join(' / ') || inventory.id}</option>)}</select></label>
                   <label className="field-label">数量<input inputMode="decimal" value={line.quantity || ''} onChange={(event) => updateLine(line.id, 'quantity', event.target.value)} /></label>
                   <label className="field-label">単位<input value={line.unit || ''} onChange={(event) => updateLine(line.id, 'unit', event.target.value)} /></label>
-                  <label className="field-label">単価<input inputMode="decimal" value={line.unitPrice || ''} onChange={(event) => updateLine(line.id, 'unitPrice', event.target.value)} /></label>
+                  <label className="field-label">単価（税抜）<input inputMode="decimal" value={line.unitPrice || ''} onChange={(event) => updateLine(line.id, 'unitPrice', event.target.value)} /></label>
                   <label className="field-label">原価<input inputMode="decimal" value={line.costPrice || ''} onChange={(event) => updateLine(line.id, 'costPrice', event.target.value)} /></label>
                   <label className="field-label">税率(%)<input inputMode="decimal" value={line.taxRate || form.defaultTaxRate || DEFAULT_QUOTE_TAX_RATE} onChange={(event) => updateLine(line.id, 'taxRate', event.target.value)} /></label>
                   <label className="field-label">賞味期限<input value={line.expirationText || ''} onChange={(event) => updateLine(line.id, 'expirationText', event.target.value)} /></label>
@@ -687,12 +692,14 @@ export default function QuoteFormModal({
           <label className="field-label">個別特記事項<textarea value={form.specialTerms || ''} onChange={(event) => updateField('specialTerms', event.target.value)} /></label>
         </section>
 
-        <div className="price-preview">
-          <div><span>小計</span><strong>{formatPrice(totals.subtotal) || '-'} {form.currency}</strong></div>
-          <div><span>消費税</span><strong>{formatPrice(totals.taxAmount) || '-'} {form.currency}</strong></div>
-          <div><span>税込合計</span><strong>{formatPrice(totals.grandTotal) || '-'} {form.currency}</strong></div>
-          <div><span>粗利率</span><strong>{totals.grossMarginRate || '-'}</strong></div>
-        </div>
+        {showFinancialSummary && (
+          <div className="price-preview">
+            <div><span>小計</span><strong>{formatPrice(totals.subtotal) || '-'} {form.currency}</strong></div>
+            <div><span>消費税</span><strong>{formatPrice(totals.taxAmount) || '-'} {form.currency}</strong></div>
+            <div><span>税込合計</span><strong>{formatPrice(totals.grandTotal) || '-'} {form.currency}</strong></div>
+            <div><span>粗利率</span><strong>{totals.grossMarginRate || '-'}</strong></div>
+          </div>
+        )}
 
         {error && <p className="error-text">{error}</p>}
         <div className="mail-action-row">

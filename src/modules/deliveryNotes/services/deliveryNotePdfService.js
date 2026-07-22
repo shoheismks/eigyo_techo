@@ -1,5 +1,6 @@
 import { DELIVERY_NOTE_STATUS_LABELS, normalizeDeliveryNote } from '../hooks/useDeliveryNotes.js';
 import { formatPrice } from '../../products/hooks/useProducts.js';
+import { formatDocumentRecipient } from '../../../shared/utils/documentRecipient.js';
 
 const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
@@ -80,6 +81,13 @@ function customerName(context) {
   return context.customer?.companyName || context.deliveryNote.snapshot?.customer?.companyName || context.salesOrder?.customerSnapshot?.companyName || '-';
 }
 
+function recipientText(context) {
+  return formatDocumentRecipient({
+    companyName: customerName(context),
+    branchName: context.customer?.branchName || context.deliveryNote.snapshot?.customer?.branchName || context.salesOrder?.customerSnapshot?.branchName || '',
+  }).text || '-';
+}
+
 function issuerName(context) {
   const issuer = context.issuer || {};
   return issuer.legalName || issuer.name || '営業手帳';
@@ -104,7 +112,7 @@ function renderHtmlTable(note, lines) {
           <th style="width: 10%;">賞味期限</th>
           <th style="width: 8%;">数量</th>
           <th style="width: 7%;">単位</th>
-          ${priceVisible ? '<th style="width: 10%;">単価</th><th style="width: 11%;">金額</th>' : ''}
+          ${priceVisible ? '<th style="width: 10%;">単価（税抜）</th><th style="width: 11%;">金額</th>' : ''}
         </tr>
       </thead>
       <tbody>
@@ -168,7 +176,7 @@ export function renderDeliveryNotePreviewHtml(context) {
           ${pageIndex === 0 ? `
             <h2 class="delivery-note-title">納品書</h2>
             <div class="delivery-note-meta">
-              <div><strong>納品先:</strong> ${escapeHtml(customerName(context))}</div>
+              <div><strong>宛先:</strong><br>${escapeHtml(recipientText(context)).replace(/\n/g, '<br>')}</div>
               <div><strong>出荷番号:</strong> ${escapeHtml(context.shipment?.shipmentNumber || '-')}</div>
               <div><strong>受注番号:</strong> ${escapeHtml(context.salesOrder?.salesOrderNumber || '-')}</div>
               <div><strong>件名:</strong> ${escapeHtml(context.salesOrder?.subject || '-')}</div>
@@ -211,7 +219,7 @@ export function createDeliveryNotePdfFile(context) {
 
     if (pageIndex === 0) {
       lines.push(
-        { text: `納品先: ${customerName(context)}`, x: 40, y: 735, size: 10 },
+        { text: `宛先: ${recipientText(context).replace(/\n/g, ' / ')}`, x: 40, y: 735, size: 10 },
         { text: `出荷番号: ${context.shipment?.shipmentNumber || '-'}`, x: 40, y: 720, size: 9 },
         { text: `受注番号: ${context.salesOrder?.salesOrderNumber || '-'}`, x: 40, y: 705, size: 9 },
         { text: `件名: ${context.salesOrder?.subject || '-'}`, x: 40, y: 690, size: 9 },
@@ -232,7 +240,7 @@ export function createDeliveryNotePdfFile(context) {
     );
     if (priceVisible) {
       lines.push(
-        { text: '単価', x: 500, y: headerY, size: 8 },
+        { text: '単価（税抜）', x: 500, y: headerY, size: 8 },
         { text: '金額', x: 545, y: headerY, size: 8 },
       );
     }

@@ -1,5 +1,6 @@
 import { calculateInvoiceTotals, DEFAULT_INVOICE_TAX_RATE, emptyInvoice, normalizeInvoice } from '../hooks/useInvoices.js';
 import { calculateQuoteTotals } from '../../quotes/hooks/useQuotes.js';
+import { formatDocumentRecipient } from '../../../shared/utils/documentRecipient.js';
 
 const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
@@ -45,6 +46,15 @@ function sanitizeFilePart(value = '') {
     .replace(/[\\/:*?"<>|]/g, '-')
     .replace(/\s+/g, '_')
     .slice(0, 80);
+}
+
+function invoiceRecipientText(invoice = {}, customer = {}) {
+  return formatDocumentRecipient({
+    companyName: invoice.billingName || customer?.companyName || invoice.customerSnapshot?.companyName || '',
+    branchName: customer?.branchName || invoice.customerSnapshot?.branchName || '',
+    departmentName: invoice.billingDepartmentName || invoice.billingDepartment || '',
+    contactName: invoice.billingContactName || '',
+  }).text || '-';
 }
 
 export function generateInvoiceNumber(invoices = [], issuerId = '') {
@@ -210,6 +220,7 @@ export function renderInvoicePreviewHtml(context) {
   const pages = chunkLines(totals.invoiceLines);
   const issuerSnapshot = invoice.issuerSnapshot || issuer || {};
   const customerName = invoice.billingName || customer?.companyName || invoice.customerSnapshot?.companyName || '-';
+  const recipientText = invoiceRecipientText(invoice, customer);
 
   return `
     <article class="quote-preview-document quote-a4-preview invoice-preview-document">
@@ -251,8 +262,7 @@ export function renderInvoicePreviewHtml(context) {
           ${pageIndex === 0 ? `
             <h2 class="invoice-title">請求書</h2>
             <div class="invoice-meta">
-              <div><strong>御請求先:</strong> ${escapeHtml(customerName)}</div>
-              <div><strong>御担当者:</strong> ${escapeHtml(invoice.billingContactName || '-')}</div>
+              <div style="grid-column: 1 / -1;"><strong>宛先:</strong><br>${escapeHtml(recipientText).replace(/\n/g, '<br>')}</div>
               <div><strong>件名:</strong> ${escapeHtml(invoice.subject || '-')}</div>
               <div><strong>取引日:</strong> ${escapeHtml(invoice.transactionDate || '-')}</div>
               <div><strong>元見積番号:</strong> ${escapeHtml(invoice.sourceQuoteSnapshot?.quoteNumber || '-')}</div>
@@ -269,7 +279,7 @@ export function renderInvoicePreviewHtml(context) {
                 <th style="width: 15%;">規格</th>
                 <th style="width: 8%;">数量</th>
                 <th style="width: 7%;">単位</th>
-                <th style="width: 11%;">単価</th>
+                <th style="width: 11%;">単価（税抜）</th>
                 <th style="width: 11%;">税抜金額</th>
                 <th style="width: 8%;">税率</th>
                 <th style="width: 12%;">備考</th>
@@ -308,7 +318,7 @@ export function renderInvoicePreviewHtml(context) {
               </div>
             </div>
           ` : ''}
-          <div class="invoice-footer">本書は顧客向け請求書です。社内原価・粗利・利益情報は表示していません。</div>
+          <div class="invoice-footer">お支払期限までに上記金額をお振込みください。</div>
         </section>
       `).join('')}
     </article>
@@ -330,6 +340,7 @@ export function createInvoicePdfFile(context) {
   const pages = chunkLines(totals.invoiceLines);
   const issuer = invoice.issuerSnapshot || context.issuer || {};
   const customerName = invoice.billingName || context.customer?.companyName || invoice.customerSnapshot?.companyName || '-';
+  const recipientText = invoiceRecipientText(invoice, context.customer);
   const totalPdfPages = pages.length;
   const pdfPages = pages.map((pageLines, pageIndex) => {
     const headerY = pageIndex === 0 ? 655 : 710;
@@ -347,8 +358,7 @@ export function createInvoicePdfFile(context) {
 
     if (pageIndex === 0) {
       lines.push(
-        { text: `御請求先: ${customerName}`, x: 40, y: 735, size: 10 },
-        { text: `御担当者: ${invoice.billingContactName || '-'}`, x: 40, y: 720, size: 9 },
+        { text: `宛先: ${recipientText.replace(/\n/g, ' / ')}`, x: 40, y: 735, size: 10 },
         { text: `件名: ${invoice.subject || '-'}`, x: 40, y: 705, size: 9 },
         { text: `取引日: ${invoice.transactionDate || '-'}`, x: 40, y: 690, size: 9 },
         { text: `御請求金額: ${invoiceMoney(totals.grandTotal)}`, x: 360, y: 710, size: 13 },
@@ -364,7 +374,7 @@ export function createInvoicePdfFile(context) {
       { text: '規格', x: 255, y: headerY, size: 8 },
       { text: '数量', x: 325, y: headerY, size: 8 },
       { text: '単位', x: 360, y: headerY, size: 8 },
-      { text: '単価', x: 390, y: headerY, size: 8 },
+      { text: '単価（税抜）', x: 390, y: headerY, size: 8 },
       { text: '税抜金額', x: 445, y: headerY, size: 8 },
       { text: '税率', x: 515, y: headerY, size: 8 },
     );

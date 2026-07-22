@@ -206,8 +206,33 @@ export default function SettingsPage({
           <strong>Issuer Master</strong>
         </div>
         <p>複数の所属会社・事業体を登録し、見積ごとに発行元とPDFテンプレートを切り替えます。</p>
-        <form className="sample-form" onSubmit={handleSaveIssuer}>
-          <div className="date-grid">
+        <div className="issuer-master-layout">
+          <aside className="issuer-picker-panel">
+            <div className="section-heading compact-heading">
+              <div>
+                <h3>登録済み発行元</h3>
+                <span>{issuers.length}件</span>
+              </div>
+              <button className="ghost-button" type="button" onClick={resetIssuerForm}>＋ 新規</button>
+            </div>
+            <div className="issuer-picker-list">
+              {issuers.length > 0 ? issuers.map((issuer) => (
+                <button className={`issuer-picker-item ${issuerForm.id === issuer.id ? 'active' : ''}`} type="button" onClick={() => editIssuer(issuer)} key={issuer.id}>
+                  <strong>{issuer.name || issuer.legalName || '名称未設定'}</strong>
+                  <span>{[issuer.phone, issuer.email].filter(Boolean).join(' / ') || issuer.address || '-'}</span>
+                  <small>{issuer.isDefault ? '既定 / ' : ''}{issuer.isActive === false ? '無効' : '有効'} / 税率 {issuer.defaultTaxRate || DEFAULT_ISSUER_TAX_RATE}%</small>
+                </button>
+              )) : <p>発行元が未登録です。右側から最初の1件を登録してください。</p>}
+            </div>
+          </aside>
+          <form className="sample-form issuer-form-panel" onSubmit={handleSaveIssuer}>
+            <div className="section-heading compact-heading">
+              <div>
+                <h3>{issuerForm.id ? '発行元を編集' : '発行元を追加'}</h3>
+                <span>見積・成約確認書・請求書に使用します</span>
+              </div>
+            </div>
+            <div className="date-grid">
             <label className="field-label">会社名<input value={issuerForm.name || ''} onChange={(event) => updateIssuerForm('name', event.target.value)} /></label>
             <label className="field-label">正式社名<input value={issuerForm.legalName || ''} onChange={(event) => updateIssuerForm('legalName', event.target.value)} /></label>
             <label className="field-label">住所<input value={issuerForm.address || ''} onChange={(event) => updateIssuerForm('address', event.target.value)} /></label>
@@ -279,8 +304,9 @@ export default function SettingsPage({
             <button className="ghost-button" type="button" onClick={resetIssuerForm}>新規入力</button>
           </div>
           {issuerMessage && <p>{issuerMessage}</p>}
-        </form>
-        <div className="karte-card-list">
+          </form>
+        </div>
+        <div className="karte-card-list issuer-legacy-actions">
           {issuers.length > 0 ? issuers.map((issuer) => (
             <article className={`karte-mini-card ${issuer.isActive === false ? 'muted-card' : ''}`} key={issuer.id}>
               <h3>{issuer.name || issuer.legalName || '名称未設定'}</h3>
