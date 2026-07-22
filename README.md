@@ -168,6 +168,7 @@ https://eigyo-techo.vercel.app/import?companyName=選択した会社名
 - [FEATURE_SPEC.md](docs/FEATURE_SPEC.md)
 - [BUSINESS_RULE.md](docs/BUSINESS_RULE.md)
 - [API_SPEC.md](docs/API_SPEC.md)
+- [CUSTOMER_PRODUCT_PRICE.md](docs/CUSTOMER_PRODUCT_PRICE.md)
 - [BUGFIX_RULE.md](docs/BUGFIX_RULE.md)
 - [MANUAL.md](docs/MANUAL.md)
 - [DATA_RULE.md](docs/DATA_RULE.md)

@@ -5,6 +5,8 @@ const DATASET_KEYS = [
   'customers',
   'products',
   'brands',
+  'customerProductPrices',
+  'customerProductPriceHistory',
   'inventories',
   'inventoryLots',
   'inventoryMovements',

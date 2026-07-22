@@ -12,7 +12,7 @@ const customerPages = [
   'MailAI',
   'Import',
 ];
-const productPages = ['Products', 'ProductDetail'];
+const productPages = ['Products', 'ProductDetail', 'CustomerProductPrices'];
 const pipelinePages = ['Pipeline'];
 const salesOrderPages = ['SalesOrders', 'Shipments', 'DeliveryNotes'];
 const inventoryPages = ['Inventory'];
@@ -31,6 +31,7 @@ const navGroups = [
     label: '販売',
     items: [
       { key: 'Products', label: '商品', helper: '商品マスター' },
+      { key: 'CustomerProductPrices', label: '顧客別価格', helper: '取引先別単価' },
       { key: 'Inventory', label: '在庫管理', helper: '入庫・出庫・棚卸' },
       { key: 'Pipeline', label: '見積', helper: '見積作成' },
       { key: 'Pipeline', label: '成約確認書', helper: '約款・確認書' },

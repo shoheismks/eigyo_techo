@@ -27,6 +27,10 @@ import {
   renderConfirmationPreviewHtml,
   renderQuotePreviewHtml,
 } from '../services/quotePdfService.js';
+import {
+  applyResolvedPriceToLine,
+  resolveCustomerProductPrice,
+} from '../../prices/services/customerProductPriceService.js';
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -115,9 +119,15 @@ function createInitialQuote({ draft, quotes, user, issuers = [] }) {
   }, user?.id ?? '');
 }
 
-function buildLineSnapshot(line = {}, product, inventory, defaultTaxRate = DEFAULT_QUOTE_TAX_RATE) {
+function buildLineSnapshot(
+  line = {},
+  product,
+  inventory,
+  defaultTaxRate = DEFAULT_QUOTE_TAX_RATE,
+  pricingContext = {},
+) {
   const productName = productDisplayName(product, line.productName || line.description || '');
-  return {
+  const baseLine = {
     ...line,
     productId: product?.id || line.productId || '',
     inventoryId: inventory?.id || line.inventoryId || '',
@@ -146,6 +156,21 @@ function buildLineSnapshot(line = {}, product, inventory, defaultTaxRate = DEFAU
     sourceProductUpdatedAt: product?.updatedAt || line.sourceProductUpdatedAt || '',
     sourceInventoryUpdatedAt: inventory?.updatedAt || line.sourceInventoryUpdatedAt || '',
   };
+
+  if (!product || line.isManualPrice) return baseLine;
+
+  const resolved = resolveCustomerProductPrice({
+    customerId: pricingContext.customerId,
+    productId: product.id,
+    quantity: baseLine.quantity,
+    priceUnit: baseLine.unit,
+    targetDate: pricingContext.targetDate,
+    customers: pricingContext.customers,
+    products: pricingContext.products,
+    prices: pricingContext.customerProductPrices,
+  });
+
+  return applyResolvedPriceToLine(baseLine, resolved);
 }
 
 export default function QuoteFormModal({
@@ -157,6 +182,7 @@ export default function QuoteFormModal({
   inventories = [],
   suppliers = [],
   issuers = [],
+  customerProductPrices = [],
   quotes = [],
   addQuote,
   updateQuote,
@@ -242,6 +268,23 @@ export default function QuoteFormModal({
         billingCustomerSnapshot: customerSnapshot(billingCustomer),
         shippingCustomerId: customer?.shippingCustomerId || customer?.id || '',
         shippingCustomerSnapshot: customerSnapshot(shippingCustomer),
+        quoteLines: (current.quoteLines ?? []).map((line) => {
+          const product = products.find((item) => item.id === line.productId);
+          const inventory = inventories.find((item) => item.id === line.inventoryId);
+          return buildLineSnapshot(
+            { ...line, isManualPrice: line.isManualPrice },
+            product,
+            inventory,
+            current.defaultTaxRate,
+            {
+              customerId: value,
+              customers,
+              products,
+              customerProductPrices,
+              targetDate: current.issueDate || todayString(),
+            },
+          );
+        }),
       }));
       return;
     }
@@ -292,12 +335,62 @@ export default function QuoteFormModal({
         if (line.id !== lineId) return line;
         if (field === 'productId') {
           const product = products.find((item) => item.id === value);
-          return buildLineSnapshot({ ...line, productId: value, inventoryId: '' }, product, null, current.defaultTaxRate);
+          return buildLineSnapshot(
+            { ...line, productId: value, inventoryId: '', isManualPrice: false },
+            product,
+            null,
+            current.defaultTaxRate,
+            {
+              customerId: current.customerId,
+              customers,
+              products,
+              customerProductPrices,
+              targetDate: current.issueDate || todayString(),
+            },
+          );
         }
         if (field === 'inventoryId') {
           const inventory = inventories.find((item) => item.id === value);
           const product = products.find((item) => item.id === (inventory?.productId || line.productId));
-          return buildLineSnapshot(line, product, inventory, current.defaultTaxRate);
+          return buildLineSnapshot(
+            { ...line, inventoryId: value },
+            product,
+            inventory,
+            current.defaultTaxRate,
+            {
+              customerId: current.customerId,
+              customers,
+              products,
+              customerProductPrices,
+              targetDate: current.issueDate || todayString(),
+            },
+          );
+        }
+        if (field === 'quantity' || field === 'unit') {
+          const product = products.find((item) => item.id === line.productId);
+          const inventory = inventories.find((item) => item.id === line.inventoryId);
+          return buildLineSnapshot(
+            { ...line, [field]: value },
+            product,
+            inventory,
+            current.defaultTaxRate,
+            {
+              customerId: current.customerId,
+              customers,
+              products,
+              customerProductPrices,
+              targetDate: current.issueDate || todayString(),
+            },
+          );
+        }
+        if (field === 'unitPrice') {
+          return {
+            ...line,
+            unitPrice: value,
+            isManualPrice: true,
+            originalUnitPrice: line.originalUnitPrice || line.unitPrice || '',
+            priceOverriddenAt: new Date().toISOString(),
+          };
         }
         return { ...line, [field]: value };
       });
@@ -328,7 +421,13 @@ export default function QuoteFormModal({
     const quoteLines = (form.quoteLines ?? []).map((line) => {
       const product = products.find((item) => item.id === line.productId);
       const inventory = inventories.find((item) => item.id === line.inventoryId);
-      return buildLineSnapshot(line, product, inventory, form.defaultTaxRate);
+      return buildLineSnapshot(line, product, inventory, form.defaultTaxRate, {
+        customerId: form.customerId,
+        customers,
+        products,
+        customerProductPrices,
+        targetDate: form.issueDate || todayString(),
+      });
     });
     const financials = calculateQuoteTotals({ ...form, quoteLines });
       const quote = normalizeQuote({

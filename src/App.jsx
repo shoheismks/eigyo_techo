@@ -13,6 +13,8 @@ import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useInvoices } from './modules/invoices/hooks/useInvoices.js';
 import { useBrands } from './modules/products/hooks/useBrands.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
+import { useCustomerProductPrices } from './modules/prices/hooks/useCustomerProductPrices.js';
+import { applyResolvedPriceToLine, resolveCustomerProductPrice } from './modules/prices/services/customerProductPriceService.js';
 import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuotes.js';
 import { buildSalesOrderDraft, useSalesOrders } from './modules/salesOrders/hooks/useSalesOrders.js';
 import { useSamples } from './modules/samples/hooks/useSamples.js';
@@ -45,6 +47,7 @@ const MailAI = lazy(() => import('./pages/MailAI.jsx'));
 const Pipeline = lazy(() => import('./pages/Pipeline.jsx'));
 const ProductDetail = lazy(() => import('./modules/products/pages/ProductDetail.jsx'));
 const Products = lazy(() => import('./modules/products/pages/Products.jsx'));
+const CustomerProductPrices = lazy(() => import('./modules/prices/pages/CustomerProductPrices.jsx'));
 const SalesOrders = lazy(() => import('./modules/salesOrders/pages/SalesOrders.jsx'));
 const SettingsPage = lazy(() => import('./modules/settings/pages/SettingsPage.jsx'));
 const Shipments = lazy(() => import('./modules/shipments/pages/Shipments.jsx'));
@@ -154,6 +157,15 @@ function AuthenticatedApp() {
     updateRecord: updateBrand,
     removeRecord: removeBrand,
   } = useBrands(userId);
+  const {
+    records: customerProductPrices,
+    history: customerProductPriceHistory,
+    addRecord: addCustomerProductPrice,
+    updateRecord: updateCustomerProductPrice,
+    removeRecord: removeCustomerProductPrice,
+    deactivateRecord: deactivateCustomerProductPrice,
+    addHistoryRecord: addCustomerProductPriceHistory,
+  } = useCustomerProductPrices(userId);
   const {
     records: inventories,
     addRecord: addInventory,
@@ -301,7 +313,7 @@ function AuthenticatedApp() {
     const product = products.find((item) => item.id === productId);
     const inventory = inventories.find((item) => item.id === inventoryId);
     if (!product) return null;
-    return {
+    const baseLine = {
       id: crypto.randomUUID(),
       productId: product.id,
       inventoryId: inventory?.id || '',
@@ -330,6 +342,16 @@ function AuthenticatedApp() {
       sourceProductUpdatedAt: product.updatedAt || '',
       sourceInventoryUpdatedAt: inventory?.updatedAt || '',
     };
+    const resolved = resolveCustomerProductPrice({
+      customerId: proposal.customerId || quoteDraft?.customerId || '',
+      productId: product.id,
+      quantity: baseLine.quantity,
+      priceUnit: baseLine.unit,
+      customers,
+      products,
+      prices: customerProductPrices,
+    });
+    return applyResolvedPriceToLine(baseLine, resolved);
   }
 
   function openQuoteForm(initial = {}) {
@@ -342,23 +364,23 @@ function AuthenticatedApp() {
       issuers.find((issuer) => issuer.isDefault && issuer.isActive !== false) ||
       issuers.find((issuer) => issuer.isActive !== false);
     const proposalLines = (initial.productProposals ?? [])
-      .map((proposal) => buildProductQuoteLine(proposal.productId, proposal.inventoryId, proposal))
+      .map((proposal) => buildProductQuoteLine(proposal.productId, proposal.inventoryId, { ...proposal, customerId: initial.customerId }))
       .filter(Boolean);
     const inventoryLines = (initial.inventoryIds ?? [])
       .map((inventoryId) => {
         const inventory = inventories.find((item) => item.id === inventoryId);
-        return inventory ? buildProductQuoteLine(inventory.productId, inventory.id) : null;
+        return inventory ? buildProductQuoteLine(inventory.productId, inventory.id, { customerId: initial.customerId }) : null;
       })
       .filter(Boolean);
     const productLines = (initial.productIds ?? [])
-      .map((productId) => buildProductQuoteLine(productId))
+      .map((productId) => buildProductQuoteLine(productId, '', { customerId: initial.customerId }))
       .filter(Boolean);
     const quoteLines = initial.quoteLines?.length
       ? initial.quoteLines
       : initial.inventoryId
-        ? [buildProductQuoteLine(initial.productId, initial.inventoryId)].filter(Boolean)
+        ? [buildProductQuoteLine(initial.productId, initial.inventoryId, { customerId: initial.customerId })].filter(Boolean)
         : initial.productId
-          ? [buildProductQuoteLine(initial.productId)].filter(Boolean)
+          ? [buildProductQuoteLine(initial.productId, '', { customerId: initial.customerId })].filter(Boolean)
           : [...proposalLines, ...inventoryLines, ...productLines];
     const uniqueQuoteLines = quoteLines.filter((line, index, lines) => {
       const key = `${line.productId || ''}:${line.inventoryId || ''}`;
@@ -647,6 +669,8 @@ function AuthenticatedApp() {
             selectedCustomerId={selectedCustomerId}
             products={products}
             brands={brands}
+            customerProductPrices={customerProductPrices}
+            customerProductPriceHistory={customerProductPriceHistory}
             inventories={inventories}
             inventoryLots={inventoryLots}
             inventoryMovements={inventoryMovements}
@@ -662,6 +686,10 @@ function AuthenticatedApp() {
             addBrand={addBrand}
             updateBrand={updateBrand}
             removeBrand={removeBrand}
+            addCustomerProductPrice={addCustomerProductPrice}
+            updateCustomerProductPrice={updateCustomerProductPrice}
+            removeCustomerProductPrice={removeCustomerProductPrice}
+            deactivateCustomerProductPrice={deactivateCustomerProductPrice}
             adoptions={adoptions}
             addAdoption={addAdoption}
             updateAdoption={updateAdoption}
@@ -752,6 +780,7 @@ function AuthenticatedApp() {
         inventories={inventories}
         suppliers={suppliers}
         issuers={issuers}
+        customerProductPrices={customerProductPrices}
         quotes={quotes}
         addQuote={addQuote}
         updateQuote={updateQuote}
@@ -795,6 +824,8 @@ function ActivePage({
   selectedCustomerId,
   products,
   brands,
+  customerProductPrices = [],
+  customerProductPriceHistory = [],
   inventories,
   inventoryLots = [],
   inventoryMovements = [],
@@ -810,6 +841,10 @@ function ActivePage({
   addBrand,
   updateBrand,
   removeBrand,
+  addCustomerProductPrice,
+  updateCustomerProductPrice,
+  removeCustomerProductPrice,
+  deactivateCustomerProductPrice,
   adoptions,
   addAdoption,
   updateAdoption,
@@ -946,6 +981,7 @@ function ActivePage({
           contacts={contacts}
           businessCards={businessCards}
           products={products}
+          customerProductPrices={customerProductPrices}
           inventories={inventories}
           adoptions={adoptions}
           samples={samples}
@@ -1067,6 +1103,7 @@ function ActivePage({
         quotes={quotes}
         issuers={issuers}
         products={products}
+        customerProductPrices={customerProductPrices}
         inventoryLots={inventoryLots}
         inventoryReservations={inventoryReservations}
         reserveLineFefo={reserveLineFefo}
@@ -1146,10 +1183,28 @@ function ActivePage({
       <Products
         products={products}
         brands={brands}
+        customerProductPrices={customerProductPrices}
         inventories={inventories}
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
         onOpenInventory={openInventoryPage}
+      />
+    );
+  }
+
+  if (activePage === 'CustomerProductPrices') {
+    return (
+      <CustomerProductPrices
+        prices={customerProductPrices}
+        priceHistory={customerProductPriceHistory}
+        customers={customers}
+        products={products}
+        brands={brands}
+        addPrice={addCustomerProductPrice}
+        updatePrice={updateCustomerProductPrice}
+        removePrice={removeCustomerProductPrice}
+        deactivatePrice={deactivateCustomerProductPrice}
+        userId={userId}
       />
     );
   }
@@ -1334,6 +1389,8 @@ function ActivePage({
           customers,
           products,
           brands,
+          customerProductPrices,
+          customerProductPriceHistory,
           inventories,
           inventoryLots,
           inventoryMovements,
@@ -1360,6 +1417,8 @@ function ActivePage({
           customers: { records: customers, add: addCustomer, update: updateCustomer },
           products: { records: products, add: addProduct, update: updateProduct },
           brands: { records: brands, add: addBrand, update: updateBrand },
+          customerProductPrices: { records: customerProductPrices, add: addCustomerProductPrice, update: updateCustomerProductPrice },
+          customerProductPriceHistory: { records: customerProductPriceHistory, add: addCustomerProductPriceHistory, update: () => {} },
           inventories: { records: inventories, add: addInventory, update: updateInventory },
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },

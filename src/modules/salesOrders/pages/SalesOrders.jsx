@@ -15,6 +15,10 @@ import {
   summarizeContractBalances,
 } from '../services/contractBalanceService.js';
 import { SALES_ORDER_SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_LABELS } from '../../shipments/hooks/useShipments.js';
+import {
+  applyResolvedPriceToLine,
+  resolveCustomerProductPrice,
+} from '../../prices/services/customerProductPriceService.js';
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -120,6 +124,7 @@ export default function SalesOrders({
   quotes = [],
   issuers = [],
   products = [],
+  customerProductPrices = [],
   inventoryLots = [],
   inventoryReservations = [],
   reserveLineFefo,
@@ -423,7 +428,63 @@ export default function SalesOrders({
   function updateLine(lineId, field, value) {
     setForm((current) => ({
       ...current,
-      salesOrderLines: current.salesOrderLines.map((line) => (line.id === lineId ? { ...line, [field]: value } : line)),
+      salesOrderLines: current.salesOrderLines.map((line) => {
+        if (line.id !== lineId) return line;
+        if (field === 'productId') {
+          const product = productMap.get(value);
+          if (!product) return { ...line, productId: value };
+          const baseLine = {
+            ...line,
+            productId: product.id,
+            productCode: product.productCode || '',
+            productName: product.name || '',
+            brandId: product.brandId || '',
+            brandName: product.brandName || '',
+            specification: product.packageStyle || product.category || '',
+            temperatureZone: product.temperatureZone || '',
+            expirationText: product.shelfLife || '',
+            unit: product.sellingPriceUnit || product.costUnit || line.unit || 'kg',
+            unitPrice: product.desiredSellingPrice || line.unitPrice || '',
+            isManualPrice: false,
+          };
+          const resolved = resolveCustomerProductPrice({
+            customerId: current.customerId,
+            productId: product.id,
+            quantity: baseLine.quantity,
+            priceUnit: baseLine.unit,
+            targetDate: current.orderDate || todayString(),
+            customers,
+            products,
+            prices: customerProductPrices,
+          });
+          return applyResolvedPriceToLine(baseLine, resolved);
+        }
+        if (field === 'quantity' || field === 'unit') {
+          const nextLine = { ...line, [field]: value };
+          if (!nextLine.productId || nextLine.isManualPrice) return nextLine;
+          const resolved = resolveCustomerProductPrice({
+            customerId: current.customerId,
+            productId: nextLine.productId,
+            quantity: nextLine.quantity,
+            priceUnit: nextLine.unit,
+            targetDate: current.orderDate || todayString(),
+            customers,
+            products,
+            prices: customerProductPrices,
+          });
+          return applyResolvedPriceToLine(nextLine, resolved);
+        }
+        if (field === 'unitPrice') {
+          return {
+            ...line,
+            unitPrice: value,
+            isManualPrice: true,
+            originalUnitPrice: line.originalUnitPrice || line.unitPrice || '',
+            priceOverriddenAt: new Date().toISOString(),
+          };
+        }
+        return { ...line, [field]: value };
+      }),
     }));
   }
 
