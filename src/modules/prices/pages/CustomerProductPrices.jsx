@@ -4,7 +4,11 @@ import { formatPrice, productDisplayName } from '../../products/hooks/useProduct
 import {
   PRICE_TYPES,
   PRICE_UNITS,
+  findExactDuplicatePrice,
+  findOverlappingPriceConflicts,
+  formatPriceReason,
   isActivePrice,
+  priceTypeLabel,
 } from '../services/customerProductPriceService.js';
 import {
   emptyCustomerProductPrice,
@@ -28,23 +32,28 @@ function displayPeriod(price) {
 }
 
 function displayQuantity(price) {
-  if (!price.minimumQuantity && !price.maximumQuantity) return '条件なし';
-  return `${price.minimumQuantity || '0'} - ${price.maximumQuantity || '上限なし'} ${price.priceUnit}`;
+  if (!price.minimumQuantity && !price.maximumQuantity) return `条件なし / ${price.priceUnit || ''}`.trim();
+  return `${price.minimumQuantity || '0'} - ${price.maximumQuantity || '上限なし'} ${price.priceUnit || ''}`.trim();
 }
 
-function duplicateWarning(prices, form) {
-  return prices.some((price) =>
-    price.id !== form.id &&
-    !price.deletedAt &&
-    price.customerId === form.customerId &&
-    price.productId === form.productId &&
-    price.priceUnit === form.priceUnit &&
-    String(price.minimumQuantity || '') === String(form.minimumQuantity || '') &&
-    String(price.maximumQuantity || '') === String(form.maximumQuantity || '') &&
-    String(price.validFrom || '') === String(form.validFrom || '') &&
-    String(price.validTo || '') === String(form.validTo || '') &&
-    Number(price.priority || 0) === Number(form.priority || 0)
-  );
+function summarizePrice(price = {}) {
+  if (!price) return '-';
+  return [
+    `${formatPrice(price.unitPrice) || '-'} / ${price.priceUnit || '-'}`,
+    priceTypeLabel(price.priceType),
+    displayPeriod(price),
+    displayQuantity(price),
+  ].filter(Boolean).join(' | ');
+}
+
+function historyTitle(entry) {
+  const labels = {
+    created: '作成',
+    updated: '更新',
+    deleted: '削除',
+    deactivated: '無効化',
+  };
+  return labels[entry.action] || entry.action || '変更';
 }
 
 export default function CustomerProductPrices({
@@ -66,14 +75,21 @@ export default function CustomerProductPrices({
   const [activeFilter, setActiveFilter] = useState('active');
   const [editingId, setEditingId] = useState('');
   const [form, setForm] = useState(() => normalizeCustomerProductPrice({ ...emptyCustomerProductPrice, userId }, userId));
+  const [changeReason, setChangeReason] = useState('');
   const [message, setMessage] = useState('');
 
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.id, brand])), [brands]);
 
+  const normalizedForm = useMemo(() => normalizeCustomerProductPrice(form, userId), [form, userId]);
+  const conflictPrices = useMemo(
+    () => findOverlappingPriceConflicts(prices, normalizedForm),
+    [normalizedForm, prices],
+  );
+
   const visiblePrices = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
+    const query = keyword.trim().toLowerCase();
     return prices
       .filter((price) => !price.deletedAt)
       .filter((price) => customerFilter === ALL || price.customerId === customerFilter)
@@ -85,7 +101,7 @@ export default function CustomerProductPrices({
         return true;
       })
       .filter((price) => {
-        if (!normalizedKeyword) return true;
+        if (!query) return true;
         const customer = customerMap.get(price.customerId);
         const product = productMap.get(price.productId);
         const brand = brandMap.get(price.brandId);
@@ -98,24 +114,31 @@ export default function CustomerProductPrices({
           brand?.name,
           price.priceType,
           price.notes,
-        ].some((value) => String(value || '').toLowerCase().includes(normalizedKeyword));
+        ].some((value) => String(value || '').toLowerCase().includes(query));
       })
       .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-  }, [activeFilter, brandMap, customerFilter, customerMap, keyword, priceHistory, prices, productFilter, productMap, typeFilter]);
+  }, [activeFilter, brandMap, customerFilter, customerMap, keyword, prices, productFilter, productMap, typeFilter]);
 
-  const selectedHistory = priceHistory
-    .filter((entry) => entry.customerProductPriceId === editingId)
-    .slice(0, 8);
+  const selectedHistory = useMemo(
+    () =>
+      priceHistory
+        .filter((entry) => entry.customerProductPriceId === editingId)
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+        .slice(0, 10),
+    [editingId, priceHistory],
+  );
 
   function resetForm() {
     setEditingId('');
     setForm(normalizeCustomerProductPrice({ ...emptyCustomerProductPrice, userId }, userId));
+    setChangeReason('');
     setMessage('');
   }
 
   function editPrice(price) {
     setEditingId(price.id);
     setForm(normalizeCustomerProductPrice(price, userId));
+    setChangeReason('');
     setMessage('');
   }
 
@@ -129,6 +152,7 @@ export default function CustomerProductPrices({
       notes: `${price.notes || ''} copy`.trim(),
       userId,
     }, userId));
+    setChangeReason('複製して新規作成');
     setMessage('');
   }
 
@@ -169,29 +193,42 @@ export default function CustomerProductPrices({
       setMessage('適用開始日は終了日以前にしてください。');
       return;
     }
-    if (duplicateWarning(prices, payload)) {
-      setMessage('同じ顧客・商品・単位・数量条件・期間・優先度の価格が既にあります。');
+    if (findExactDuplicatePrice(prices, payload)) {
+      setMessage('完全に同じ条件の価格がすでに登録されています。登録内容を確認してください。');
       return;
     }
 
+    const reason = changeReason.trim() || (editingId ? 'price master updated' : 'price master created');
     if (editingId) {
-      updatePrice?.(editingId, payload, 'price master updated');
+      updatePrice?.(editingId, payload, reason);
       setMessage('価格を更新しました。');
     } else {
-      addPrice?.(payload, 'price master created');
-      setMessage('価格を登録しました。');
+      addPrice?.(payload, reason);
       resetForm();
+      setMessage('価格を登録しました。');
     }
+  }
+
+  function deactivateSelectedPrice() {
+    if (!editingId) return;
+    deactivatePrice?.(editingId, changeReason.trim() || 'deactivated from price master');
+    setMessage('価格を無効化しました。');
+  }
+
+  function removeSelectedPrice() {
+    if (!editingId) return;
+    removePrice?.(editingId, changeReason.trim() || 'deleted from price master');
+    setMessage('価格を削除しました。');
   }
 
   const columns = [
     { key: 'customer', label: '顧客', minWidth: '220px', render: (price) => displayCustomer(customerMap.get(price.customerId)) },
     { key: 'product', label: '商品', minWidth: '260px', render: (price) => productDisplayName(productMap.get(price.productId), price.productId) },
     { key: 'brand', label: 'ブランド', minWidth: '140px', render: (price) => brandMap.get(price.brandId)?.name || productMap.get(price.productId)?.brandName || '-' },
-    { key: 'priceType', label: '価格種別', minWidth: '120px', render: (price) => PRICE_TYPES.find((item) => item.value === price.priceType)?.label || price.priceType },
+    { key: 'priceType', label: '価格種別', minWidth: '120px', render: (price) => priceTypeLabel(price.priceType) },
     { key: 'unitPrice', label: '単価（税抜）', minWidth: '130px', render: (price) => `${formatPrice(price.unitPrice) || '-'} / ${price.priceUnit}` },
-    { key: 'quantity', label: '数量条件', minWidth: '150px', render: displayQuantity },
-    { key: 'period', label: '適用期間', minWidth: '180px', render: displayPeriod },
+    { key: 'quantity', label: '数量帯', minWidth: '150px', render: displayQuantity },
+    { key: 'period', label: '採用価格の根拠', minWidth: '260px', render: formatPriceReason },
     { key: 'scope', label: '適用範囲', minWidth: '150px', render: (price) => price.applyToChildCustomers ? '本社配下を含む' : 'この拠点のみ' },
     { key: 'status', label: '状態', minWidth: '100px', render: (price) => isActivePrice(price) ? '有効' : '無効' },
     { key: 'updatedAt', label: '更新日', minWidth: '120px', render: (price) => String(price.updatedAt || '').slice(0, 10) || '-' },
@@ -202,7 +239,7 @@ export default function CustomerProductPrices({
       <section className="page-header">
         <p className="eyebrow">Price Master</p>
         <h1>顧客別価格マスター</h1>
-        <p>商品ごと・顧客ごとの販売価格を管理し、見積と受注へ税抜単価を自動反映します。</p>
+        <p>顧客・商品ごとの税抜販売単価を管理し、見積と受注へ採用根拠付きで反映します。</p>
       </section>
 
       <section className="search-panel desktop-filter-panel">
@@ -217,7 +254,7 @@ export default function CustomerProductPrices({
         <div className="section-heading">
           <div>
             <h2>{editingId ? '価格編集' : '価格登録'}</h2>
-            <span>同条件の重複は保存前に警告します。</span>
+            <span>完全重複は保存不可、期間・数量帯の重なりは警告します。</span>
           </div>
           <button type="button" className="ghost-button" onClick={resetForm}>新規入力</button>
         </div>
@@ -237,22 +274,38 @@ export default function CustomerProductPrices({
             <label className="field-label">状態<select value={form.isActive ? 'active' : 'inactive'} onChange={(event) => updateField('isActive', event.target.value === 'active')}><option value="active">有効</option><option value="inactive">無効</option></select></label>
           </div>
           <label className="field-label checkbox-line"><input type="checkbox" checked={form.applyToChildCustomers} onChange={(event) => updateField('applyToChildCustomers', event.target.checked)} />本社配下の支社・支店にも適用</label>
-          <label className="field-label">メモ<textarea value={form.notes} onChange={(event) => updateField('notes', event.target.value)} /></label>
+          <label className="field-label">採用理由・メモ<textarea value={form.notes} onChange={(event) => updateField('notes', event.target.value)} /></label>
+          <label className="field-label">変更理由<textarea value={changeReason} placeholder="例: 2026年8月改定、特別条件更新、契約更新など" onChange={(event) => setChangeReason(event.target.value)} /></label>
+
+          {conflictPrices.length > 0 && (
+            <div className="form-error-message">
+              期間または数量帯が重なる価格が{conflictPrices.length}件あります。必要に応じて期間・数量帯・優先度を調整してください。
+              <ul>
+                {conflictPrices.slice(0, 3).map((price) => (
+                  <li key={price.id}>{summarizePrice(price)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mail-action-row">
             <button type="submit" className="primary-button">{editingId ? '更新' : '登録'}</button>
             {editingId && <button type="button" className="ghost-button" onClick={() => duplicatePrice(form)}>複製</button>}
-            {editingId && <button type="button" className="ghost-button" onClick={() => deactivatePrice?.(editingId, 'deactivated from price master')}>無効化</button>}
-            {editingId && <button type="button" className="ghost-button danger" onClick={() => removePrice?.(editingId, 'deleted from price master')}>削除</button>}
+            {editingId && <button type="button" className="ghost-button" onClick={deactivateSelectedPrice}>無効化</button>}
+            {editingId && <button type="button" className="ghost-button danger" onClick={removeSelectedPrice}>削除</button>}
           </div>
-          {message && <p className={message.includes('警告') || message.includes('選択') || message.includes('入力') || message.includes('既に') ? 'form-error-message' : 'notice-text'}>{message}</p>}
+          {message && <p className={message.includes('選択') || message.includes('入力') || message.includes('同じ') || message.includes('以前') ? 'form-error-message' : 'notice-text'}>{message}</p>}
         </form>
         {editingId && (
           <div className="timeline-list">
             <h3>変更履歴</h3>
             {selectedHistory.length ? selectedHistory.map((entry) => (
               <div className="timeline-item" key={entry.id}>
-                <strong>{entry.action}</strong>
-                <span>{entry.reason || '-'} / {String(entry.createdAt || '').slice(0, 16).replace('T', ' ')}</span>
+                <strong>{historyTitle(entry)}</strong>
+                <span>{String(entry.createdAt || '').slice(0, 16).replace('T', ' ')} / 変更者: {entry.changedBy || '-'}</span>
+                <small>理由: {entry.reason || '-'}</small>
+                <small>変更前: {entry.beforeData ? summarizePrice(entry.beforeData) : '-'}</small>
+                <small>変更後: {entry.afterData ? summarizePrice(entry.afterData) : '-'}</small>
               </div>
             )) : <p className="notice-text">履歴はまだありません。</p>}
           </div>
@@ -284,7 +337,7 @@ export default function CustomerProductPrices({
               </div>
               <div className="card-meta">
                 <span>{formatPrice(price.unitPrice)} / {price.priceUnit}</span>
-                <span>{displayPeriod(price)}</span>
+                <span>{formatPriceReason(price)}</span>
               </div>
             </article>
           ))}
