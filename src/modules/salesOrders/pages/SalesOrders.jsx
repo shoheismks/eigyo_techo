@@ -410,7 +410,25 @@ export default function SalesOrders({
     setForm((current) => {
       if (field === 'customerId') {
         const customer = customerMap.get(value);
-        return { ...current, customerId: value, customerSnapshot: customer ? { ...customer } : current.customerSnapshot };
+        return {
+          ...current,
+          customerId: value,
+          customerSnapshot: customer ? { ...customer } : current.customerSnapshot,
+          salesOrderLines: current.salesOrderLines.map((line) => {
+            if (!line.productId || line.isManualPrice) return line;
+            const resolved = resolveCustomerProductPrice({
+              customerId: value,
+              productId: line.productId,
+              quantity: line.quantity,
+              priceUnit: line.unit,
+              targetDate: current.orderDate || todayString(),
+              customers,
+              products,
+              prices: customerProductPrices,
+            });
+            return applyResolvedPriceToLine(line, resolved);
+          }),
+        };
       }
       if (field === 'issuerId') {
         const issuer = issuerMap.get(value);
@@ -734,6 +752,24 @@ export default function SalesOrders({
               </div>
               {form.salesOrderLines.map((line, index) => (
                 <article className="karte-mini-card" key={line.id}>
+                  <label className="field-label">
+                    商品マスター検索
+                    <select value={line.productId || ''} onChange={(event) => updateLine(line.id, 'productId', event.target.value)}>
+                      <option value="">商品を選択</option>
+                      {products.map((product) => (
+                        <option value={product.id} key={product.id}>
+                          {[product.productCode, product.name, product.brandName, product.manufacturerName].filter(Boolean).join(' / ')}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="price-preview">
+                    <div><span>適用価格</span><strong>{line.unitPrice ? `${Number(line.unitPrice).toLocaleString('ja-JP')}円` : '-'}</strong></div>
+                    <div><span>価格ソース</span><strong>{line.isManualPrice ? '手動変更' : line.priceSource || '-'}</strong></div>
+                    <div><span>単価区分</span><strong>{line.priceType || '-'}</strong></div>
+                    <div><span>価格単位</span><strong>{line.priceUnit || line.unit || '-'}</strong></div>
+                  </div>
+                  {line.priceWarning && <p className="form-error-message">{line.priceWarning}</p>}
                   <div className="history-meta">
                     <span>明細 {index + 1}</span>
                     <button type="button" className="ghost-button danger" onClick={() => removeLine(line.id)}>削除</button>
