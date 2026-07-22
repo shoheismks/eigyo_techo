@@ -732,8 +732,17 @@ export default function CustomerKarte({
   const groupProjects = projects.filter((project) => groupCustomerIds.has(project.customerId));
   const groupQuotes = quotes.filter((quote) => groupCustomerIds.has(quote.customerId));
   const groupSalesOrders = salesOrders.filter((order) => groupCustomerIds.has(order.customerId));
-  const groupShipments = shipments.filter((shipment) => groupCustomerIds.has(shipment.customerId));
-  const groupDeliveryNotes = deliveryNotes.filter((note) => groupCustomerIds.has(note.customerId));
+  const groupSalesOrderIds = new Set(groupSalesOrders.map((order) => order.id));
+  const groupShipments = shipments.filter(
+    (shipment) => groupCustomerIds.has(shipment.customerId) || groupSalesOrderIds.has(shipment.salesOrderId),
+  );
+  const groupShipmentIds = new Set(groupShipments.map((shipment) => shipment.id));
+  const groupDeliveryNotes = deliveryNotes.filter(
+    (note) =>
+      groupCustomerIds.has(note.customerId) ||
+      groupSalesOrderIds.has(note.salesOrderId) ||
+      groupShipmentIds.has(note.shipmentId),
+  );
   const groupQuoteTotal = groupQuotes.reduce((sum, quote) => sum + (parsePrice(quote.grandTotal || quote.totalAmount) || 0), 0);
   const groupSalesOrderTotal = groupSalesOrders.reduce((sum, order) => sum + (parsePrice(order.grandTotal || order.totalAmount) || 0), 0);
   const groupShipmentQuantity = groupShipments.reduce((sum, shipment) => (
