@@ -19,6 +19,10 @@ import {
   applyResolvedPriceToLine,
   resolveCustomerProductPrice,
 } from '../../prices/services/customerProductPriceService.js';
+import {
+  displayCustomerOfficeName,
+  getCustomerGroupIds,
+} from '../../customers/services/customerOfficeService.js';
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -82,6 +86,28 @@ function shipmentDocumentStatusLabel(status) {
 
 function customerName(customer) {
   return customer?.companyName || customer?.name || '-';
+}
+
+function customerSnapshot(customer = {}, contact = {}) {
+  return customer ? {
+    id: customer.id || '',
+    companyName: customer.companyName || '',
+    customerCode: customer.customerCode || '',
+    branchName: customer.branchName || '',
+    branchCode: customer.branchCode || '',
+    officeType: customer.officeType || 'head_office',
+    parentCustomerId: customer.parentCustomerId || '',
+    billingCustomerId: customer.billingCustomerId || '',
+    shippingCustomerId: customer.shippingCustomerId || '',
+    address: customer.address || '',
+    phone: customer.phone || '',
+    email: customer.email || '',
+    contactId: contact?.id || '',
+    contactName: contact?.name || contact?.contactName || '',
+    departmentName: contact?.departmentName || contact?.department || '',
+    contactEmail: contact?.email || '',
+    contactPhone: contact?.phone || contact?.mobile || '',
+  } : null;
 }
 
 function sourceLabel(order) {
@@ -222,6 +248,11 @@ export default function SalesOrders({
   }, [contractBalanceByOrder, contractFilter, contractSort, customerMap, keyword, projectMap, salesOrders, statusFilter]);
 
   const relatedContacts = contacts.filter((contact) => !form.customerId || contact.customerId === form.customerId);
+  const officeOptions = useMemo(() => {
+    if (!form.customerId) return customers;
+    const groupIds = new Set(getCustomerGroupIds(form.customerId, customers));
+    return customers.filter((customer) => groupIds.has(customer.id));
+  }, [customers, form.customerId]);
   const duplicateSource = useMemo(() => {
     const key = sourceKey(form);
     if (!key) return null;
@@ -410,10 +441,17 @@ export default function SalesOrders({
     setForm((current) => {
       if (field === 'customerId') {
         const customer = customerMap.get(value);
+        const contact = contactMap.get(current.contactId);
+        const billingCustomer = customerMap.get(customer?.billingCustomerId) || customer;
+        const shippingCustomer = customerMap.get(customer?.shippingCustomerId) || customer;
         return {
           ...current,
           customerId: value,
-          customerSnapshot: customer ? { ...customer } : current.customerSnapshot,
+          customerSnapshot: customerSnapshot(customer, contact),
+          billingCustomerId: billingCustomer?.id || value || '',
+          billingCustomerSnapshot: customerSnapshot(billingCustomer, contact),
+          shippingCustomerId: shippingCustomer?.id || value || '',
+          shippingCustomerSnapshot: customerSnapshot(shippingCustomer, contact),
           salesOrderLines: current.salesOrderLines.map((line) => {
             if (!line.productId || line.isManualPrice) return line;
             const resolved = resolveCustomerProductPrice({
@@ -428,6 +466,29 @@ export default function SalesOrders({
             });
             return applyResolvedPriceToLine(line, resolved);
           }),
+        };
+      }
+      if (field === 'billingCustomerId' || field === 'shippingCustomerId') {
+        const transactionCustomer = customerMap.get(current.customerId);
+        const selectedOffice = customerMap.get(value) || transactionCustomer;
+        const contact = contactMap.get(current.contactId);
+        return {
+          ...current,
+          [field]: selectedOffice?.id || current.customerId || '',
+          [field === 'billingCustomerId' ? 'billingCustomerSnapshot' : 'shippingCustomerSnapshot']: customerSnapshot(selectedOffice, contact),
+        };
+      }
+      if (field === 'contactId') {
+        const contact = contactMap.get(value);
+        const transactionCustomer = customerMap.get(current.customerId);
+        const billingCustomer = customerMap.get(current.billingCustomerId || transactionCustomer?.billingCustomerId) || transactionCustomer;
+        const shippingCustomer = customerMap.get(current.shippingCustomerId || transactionCustomer?.shippingCustomerId) || transactionCustomer;
+        return {
+          ...current,
+          contactId: value,
+          customerSnapshot: customerSnapshot(transactionCustomer, contact),
+          billingCustomerSnapshot: customerSnapshot(billingCustomer, contact),
+          shippingCustomerSnapshot: customerSnapshot(shippingCustomer, contact),
         };
       }
       if (field === 'issuerId') {
@@ -537,8 +598,17 @@ export default function SalesOrders({
     }
     setSaving(true);
     const now = new Date().toISOString();
+    const selectedContact = contactMap.get(form.contactId);
+    const transactionCustomer = customerMap.get(form.customerId);
+    const billingCustomer = customerMap.get(form.billingCustomerId) || transactionCustomer;
+    const shippingCustomer = customerMap.get(form.shippingCustomerId) || transactionCustomer;
     const payload = normalizeSalesOrder({
       ...form,
+      customerSnapshot: customerSnapshot(transactionCustomer, selectedContact),
+      billingCustomerId: form.billingCustomerId || form.customerId,
+      billingCustomerSnapshot: customerSnapshot(billingCustomer, selectedContact),
+      shippingCustomerId: form.shippingCustomerId || form.customerId,
+      shippingCustomerSnapshot: customerSnapshot(shippingCustomer, selectedContact),
       updatedBy: user?.id || '',
       updatedByName: user?.email || '',
       confirmedAt: form.status === '受注確定' ? form.confirmedAt || now : form.confirmedAt,
@@ -735,6 +805,8 @@ export default function SalesOrders({
                 <label className="field-label">ステータス<select value={form.status} onChange={(event) => updateField('status', event.target.value)}>{SALES_ORDER_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
                 <label className="field-label">顧客<select value={form.customerId} onChange={(event) => updateField('customerId', event.target.value)}><option value="">未選択</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.companyName}</option>)}</select></label>
                 <label className="field-label">担当者<select value={form.contactId} onChange={(event) => updateField('contactId', event.target.value)}><option value="">未選択</option>{relatedContacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name}</option>)}</select></label>
+                <label className="field-label">請求先<select value={form.billingCustomerId || form.customerId || ''} onChange={(event) => updateField('billingCustomerId', event.target.value)}><option value="">取引拠点を使用</option>{officeOptions.map((customer) => <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>)}</select></label>
+                <label className="field-label">納品先<select value={form.shippingCustomerId || form.customerId || ''} onChange={(event) => updateField('shippingCustomerId', event.target.value)}><option value="">取引拠点を使用</option>{officeOptions.map((customer) => <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>)}</select></label>
                 <label className="field-label">案件<select value={form.projectId} onChange={(event) => updateField('projectId', event.target.value)}><option value="">未選択</option>{projects.map((project) => <option value={project.id} key={project.id}>{project.title || project.projectCode}</option>)}</select></label>
                 <label className="field-label">発行元<select value={form.issuerId} onChange={(event) => updateField('issuerId', event.target.value)}><option value="">未選択</option>{issuers.filter((issuer) => issuer.isActive !== false).map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}</select></label>
                 <label className="field-label">優先度<select value={form.priority || 3} onChange={(event) => updateField('priority', Number(event.target.value))}>{PRIORITY_OPTIONS.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></label>

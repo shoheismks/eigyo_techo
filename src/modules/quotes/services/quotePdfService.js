@@ -55,9 +55,18 @@ function recipientFromContext(customer = {}, contacts = []) {
   return formatDocumentRecipient({
     companyName: customer?.companyName || customer?.name || '',
     branchName: customer?.branchName || '',
-    departmentName: contact?.departmentName || contact?.department || '',
-    contactName: contact?.name || contact?.contactName || '',
+    departmentName: customer?.departmentName || contact?.departmentName || contact?.department || '',
+    contactName: customer?.contactName || contact?.name || contact?.contactName || '',
   });
+}
+
+function customerOfficeSummary(customer = {}) {
+  return [
+    customer?.companyName || customer?.name,
+    customer?.branchName,
+    customer?.address,
+    customer?.contactName && `${customer.departmentName ? `${customer.departmentName} ` : ''}${customer.contactName}`,
+  ].filter(Boolean).join(' / ');
 }
 
 function truncate(value = '', length = 28) {
@@ -135,10 +144,15 @@ export function buildQuotePdfContext({
   const supplier = suppliers.find((item) => item.id === quote.supplierId);
   const quoteLines = quoteLinesWithFallback(quote, products, inventories);
   const totals = financials ?? calculateQuoteTotals({ ...quote, quoteLines });
+  const transactionCustomer = quote.transactionCustomerSnapshot || customer;
+  const billingCustomer = quote.billingCustomerSnapshot || transactionCustomer;
+  const shippingCustomer = quote.shippingCustomerSnapshot || transactionCustomer;
 
   return {
     quote: { ...quote, quoteLines },
-    customer,
+    customer: transactionCustomer,
+    billingCustomer,
+    shippingCustomer,
     contacts: selectedContacts,
     products,
     inventories,
@@ -238,7 +252,7 @@ function renderTermsHtml(quote = {}) {
 }
 
 export function renderQuotePreviewHtml(context) {
-  const { quote, customer, contacts, products, issuer, financials, generatedAt } = context;
+  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt } = context;
   const lines = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(lines);
   const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
@@ -301,6 +315,8 @@ export function renderQuotePreviewHtml(context) {
             <h2 class="quote-title">御見積書</h2>
             <div class="quote-meta">
               <div class="quote-recipient"><strong>宛先:</strong><br>${escapeHtml(recipient.text || '-').replace(/\n/g, '<br>')}</div>
+              <div><strong>請求先:</strong><br>${escapeHtml(customerOfficeSummary(billingCustomer) || '-')}</div>
+              <div><strong>納品先:</strong><br>${escapeHtml(customerOfficeSummary(shippingCustomer) || '-')}</div>
               <div><strong>発行元担当者:</strong> ${escapeHtml(issuer?.contactPerson || '-')}</div>
             </div>
           ` : `<h2 class="quote-title">御見積書 続き</h2>`}
@@ -358,7 +374,7 @@ export function renderConfirmationPreviewHtml(context) {
 }
 
 export function createQuotePdfFile(context, documentType = 'quote') {
-  const { quote, customer, contacts, products, issuer, financials, generatedAt } = context;
+  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt } = context;
   const isConfirmation = documentType === 'confirmation';
   const rows = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(rows);
@@ -405,12 +421,14 @@ export function createQuotePdfFile(context, documentType = 'quote') {
       recipientLines.forEach((line, index) => {
         lines.push({ text: line, x: 78, y: 745 - index * 14, size: index === 0 ? 10 : 9 });
       });
+      lines.push({ text: `請求先: ${truncate(customerOfficeSummary(billingCustomer) || '-', 36)}`, x: 40, y: 710, size: 8 });
+      lines.push({ text: `納品先: ${truncate(customerOfficeSummary(shippingCustomer) || '-', 36)}`, x: 40, y: 697, size: 8 });
       lines.push({ text: `発行元担当者: ${issuer?.contactPerson || '-'}`, x: 360, y: 715, size: 9 });
     } else {
       lines.push({ text: `${documentTitle} 続き`, x: 40, y: 745, size: 10 });
     }
 
-    const headerY = pageIndex === 0 ? 690 : 720;
+    const headerY = pageIndex === 0 ? 670 : 720;
     const columns = showExpiration
       ? [
         ['No', 40], ['商品コード', 62], ['商品名', 122], ['規格/荷姿', 245], ['温度帯', 310], ['賞味期限', 355], ['数量', 420], ['単位', 455], ['単価（税抜）', 485], ['金額', 540],

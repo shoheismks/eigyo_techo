@@ -31,6 +31,10 @@ import {
   applyResolvedPriceToLine,
   resolveCustomerProductPrice,
 } from '../../prices/services/customerProductPriceService.js';
+import {
+  displayCustomerOfficeName,
+  getCustomerGroupIds,
+} from '../../customers/services/customerOfficeService.js';
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -58,7 +62,7 @@ function generateQuoteNumber(quotes = []) {
   return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
-function customerSnapshot(customer = {}) {
+function customerSnapshot(customer = {}, contact = {}) {
   return customer ? {
     id: customer.id || '',
     customerCode: customer.customerCode || '',
@@ -68,6 +72,11 @@ function customerSnapshot(customer = {}) {
     address: customer.address || '',
     phone: customer.phone || '',
     email: customer.email || '',
+    contactId: contact?.id || '',
+    contactName: contact?.name || contact?.contactName || '',
+    departmentName: contact?.departmentName || contact?.department || '',
+    contactEmail: contact?.email || '',
+    contactPhone: contact?.phone || contact?.mobile || '',
   } : null;
 }
 
@@ -212,6 +221,11 @@ export default function QuoteFormModal({
   const activeIssuers = issuers.filter((issuer) => issuer.isActive !== false);
   const selectedIssuer = issuers.find((issuer) => issuer.id === form.issuerId) || activeIssuers[0];
   const visibleContacts = contacts.filter((contact) => !form.customerId || contact.customerId === form.customerId);
+  const officeOptions = useMemo(() => {
+    if (!form.customerId) return customers;
+    const groupIds = new Set(getCustomerGroupIds(form.customerId, customers));
+    return customers.filter((customer) => groupIds.has(customer.id));
+  }, [customers, form.customerId]);
   const productOptions = useMemo(() => {
     const keyword = productSearch.trim().toLowerCase();
     if (!keyword) return products;
@@ -258,16 +272,17 @@ export default function QuoteFormModal({
 
     if (field === 'customerId') {
       const customer = customers.find((item) => item.id === value);
+      const contact = contacts.find((item) => item.id === (form.contactIds?.[0] || ''));
       const billingCustomer = customers.find((item) => item.id === customer?.billingCustomerId) || customer;
       const shippingCustomer = customers.find((item) => item.id === customer?.shippingCustomerId) || customer;
       setForm((current) => ({
         ...current,
         customerId: value,
-        transactionCustomerSnapshot: customerSnapshot(customer),
+        transactionCustomerSnapshot: customerSnapshot(customer, contact),
         billingCustomerId: customer?.billingCustomerId || customer?.id || '',
-        billingCustomerSnapshot: customerSnapshot(billingCustomer),
+        billingCustomerSnapshot: customerSnapshot(billingCustomer, contact),
         shippingCustomerId: customer?.shippingCustomerId || customer?.id || '',
-        shippingCustomerSnapshot: customerSnapshot(shippingCustomer),
+        shippingCustomerSnapshot: customerSnapshot(shippingCustomer, contact),
         quoteLines: (current.quoteLines ?? []).map((line) => {
           const product = products.find((item) => item.id === line.productId);
           const inventory = inventories.find((item) => item.id === line.inventoryId);
@@ -285,6 +300,33 @@ export default function QuoteFormModal({
             },
           );
         }),
+      }));
+      return;
+    }
+
+    if (field === 'billingCustomerId' || field === 'shippingCustomerId') {
+      const transactionCustomer = customers.find((item) => item.id === form.customerId);
+      const selectedOffice = customers.find((item) => item.id === value) || transactionCustomer;
+      const contact = contacts.find((item) => item.id === (form.contactIds?.[0] || ''));
+      setForm((current) => ({
+        ...current,
+        [field]: selectedOffice?.id || current.customerId || '',
+        [field === 'billingCustomerId' ? 'billingCustomerSnapshot' : 'shippingCustomerSnapshot']: customerSnapshot(selectedOffice, contact),
+      }));
+      return;
+    }
+
+    if (field === 'contactIds') {
+      const contact = contacts.find((item) => item.id === (value?.[0] || ''));
+      const transactionCustomer = customers.find((item) => item.id === form.customerId);
+      const billingCustomer = customers.find((item) => item.id === (form.billingCustomerId || transactionCustomer?.billingCustomerId)) || transactionCustomer;
+      const shippingCustomer = customers.find((item) => item.id === (form.shippingCustomerId || transactionCustomer?.shippingCustomerId)) || transactionCustomer;
+      setForm((current) => ({
+        ...current,
+        contactIds: value,
+        transactionCustomerSnapshot: customerSnapshot(transactionCustomer, contact),
+        billingCustomerSnapshot: customerSnapshot(billingCustomer, contact),
+        shippingCustomerSnapshot: customerSnapshot(shippingCustomer, contact),
       }));
       return;
     }
@@ -418,6 +460,9 @@ export default function QuoteFormModal({
   }
 
   function buildContext() {
+    const selectedContact = contacts.find((contact) => contact.id === (form.contactIds?.[0] || ''));
+    const selectedBillingCustomer = customers.find((customer) => customer.id === form.billingCustomerId) || selectedCustomer;
+    const selectedShippingCustomer = customers.find((customer) => customer.id === form.shippingCustomerId) || selectedCustomer;
     const quoteLines = (form.quoteLines ?? []).map((line) => {
       const product = products.find((item) => item.id === line.productId);
       const inventory = inventories.find((item) => item.id === line.inventoryId);
@@ -433,6 +478,11 @@ export default function QuoteFormModal({
       const quote = normalizeQuote({
         ...form,
         issuerSnapshot: form.issuerSnapshot || createIssuerSnapshot(selectedIssuer),
+        transactionCustomerSnapshot: customerSnapshot(selectedCustomer, selectedContact),
+        billingCustomerId: form.billingCustomerId || selectedCustomer?.billingCustomerId || selectedCustomer?.id || '',
+        billingCustomerSnapshot: customerSnapshot(selectedBillingCustomer, selectedContact),
+        shippingCustomerId: form.shippingCustomerId || selectedCustomer?.shippingCustomerId || selectedCustomer?.id || '',
+        shippingCustomerSnapshot: customerSnapshot(selectedShippingCustomer, selectedContact),
         termsSnapshot: form.termsSnapshot || createTermsSnapshotFromIssuer(selectedIssuer),
         quoteTermsSummary: form.quoteTermsSummary || selectedIssuer?.defaultQuoteTermsSummary || DEFAULT_QUOTE_TERMS_SUMMARY,
         disclaimerSnapshot: form.disclaimerSnapshot || {
@@ -656,6 +706,8 @@ export default function QuoteFormModal({
         <div className="date-grid">
           <label className="field-label">顧客<select value={form.customerId} onChange={(event) => updateField('customerId', event.target.value)}><option value="">選択してください</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.companyName}</option>)}</select></label>
           <label className="field-label">担当者<select value={form.contactIds?.[0] || ''} onChange={(event) => updateField('contactIds', event.target.value ? [event.target.value] : [])}><option value="">未選択</option>{visibleContacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name}</option>)}</select></label>
+          <label className="field-label">請求先<select value={form.billingCustomerId || form.customerId || ''} onChange={(event) => updateField('billingCustomerId', event.target.value)}><option value="">取引拠点を使用</option>{officeOptions.map((customer) => <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>)}</select></label>
+          <label className="field-label">納品先<select value={form.shippingCustomerId || form.customerId || ''} onChange={(event) => updateField('shippingCustomerId', event.target.value)}><option value="">取引拠点を使用</option>{officeOptions.map((customer) => <option value={customer.id} key={customer.id}>{displayCustomerOfficeName(customer)}</option>)}</select></label>
           <label className="field-label">発行元<select value={form.issuerId || ''} onChange={(event) => updateField('issuerId', event.target.value)}><option value="">未選択</option>{activeIssuers.map((issuer) => <option value={issuer.id} key={issuer.id}>{issuer.name || issuer.legalName}</option>)}</select></label>
           <label className="field-label">PDFテンプレート<select value={form.pdfTemplate || 'standard'} onChange={(event) => updateField('pdfTemplate', event.target.value)}><option value="standard">標準</option><option value="compact">コンパクト</option><option value="executive">エグゼクティブ</option></select></label>
           <label className="field-label">見積番号<input value={form.quoteNumber} onChange={(event) => updateField('quoteNumber', event.target.value)} /></label>

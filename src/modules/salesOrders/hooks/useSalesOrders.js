@@ -15,6 +15,10 @@ export const emptySalesOrder = {
   issuerSnapshot: null,
   customerId: '',
   customerSnapshot: null,
+  billingCustomerId: '',
+  billingCustomerSnapshot: null,
+  shippingCustomerId: '',
+  shippingCustomerSnapshot: null,
   contactId: '',
   projectId: '',
   quoteId: '',
@@ -180,6 +184,10 @@ export function normalizeSalesOrder(order = {}, userId = '') {
     issuerSnapshot: order.issuerSnapshot ?? order.issuer_snapshot ?? null,
     customerId: order.customerId ?? order.customer_id ?? '',
     customerSnapshot: order.customerSnapshot ?? order.customer_snapshot ?? null,
+    billingCustomerId: order.billingCustomerId ?? order.billing_customer_id ?? '',
+    billingCustomerSnapshot: order.billingCustomerSnapshot ?? order.billing_customer_snapshot ?? null,
+    shippingCustomerId: order.shippingCustomerId ?? order.shipping_customer_id ?? '',
+    shippingCustomerSnapshot: order.shippingCustomerSnapshot ?? order.shipping_customer_snapshot ?? null,
     contactId: order.contactId ?? order.contact_id ?? '',
     projectId: order.projectId ?? order.project_id ?? '',
     quoteId: order.quoteId ?? order.quote_id ?? '',
@@ -224,6 +232,10 @@ function orderToRow(order) {
     issuer_snapshot: order.issuerSnapshot,
     customer_id: order.customerId || null,
     customer_snapshot: order.customerSnapshot,
+    billing_customer_id: order.billingCustomerId || null,
+    billing_customer_snapshot: order.billingCustomerSnapshot,
+    shipping_customer_id: order.shippingCustomerId || null,
+    shipping_customer_snapshot: order.shippingCustomerSnapshot,
     contact_id: order.contactId || null,
     project_id: order.projectId || null,
     quote_id: order.quoteId || null,
@@ -328,6 +340,10 @@ function rowToOrder(row, lines = [], history = [], userId = '') {
     issuerSnapshot: row.issuer_snapshot,
     customerId: row.customer_id,
     customerSnapshot: row.customer_snapshot,
+    billingCustomerId: row.billing_customer_id,
+    billingCustomerSnapshot: row.billing_customer_snapshot,
+    shippingCustomerId: row.shipping_customer_id,
+    shippingCustomerSnapshot: row.shipping_customer_snapshot,
     contactId: row.contact_id,
     projectId: row.project_id,
     quoteId: row.quote_id,
@@ -389,7 +405,7 @@ export function generateSalesOrderNumber(orders = [], issuerId = '') {
   return `${prefix}${String(max + 1).padStart(6, '0')}`;
 }
 
-function customerSnapshot(customer = {}) {
+function customerSnapshot(customer = {}, contact = {}) {
   return customer ? {
     id: customer.id || '',
     companyName: customer.companyName || '',
@@ -403,6 +419,11 @@ function customerSnapshot(customer = {}) {
     address: customer.address || '',
     phone: customer.phone || '',
     email: customer.email || '',
+    contactId: contact?.id || '',
+    contactName: contact?.name || contact?.contactName || '',
+    departmentName: contact?.departmentName || contact?.department || '',
+    contactEmail: contact?.email || '',
+    contactPhone: contact?.phone || contact?.mobile || '',
   } : null;
 }
 
@@ -471,6 +492,9 @@ export function buildSalesOrderDraft({
   const salesOrderLines = sourceLines.map((line, index) => quoteLineToOrderLine(line, index, defaultTaxRate));
   const totals = calculateOrderTotals(salesOrderLines);
   const now = new Date().toISOString();
+  const transactionSnapshot = quote?.transactionCustomerSnapshot || customerSnapshot(customer, contact);
+  const billingSnapshot = quote?.billingCustomerSnapshot || transactionSnapshot;
+  const shippingSnapshot = quote?.shippingCustomerSnapshot || transactionSnapshot;
   const resolvedSourceType = quote
     ? sourceType === 'confirmation' || quote.confirmationPdfUrl ? sourceType : 'quote'
     : sourceType;
@@ -484,7 +508,11 @@ export function buildSalesOrderDraft({
     issuerId: quote?.issuerId || selectedIssuer.id || '',
     issuerSnapshot: issuerSnapshot(selectedIssuer),
     customerId: quote?.customerId || customer?.id || '',
-    customerSnapshot: customerSnapshot(customer),
+    customerSnapshot: transactionSnapshot,
+    billingCustomerId: quote?.billingCustomerId || customer?.billingCustomerId || customer?.id || '',
+    billingCustomerSnapshot: billingSnapshot,
+    shippingCustomerId: quote?.shippingCustomerId || customer?.shippingCustomerId || customer?.id || '',
+    shippingCustomerSnapshot: shippingSnapshot,
     contactId: quote?.contactIds?.[0] || contact?.id || '',
     projectId: quote?.projectId || project?.id || '',
     quoteId: quote?.id || '',
