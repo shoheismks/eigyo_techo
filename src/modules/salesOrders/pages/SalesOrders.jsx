@@ -8,6 +8,12 @@ import {
   generateSalesOrderNumber,
   normalizeSalesOrder,
 } from '../hooks/useSalesOrders.js';
+import {
+  calculateContractBalanceLines,
+  contractBalanceStatusLabel,
+  groupContractBalancesByOrder,
+  summarizeContractBalances,
+} from '../services/contractBalanceService.js';
 import { SALES_ORDER_SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_LABELS } from '../../shipments/hooks/useShipments.js';
 
 function todayString() {
@@ -144,12 +150,24 @@ export default function SalesOrders({
   const [reservationQuantityByLine, setReservationQuantityByLine] = useState({});
   const [shipmentBusy, setShipmentBusy] = useState('');
   const [shipmentQuantityByLine, setShipmentQuantityByLine] = useState({});
+  const [contractFilter, setContractFilter] = useState('');
+  const [contractSort, setContractSort] = useState('');
 
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const contactMap = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
   const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const issuerMap = useMemo(() => new Map(issuers.map((issuer) => [issuer.id, issuer])), [issuers]);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+
+  const contractBalanceLines = useMemo(
+    () => calculateContractBalanceLines({ salesOrders, shipments }),
+    [salesOrders, shipments],
+  );
+
+  const contractBalanceByOrder = useMemo(
+    () => groupContractBalancesByOrder(contractBalanceLines),
+    [contractBalanceLines],
+  );
 
   useEffect(() => {
     if (!initialDraft) return;
@@ -162,9 +180,18 @@ export default function SalesOrders({
 
   const visibleOrders = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-    return salesOrders
+    const filteredOrders = salesOrders
       .filter((order) => !order.isDeleted)
       .filter((order) => !statusFilter || order.status === statusFilter)
+      .filter((order) => {
+        const summary = summarizeContractBalances(contractBalanceByOrder.get(order.id) || []);
+        if (contractFilter === 'remaining') return summary.totalRemainingAmount > 0;
+        if (contractFilter === 'completed') return summary.totalRemainingAmount <= 0;
+        if (contractFilter === 'partial') return summary.totalRemainingAmount > 0 && summary.totalShippedAmount > 0;
+        if (contractFilter === 'unshipped') return summary.totalRemainingAmount > 0 && summary.totalShippedAmount <= 0;
+        if (contractFilter === 'overdue') return summary.isOverdue;
+        return true;
+      })
       .filter((order) => {
         if (!normalizedKeyword) return true;
         const customer = customerMap.get(order.customerId);
@@ -178,7 +205,16 @@ export default function SalesOrders({
           project?.title,
         ].some((value) => String(value || '').toLowerCase().includes(normalizedKeyword));
       });
-  }, [customerMap, keyword, projectMap, salesOrders, statusFilter]);
+    return [...filteredOrders].sort((a, b) => {
+      const aSummary = summarizeContractBalances(contractBalanceByOrder.get(a.id) || []);
+      const bSummary = summarizeContractBalances(contractBalanceByOrder.get(b.id) || []);
+      if (contractSort === 'remainingAmount') return bSummary.totalRemainingAmount - aSummary.totalRemainingAmount;
+      if (contractSort === 'remainingQuantity') return (bSummary.remainingQuantity ?? 0) - (aSummary.remainingQuantity ?? 0);
+      if (contractSort === 'dueDate') return String(a.expectedDeliveryDate || '9999-12-31').localeCompare(String(b.expectedDeliveryDate || '9999-12-31'));
+      if (contractSort === 'progress') return aSummary.progressRate - bSummary.progressRate;
+      return 0;
+    });
+  }, [contractBalanceByOrder, contractFilter, contractSort, customerMap, keyword, projectMap, salesOrders, statusFilter]);
 
   const relatedContacts = contacts.filter((contact) => !form.customerId || contact.customerId === form.customerId);
   const duplicateSource = useMemo(() => {
@@ -298,6 +334,16 @@ export default function SalesOrders({
     return { lines, ordered, shipped, pending, remaining: Math.max(0, ordered - shipped), status };
   }, [form.salesOrderLines, formShipments]);
 
+  const formContractBalanceLines = useMemo(
+    () => calculateContractBalanceLines({ salesOrders: [form], shipments: formShipments }),
+    [form, formShipments],
+  );
+
+  const formContractBalanceSummary = useMemo(
+    () => summarizeContractBalances(formContractBalanceLines),
+    [formContractBalanceLines],
+  );
+
   const columns = [
     { key: 'salesOrderNumber', label: '受注番号', minWidth: '160px', render: (order) => <strong>{order.salesOrderNumber || '-'}</strong> },
     { key: 'customer', label: '顧客', minWidth: '220px', render: (order) => customerName(customerMap.get(order.customerId)) },
@@ -313,6 +359,14 @@ export default function SalesOrders({
     { key: 'shipmentStatus', label: '出荷状況', minWidth: '130px', render: (order) => {
       const summary = shipmentSummaryByOrder.get(order.id);
       return `${shipmentStatusLabel(summary?.status)} ${summary?.shipped || 0}/${summary?.ordered || 0}`;
+    } },
+    { key: 'contractProgress', label: '出荷進捗', minWidth: '120px', render: (order) => {
+      const summary = summarizeContractBalances(contractBalanceByOrder.get(order.id) || []);
+      return `${contractBalanceStatusLabel(summary.status)} ${summary.progressRate}%`;
+    } },
+    { key: 'contractRemainingAmount', label: '契約残金額（税抜）', minWidth: '150px', render: (order) => {
+      const summary = summarizeContractBalances(contractBalanceByOrder.get(order.id) || []);
+      return money(summary.totalRemainingAmount);
     } },
     { key: 'grandTotal', label: '受注金額', minWidth: '120px', render: (order) => money(order.grandTotal) },
     { key: 'status', label: 'ステータス', minWidth: '110px', render: (order) => order.status || '-' },
@@ -541,6 +595,8 @@ export default function SalesOrders({
           <label className="field-label">ステータス<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">すべて</option>{SALES_ORDER_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
           <label className="field-label">見積から作成<select value="" onChange={(event) => createFromQuote(event.target.value, 'quote')}><option value="">元見積を選択</option>{quotes.map((quote) => <option value={quote.id} key={quote.id}>{quote.quoteNumber || quote.projectName || quote.id}</option>)}</select></label>
           <label className="field-label">成約確認書から作成<select value="" onChange={(event) => createFromQuote(event.target.value, 'confirmation')}><option value="">元成約確認書を選択</option>{quotes.filter((quote) => quote.confirmationPdfUrl || quote.acceptedAt).map((quote) => <option value={quote.id} key={quote.id}>{quote.quoteNumber || quote.projectName || quote.id}</option>)}</select></label>
+          <label className="field-label">契約残<select value={contractFilter} onChange={(event) => setContractFilter(event.target.value)}><option value="">すべて</option><option value="remaining">契約残あり</option><option value="completed">出荷完了</option><option value="partial">一部出荷</option><option value="unshipped">未出荷</option><option value="overdue">納期超過かつ契約残あり</option></select></label>
+          <label className="field-label">契約残並び替え<select value={contractSort} onChange={(event) => setContractSort(event.target.value)}><option value="">標準</option><option value="remainingAmount">契約残金額</option><option value="remainingQuantity">残数量</option><option value="dueDate">納期</option><option value="progress">進捗率</option></select></label>
         </div>
         <button type="button" className="primary-button" onClick={startNew}>＋受注作成</button>
       </section>
@@ -559,6 +615,39 @@ export default function SalesOrders({
           {duplicateSource && (
             <p className="form-error-message">同じ元帳票から受注が作成済みです: {duplicateSource.salesOrderNumber}</p>
           )}
+
+          <section className="sync-status-card contract-balance-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Contract Balance</p>
+                <h3>契約残</h3>
+              </div>
+              <span className={formContractBalanceSummary.isOverdue ? 'info-badge failed' : 'info-badge ready'}>
+                {contractBalanceStatusLabel(formContractBalanceSummary.status)}
+              </span>
+            </div>
+            <div className="price-preview">
+              <div><span>契約金額（税抜）</span><strong>{money(formContractBalanceSummary.totalOrderedAmount)}</strong></div>
+              <div><span>出荷済金額（税抜）</span><strong>{money(formContractBalanceSummary.totalShippedAmount)}</strong></div>
+              <div><span>契約残金額（税抜）</span><strong>{money(formContractBalanceSummary.totalRemainingAmount)}</strong></div>
+              <div><span>金額進捗率</span><strong>{formContractBalanceSummary.progressRate}%</strong></div>
+              {formContractBalanceSummary.canAggregateQuantity && (
+                <>
+                  <div><span>契約数量</span><strong>{formContractBalanceSummary.orderedQuantity?.toLocaleString('ja-JP') || 0} {formContractBalanceSummary.unit}</strong></div>
+                  <div><span>契約残数量</span><strong>{formContractBalanceSummary.remainingQuantity?.toLocaleString('ja-JP') || 0} {formContractBalanceSummary.unit}</strong></div>
+                </>
+              )}
+            </div>
+            <div className="timeline-list">
+              {formContractBalanceLines.length > 0 ? formContractBalanceLines.map((line) => (
+                <div className="timeline-item" key={line.salesOrderLineId}>
+                  <strong>{line.productName || line.productCode || '商品未設定'}</strong>
+                  <span>契約 {line.orderedQuantity.toLocaleString('ja-JP')}{line.unit} / 出荷済 {line.shippedQuantity.toLocaleString('ja-JP')}{line.unit} / 出荷予定 {line.scheduledQuantity.toLocaleString('ja-JP')}{line.unit} / 残 {line.remainingQuantity.toLocaleString('ja-JP')}{line.unit}</span>
+                  <small>単価（税抜） {money(line.unitPrice)} / 契約残金額（税抜） {money(line.remainingAmount)}</small>
+                </div>
+              )) : <p className="notice-text">契約残を計算できる明細がありません。</p>}
+            </div>
+          </section>
 
           <div className="invoice-editor-grid">
             <div className="sample-form">
@@ -766,7 +855,7 @@ export default function SalesOrders({
         actionWidth="320px"
         className="sales-orders-common-table"
         columns={columns}
-        minWidth={1660}
+        minWidth={1900}
         rows={visibleOrders}
         selectedRowId={editingId}
         onRowClick={startEdit}
@@ -784,6 +873,7 @@ export default function SalesOrders({
               <span className="info-badge">{order.status}</span>
               <span className="info-badge">{reservationStatusLabel(reservationSummaryByOrder.get(order.id)?.status)}</span>
               <span className="info-badge">{shipmentStatusLabel(shipmentSummaryByOrder.get(order.id)?.status)}</span>
+              <span className={summarizeContractBalances(contractBalanceByOrder.get(order.id) || []).isOverdue ? 'info-badge failed' : 'info-badge'}>契約残 {money(summarizeContractBalances(contractBalanceByOrder.get(order.id) || []).totalRemainingAmount)}</span>
               <span className="info-badge ready">{money(order.grandTotal)}</span>
             </div>
             <p>{order.subject || '-'}</p>

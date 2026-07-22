@@ -670,3 +670,13 @@
 - 関連データ: `products`, `suppliers`, `quotes`, `sales_orders`, `invoices`, `delivery_notes`。
 - snapshot: 見積・受注・請求・納品書の明細には作成時点の `brandId` / `brandName` を保存し、後日のブランド変更で過去帳票を変えない。
 - 今後の拡張: ブランドロゴのStorage保存、ブランド統合、ブランド別売上分析、CSV/Excel専用インポート。
+## 契約残管理
+
+- ステータス: 開発中
+- 目的: 成約・受注した数量に対して、まだ出荷・納品していない残数量と残金額を確認する。
+- 画面: `SalesOrders`, `CustomerKarte`, `Home`
+- 入力: 受注明細、出荷明細、出荷ステータス、納期
+- 出力: 契約金額、出荷済金額、契約残金額、契約数量、出荷済数量、出荷予定数量、契約残数量、出荷進捗率、納期超過警告
+- 保存先: 集計値は保存しない。Supabase view `sales_order_contract_balance` とフロント共通serviceで再計算する。
+- 関連データ: `sales_orders`, `sales_order_lines`, `shipments`, `shipment_lines`, `customers`, `projects`
+- 今後の拡張: 成約確認書明細からの受注未作成表示、納品書単位の進捗、手動契約完了理由、企業グループ全体の詳細分析

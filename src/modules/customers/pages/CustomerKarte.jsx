@@ -51,6 +51,12 @@ import {
 import { PIPELINE_STATUSES } from '../../deals/constants.js';
 import ProjectPanel from '../../deals/components/ProjectPanel.jsx';
 import {
+  calculateContractBalanceLines,
+  contractBalanceStatusLabel,
+  groupContractBalancesByOrder,
+  summarizeContractBalances,
+} from '../../salesOrders/services/contractBalanceService.js';
+import {
   displayCustomerOfficeName,
   getChildOffices,
   getCustomerGroupIds,
@@ -588,6 +594,8 @@ export default function CustomerKarte({
   const [replyForm, setReplyForm] = useState(emptyReplyForm);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [karteTab, setKarteTab] = useState('overview');
+  const [showCompletedContractBalances, setShowCompletedContractBalances] = useState(false);
+  const [contractBalanceScope, setContractBalanceScope] = useState('office');
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
@@ -736,6 +744,23 @@ export default function CustomerKarte({
     ...groupSalesOrders.flatMap((order) => order.productIds ?? []),
     ...groupShipments.flatMap((shipment) => (shipment.lines ?? shipment.shipmentLines ?? []).map((line) => line.productId)),
   ].filter(Boolean));
+  const officeSalesOrders = salesOrders.filter((order) => order.customerId === customer.id);
+  const officeShipments = shipments.filter((shipment) => shipment.customerId === customer.id || officeSalesOrders.some((order) => order.id === shipment.salesOrderId));
+  const scopedContractOrders = contractBalanceScope === 'group' ? groupSalesOrders : officeSalesOrders;
+  const scopedContractShipments = contractBalanceScope === 'group' ? groupShipments : officeShipments;
+  const customerContractBalanceLines = calculateContractBalanceLines({
+    salesOrders: scopedContractOrders,
+    shipments: scopedContractShipments,
+  });
+  const contractBalanceByOrder = groupContractBalancesByOrder(customerContractBalanceLines);
+  const contractBalanceOrders = scopedContractOrders
+    .map((order) => ({
+      order,
+      lines: contractBalanceByOrder.get(order.id) || [],
+      summary: summarizeContractBalances(contractBalanceByOrder.get(order.id) || []),
+    }))
+    .filter((item) => showCompletedContractBalances || item.summary.totalRemainingAmount > 0)
+    .sort((a, b) => b.summary.totalRemainingAmount - a.summary.totalRemainingAmount);
   const isHighRank = ['S', 'A'].includes(customer.customerRank || customer.rank);
   const hasComplaints =
     karte.complaints.length > 0 || karte.dealHistories.some((history) => history.hasComplaint);
@@ -1951,6 +1976,50 @@ export default function CustomerKarte({
               </article>
             )) : <p className="inline-helper">活動履歴はまだありません。</p>}
           </div>
+        </Section>
+
+        <Section
+          title="契約残"
+          count={contractBalanceOrders.length}
+          defaultOpen={contractBalanceOrders.length > 0}
+          action={(
+            <div className="mail-action-row">
+              <button className={contractBalanceScope === 'office' ? 'primary-button compact-action-button' : 'ghost-button compact-action-button'} type="button" onClick={() => setContractBalanceScope('office')}>この拠点のみ</button>
+              <button className={contractBalanceScope === 'group' ? 'primary-button compact-action-button' : 'ghost-button compact-action-button'} type="button" onClick={() => setContractBalanceScope('group')}>企業グループ全体</button>
+              <button className="ghost-button compact-action-button" type="button" onClick={() => setShowCompletedContractBalances((value) => !value)}>
+                {showCompletedContractBalances ? '完了済みを隠す' : '完了済みも表示'}
+              </button>
+            </div>
+          )}
+        >
+          {contractBalanceOrders.length > 0 ? (
+            <div className="karte-card-list sample-card-list">
+              {contractBalanceOrders.map(({ order, lines, summary }) => (
+                <article className={`karte-mini-card quote-card ${summary.isOverdue ? 'ng-panel' : ''}`} key={order.id}>
+                  <div className="history-meta">
+                    <strong>{order.salesOrderNumber || '受注番号未設定'}</strong>
+                    <span className={summary.isOverdue ? 'info-badge failed' : 'info-badge ready'}>{contractBalanceStatusLabel(summary.status)}</span>
+                  </div>
+                  <div className="lead-badges">
+                    <span className="info-badge">納期 {order.expectedDeliveryDate || '-'}</span>
+                    <span className="info-badge">進捗 {summary.progressRate}%</span>
+                    <span className="info-badge ready">契約残 {formatPrice(summary.totalRemainingAmount) || '0'}円</span>
+                  </div>
+                  <div className="timeline-list">
+                    {lines.map((line) => (
+                      <div className="timeline-item" key={line.salesOrderLineId}>
+                        <strong>{line.productName || line.productCode || '商品未設定'}</strong>
+                        <span>契約 {line.orderedQuantity.toLocaleString('ja-JP')}{line.unit} / 出荷済 {line.shippedQuantity.toLocaleString('ja-JP')}{line.unit} / 残 {line.remainingQuantity.toLocaleString('ja-JP')}{line.unit}</span>
+                        <small>契約残金額（税抜） {formatPrice(line.remainingAmount) || '0'}円</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <AddCard title="契約残はありません" description="出荷未完了の受注があるとここに表示されます" onClick={() => setActivePage('SalesOrders')} />
+          )}
         </Section>
 
         <ProjectPanel

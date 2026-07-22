@@ -898,6 +898,8 @@ function ActivePage({
         customers={customers}
         samples={samples}
         quotes={quotes}
+        salesOrders={salesOrders}
+        shipments={shipments}
         invoices={invoices}
         inventories={inventories}
         complaints={complaints}
@@ -1388,6 +1390,8 @@ function ActivePage({
       customers={customers}
       samples={samples}
       quotes={quotes}
+      salesOrders={salesOrders}
+      shipments={shipments}
       complaints={complaints}
       events={events}
       setActivePage={setActivePage}
