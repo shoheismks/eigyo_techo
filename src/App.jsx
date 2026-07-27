@@ -1368,6 +1368,7 @@ function ActivePage({
         updateCustomer={updateCustomer}
         user={user}
         onOpenKarte={openCustomerKarte}
+        onOpenProject={() => setActivePage('Pipeline')}
       />
     );
   }

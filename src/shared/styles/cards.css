@@ -1730,6 +1730,7 @@
   display: grid;
   gap: 3px;
   min-height: auto;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-left: 4px solid var(--blue);
   border-radius: 8px;
@@ -1737,14 +1738,26 @@
   color: var(--white);
   padding: 9px 10px;
   text-align: left;
+  overflow: hidden;
 }
 
 .calendar-event.compact {
+  gap: 2px;
   padding: 6px 7px;
 }
 
 .calendar-event strong {
+  display: -webkit-box;
   font-size: 0.76rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.calendar-event.compact strong {
+  -webkit-line-clamp: 1;
 }
 
 .calendar-event small,
@@ -1752,6 +1765,35 @@
   color: var(--muted);
   font-size: 0.7rem;
   font-style: normal;
+}
+
+.calendar-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.calendar-event-meta b {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(47, 128, 237, 0.16);
+  color: #9cc7ff;
+  font-size: 0.58rem;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
+.calendar-event.priority-high .calendar-event-meta b,
+.calendar-detail-popover.priority-high .info-badge {
+  background: rgba(255, 138, 61, 0.18);
+  color: #ffbd91;
+}
+
+.calendar-event.priority-low .calendar-event-meta b,
+.calendar-detail-popover.priority-low .info-badge {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--muted);
 }
 
 .calendar-event em {
@@ -1785,6 +1827,61 @@
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 900;
+}
+
+.calendar-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 76;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.42);
+  padding: 18px;
+}
+
+.calendar-detail-popover {
+  display: grid;
+  gap: 12px;
+  width: min(560px, calc(100vw - 28px));
+  max-height: min(78vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0d1424;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.calendar-detail-popover .section-heading {
+  align-items: flex-start;
+}
+
+.calendar-detail-popover h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.calendar-detail-meta,
+.calendar-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calendar-detail-list {
+  margin: 0;
+}
+
+.calendar-detail-list dd {
+  overflow-wrap: anywhere;
+}
+
+.calendar-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.calendar-detail-actions {
+  justify-content: flex-end;
 }
 
 .calendar-toolbar {

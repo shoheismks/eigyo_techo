@@ -168,6 +168,32 @@ function eventDate(event) {
   return toDateKey(event.startAt || event.nextFollowDate || event.createdAt);
 }
 
+function projectName(projects, projectId) {
+  return projects.find((project) => project.id === projectId)?.title || '';
+}
+
+function eventTypeIcon(event = {}) {
+  const type = event.eventType || event.type || '';
+  if (type.includes('電話')) return 'TEL';
+  if (type.includes('メール')) return 'MAIL';
+  if (type.includes('訪問')) return 'VISIT';
+  if (type.includes('展示')) return 'EXPO';
+  if (type.includes('出張')) return 'TRIP';
+  if (type.includes('会食')) return 'MEAL';
+  if (type.includes('社内')) return 'MTG';
+  if (type.includes('フォロー') || type.includes('繝輔か繝ｭ繝ｼ')) return 'FOLLOW';
+  if (type.includes('クレーム') || type.includes('繧ｯ繝ｬ繝ｼ繝')) return 'CLAIM';
+  if (type.includes('サンプル') || type.includes('繧ｵ繝ｳ繝励Ν')) return 'SAMPLE';
+  if (type.includes('見積') || type.includes('隕狗ｩ')) return 'QUOTE';
+  return 'EVENT';
+}
+
+function priorityClass(priority = '') {
+  if (String(priority).includes('高') || String(priority).includes('鬮')) return 'high';
+  if (String(priority).includes('低') || String(priority).includes('菴')) return 'low';
+  return 'normal';
+}
+
 export default function CalendarPage({
   customers,
   contacts = [],
@@ -181,12 +207,14 @@ export default function CalendarPage({
   removeEvent,
   updateCustomer,
   onOpenKarte,
+  onOpenProject,
   user,
 }) {
   const today = toDateKey(new Date());
   const [viewMode, setViewMode] = useState(() => readStoredViewMode());
   const [baseDate, setBaseDate] = useState(() => readStoredBaseDate(today));
   const [editingEvent, setEditingEvent] = useState(null);
+  const [detailEvent, setDetailEvent] = useState(null);
   const [form, setForm] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -233,6 +261,7 @@ export default function CalendarPage({
   }
 
   function openEdit(event) {
+    setDetailEvent(null);
     if (event.source !== 'event') {
       if (event.customerId) onOpenKarte?.(event.customerId);
       return;
@@ -242,10 +271,18 @@ export default function CalendarPage({
     setEditorOpen(true);
   }
 
+  function openDetail(event) {
+    setDetailEvent(event);
+  }
+
   function closeForm() {
     setEditingEvent(null);
     setForm(null);
     setEditorOpen(false);
+  }
+
+  function closeDetail() {
+    setDetailEvent(null);
   }
 
   function updateForm(field, value) {
@@ -398,7 +435,7 @@ export default function CalendarPage({
           </div>
           <div className="calendar-list">
             {listEvents.map((event) => (
-              <CalendarEventButton contacts={contacts} customers={customers} event={event} key={event.id} onClick={() => openEdit(event)} />
+              <CalendarEventButton contacts={contacts} customers={customers} event={event} key={event.id} onClick={() => openDetail(event)} />
             ))}
           </div>
           {listEvents.length === 0 && <CalendarEmpty />}
@@ -424,7 +461,7 @@ export default function CalendarPage({
                       key={event.id}
                       onClick={(clickEvent) => {
                         clickEvent.stopPropagation();
-                        openEdit(event);
+                        openDetail(event);
                       }}
                     />
                   ))}
@@ -473,7 +510,7 @@ export default function CalendarPage({
                         key={event.id}
                         onClick={(clickEvent) => {
                           clickEvent.stopPropagation();
-                          openEdit(event);
+                          openDetail(event);
                         }}
                       />
                     ))}
@@ -485,6 +522,19 @@ export default function CalendarPage({
           </div>
           {mergedEvents.length === 0 && <CalendarEmpty />}
         </section>
+      )}
+
+      {detailEvent && (
+        <CalendarEventPopover
+          contacts={contacts}
+          customers={customers}
+          event={detailEvent}
+          onClose={closeDetail}
+          onEdit={() => openEdit(detailEvent)}
+          onOpenKarte={onOpenKarte}
+          onOpenProject={onOpenProject}
+          projects={projects}
+        />
       )}
 
       {editorOpen && form && (
@@ -511,15 +561,85 @@ function CalendarEventButton({ event, customers, contacts, compact = false, onCl
   return (
     <button
       type="button"
-      className={`calendar-event ${event.tone || event.eventType || 'event'} ${compact ? 'compact' : ''}`}
+      className={`calendar-event ${event.tone || event.eventType || 'event'} priority-${priorityClass(event.priority)} ${compact ? 'compact' : ''}`}
       onClick={onClick}
       style={{ borderLeftColor: event.color || undefined }}
+      title={[event.title || event.type || event.eventType, customerName(customers, event.customerId), names].filter(Boolean).join(' / ')}
     >
-      {!compact && <span>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date}</span>}
+      <span className="calendar-event-meta">
+        <b>{eventTypeIcon(event)}</b>
+        {!compact && <span>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date}</span>}
+      </span>
       <strong>{event.title || event.type || event.eventType}</strong>
-      <small>{customerName(customers, event.customerId)}{names ? ` / ${names}` : ''}</small>
-      <em>{event.status || event.memo || '-'}</em>
+      {!compact && <small>{customerName(customers, event.customerId)}{names ? ` / ${names}` : ''}</small>}
     </button>
+  );
+}
+
+function CalendarEventPopover({
+  event,
+  customers,
+  contacts,
+  projects = [],
+  onClose,
+  onEdit,
+  onOpenKarte,
+  onOpenProject,
+}) {
+  const names = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
+  const customer = customerName(customers, event.customerId);
+  const project = projectName(projects, event.dealId);
+  const canEdit = event.source === 'event';
+
+  function openCustomer() {
+    if (!event.customerId) return;
+    onClose();
+    onOpenKarte?.(event.customerId);
+  }
+
+  function openProject() {
+    if (!event.dealId) return;
+    onClose();
+    onOpenProject?.(event.dealId);
+  }
+
+  return (
+    <div className="calendar-detail-backdrop" role="presentation" onClick={onClose}>
+      <article
+        aria-modal="true"
+        className={`calendar-detail-popover priority-${priorityClass(event.priority)}`}
+        role="dialog"
+        onClick={(clickEvent) => clickEvent.stopPropagation()}
+      >
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{event.eventType || event.type || 'Event'}</p>
+            <h2>{event.title || event.type || event.eventType}</h2>
+          </div>
+          <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+        </div>
+        <div className="calendar-detail-meta">
+          <span className="info-badge" style={{ borderColor: event.color || undefined }}>{eventTypeIcon(event)}</span>
+          <span className={`info-badge priority-${priorityClass(event.priority)}`}>{event.priority || '通常'}</span>
+          <span className="info-badge">{event.status || '-'}</span>
+        </div>
+        <dl className="company-details calendar-detail-list">
+          <div><dt>日時</dt><dd>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date || '-'}{event.endAt ? ` ～ ${toDateTimeLocal(event.endAt).replace('T', ' ')}` : ''}</dd></div>
+          <div><dt>顧客</dt><dd>{customer}</dd></div>
+          <div><dt>担当者</dt><dd>{names || '-'}</dd></div>
+          <div><dt>場所</dt><dd>{event.location || '-'}</dd></div>
+          <div><dt>関連案件</dt><dd>{project || event.dealId || '-'}</dd></div>
+          <div><dt>次回フォロー</dt><dd>{event.nextFollowDate || '-'}</dd></div>
+          <div><dt>リマインダー</dt><dd>{event.reminder || '-'}</dd></div>
+          <div className="calendar-detail-wide"><dt>メモ</dt><dd>{event.memo || '-'}</dd></div>
+        </dl>
+        <div className="calendar-detail-actions">
+          {canEdit && <button className="primary-button" type="button" onClick={onEdit}>編集</button>}
+          {event.customerId && <button className="ghost-button" type="button" onClick={openCustomer}>顧客カルテ</button>}
+          {event.dealId && <button className="ghost-button" type="button" onClick={openProject}>案件詳細</button>}
+        </div>
+      </article>
+    </div>
   );
 }
 
