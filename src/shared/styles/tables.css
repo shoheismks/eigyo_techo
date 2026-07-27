@@ -254,6 +254,12 @@
     background: rgba(40, 120, 255, 0.2);
   }
 
+  .customers-common-table .desktop-data-table th:last-child,
+  .customers-common-table .desktop-data-table td:last-child {
+    overflow: visible;
+    text-align: center;
+  }
+
   .customer-code-cell,
   .customer-follow-cell,
   .customer-name-cell {
@@ -485,6 +491,9 @@
   }
 
   .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):hover {
+    position: absolute;
+    top: 14px;
+    right: 14px;
     width: 148px;
     height: auto;
     display: grid;
