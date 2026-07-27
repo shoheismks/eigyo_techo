@@ -78,18 +78,6 @@ function productName(productId, products = []) {
   return productDisplayName(products.find((product) => product.id === productId), '');
 }
 
-function inventoryLabel(inventoryId, inventories = []) {
-  const inventory = inventories.find((item) => item.id === inventoryId);
-  if (!inventory) return '';
-  return [
-    inventory.inventoryCode || inventory.inventory_code,
-    inventory.inventoryName || inventory.name,
-    inventory.stockType,
-    inventory.owner,
-    inventory.lot && `LOT ${inventory.lot}`,
-  ].filter(Boolean).join(' / ');
-}
-
 function quoteLinesWithFallback(quote = {}, products = [], inventories = []) {
   if (Array.isArray(quote.quoteLines) && quote.quoteLines.length > 0) {
     return quote.quoteLines;
@@ -193,22 +181,45 @@ function splitText(value = '', size = 52) {
   return lines;
 }
 
-function renderLineCells(line, index, quote, products, showExpiration) {
-  return `
-    <tr>
-      <td class="num">${index + 1}</td>
-      <td>${escapeHtml(line.productCode || '-')}</td>
-      <td>${escapeHtml(truncate(lineName(line, products), 42))}</td>
-      <td>${escapeHtml(truncate(line.packageStyle || '-', 20))}</td>
-      <td>${escapeHtml(line.temperatureZone || '-')}</td>
-      ${showExpiration ? `<td>${escapeHtml(line.expirationText || '')}</td>` : ''}
-      <td class="num">${escapeHtml(line.quantity || '-')}</td>
-      <td>${escapeHtml(line.unit || '-')}</td>
-      <td class="money">${escapeHtml(money(line.unitPrice, quote.currency))}</td>
-      <td class="money">${escapeHtml(money(line.amount, quote.currency))}</td>
-      <td>${escapeHtml(truncate(line.memo || '', 24))}</td>
-    </tr>
-  `;
+function quoteColumns(showExpiration) {
+  const columns = [
+    { key: 'no', label: 'No.', htmlWidth: '4%', pdfX: 40, pdfMax: 4, align: 'right' },
+    { key: 'productCode', label: '商品コード', htmlWidth: showExpiration ? '9%' : '10%', pdfX: 62, pdfMax: 12 },
+    { key: 'productName', label: '商品名', htmlWidth: showExpiration ? '20%' : '25%', pdfX: 122, pdfMax: showExpiration ? 19 : 24 },
+    { key: 'packageStyle', label: '規格/荷姿', htmlWidth: showExpiration ? '12%' : '13%', pdfX: showExpiration ? 236 : 255, pdfMax: 12 },
+    { key: 'temperatureZone', label: '温度帯', htmlWidth: showExpiration ? '7%' : '8%', pdfX: showExpiration ? 300 : 332, pdfMax: 6 },
+  ];
+
+  if (showExpiration) {
+    columns.push({ key: 'expirationText', label: '賞味期限', htmlWidth: '10%', pdfX: 342, pdfMax: 11 });
+  }
+
+  columns.push(
+    { key: 'quantity', label: '数量', htmlWidth: '7%', pdfX: showExpiration ? 398 : 382, pdfMax: 7, align: 'right' },
+    { key: 'unit', label: '単位', htmlWidth: showExpiration ? '5%' : '6%', pdfX: showExpiration ? 430 : 423, pdfMax: 4 },
+    { key: 'unitPrice', label: '単価（税抜）', htmlWidth: showExpiration ? '10%' : '11%', pdfX: showExpiration ? 458 : 456, pdfMax: 10, align: 'right' },
+    { key: 'amount', label: '金額', htmlWidth: showExpiration ? '9%' : '9%', pdfX: showExpiration ? 512 : 510, pdfMax: 9, align: 'right' },
+    { key: 'memo', label: '備考', htmlWidth: '7%', pdfX: 552, pdfMax: 5 },
+  );
+
+  return columns;
+}
+
+function cellValue(columnKey, line, index, quote, products) {
+  const values = {
+    no: String(index + 1),
+    productCode: line.productCode || '-',
+    productName: lineName(line, products),
+    packageStyle: line.packageStyle || '-',
+    temperatureZone: line.temperatureZone || '-',
+    expirationText: line.expirationText || '',
+    quantity: line.quantity || '-',
+    unit: line.unit || '-',
+    unitPrice: money(line.unitPrice, quote.currency),
+    amount: money(line.amount, quote.currency),
+    memo: line.memo || '',
+  };
+  return values[columnKey] ?? '';
 }
 
 function visibleTermsEntries(quote = {}) {
@@ -220,60 +231,137 @@ function visibleTermsEntries(quote = {}) {
     .filter((field) => field.value.trim());
 }
 
-function renderTermsHtml(quote = {}) {
+function buildTermsModel(quote = {}, issuer = null) {
   const entries = visibleTermsEntries(quote);
-  if (entries.length === 0 && !quote.specialTerms) return '';
+  return {
+    version: quote.termsVersion || '-',
+    effectiveDate: quote.termsEffectiveDate || '-',
+    summary: termsSummary(quote.termsSnapshot),
+    entries,
+    specialTerms: quote.specialTerms || '',
+    issuerContact: issuer?.contactPerson || '-',
+    acceptedByCustomerName: quote.acceptedByCustomerName || '-',
+    acceptedAt: quote.acceptedAt ? String(quote.acceptedAt).slice(0, 10) : '-',
+    acceptanceMethod: quote.acceptanceMethod || '-',
+  };
+}
+
+export function buildQuoteDocumentModel(context, documentType = 'quote') {
+  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt, validUntilDisplay } = context;
+  const calculated = calculateQuoteTotals(quote);
+  const lines = calculated.lines;
+  const showTotals = hasQuantityInput(lines);
+  const showExpiration = hasExpirationColumn(lines);
+  const pages = chunkLines(lines);
+  const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
+  const finalPageIndex = pages.length - 1;
+  const selectedIssuer = issuer || {};
+  const issuerName = selectedIssuer.legalName || selectedIssuer.name || '営業手帳';
+  const columns = quoteColumns(showExpiration);
+
+  return {
+    documentType,
+    title: documentType === 'confirmation' ? '成約確認書' : '御見積書',
+    continuationTitle: documentType === 'confirmation' ? '成約確認書 続き' : '御見積書 続き',
+    quote,
+    products,
+    columns,
+    pages,
+    finalPageIndex,
+    showTotals,
+    showExpiration,
+    issueDate,
+    validUntilDisplay,
+    financials: financials || calculated,
+    generatedAt,
+    issuer: {
+      name: issuerName,
+      address: selectedIssuer.address || '',
+      contact: [selectedIssuer.phone, selectedIssuer.email].filter(Boolean).join(' / '),
+      registrationNumber: selectedIssuer.registrationNumber || '',
+      contactPerson: selectedIssuer.contactPerson || '',
+      bankAccount: selectedIssuer.bankAccount || '',
+      logoUrl: selectedIssuer.logoUrl || '',
+    },
+    recipient: recipientFromContext(customer, contacts),
+    billingSummary: customerOfficeSummary(billingCustomer) || '-',
+    shippingSummary: customerOfficeSummary(shippingCustomer) || '-',
+    quoteTermsSummary: quoteTermsSummaryText(quote, selectedIssuer),
+    terms: buildTermsModel(quote, selectedIssuer),
+  };
+}
+
+function renderLineCells(model, line, absoluteIndex) {
+  return `
+    <tr>
+      ${model.columns.map((column) => {
+        if (column.pdfOnlyBelow) {
+          return `<td>${escapeHtml(truncate(cellValue(column.key, line, absoluteIndex, model.quote, model.products), 24))}</td>`;
+        }
+        const value = cellValue(column.key, line, absoluteIndex, model.quote, model.products);
+        const display = column.key === 'productName'
+          ? truncate(value, 42)
+          : column.key === 'packageStyle'
+            ? truncate(value, 20)
+            : value;
+        const className = column.align === 'right' ? ' class="num"' : '';
+        return `<td${className}>${escapeHtml(display)}</td>`;
+      }).join('')}
+    </tr>
+  `;
+}
+
+function renderTermsHtml(model) {
+  if (model.terms.entries.length === 0 && !model.terms.specialTerms) return '';
   return `
     <section class="quote-terms-section">
       <h3>取引条件・約款</h3>
-      <p class="quote-terms-meta">約款バージョン: ${escapeHtml(quote.termsVersion || '-')} / 適用開始日: ${escapeHtml(quote.termsEffectiveDate || '-')}</p>
+      <p class="quote-terms-meta">約款バージョン: ${escapeHtml(model.terms.version)} / 適用開始日: ${escapeHtml(model.terms.effectiveDate)}</p>
       <div class="quote-terms-summary">
-        ${termsSummary(quote.termsSnapshot).map((item) => `<p>${escapeHtml(item)}</p>`).join('')}
+        ${model.terms.summary.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}
       </div>
-      ${entries.map((entry) => `
+      ${model.terms.entries.map((entry) => `
         <div class="quote-term-block">
           <strong>${escapeHtml(entry.label)}</strong>
           <p>${escapeHtml(entry.value).replace(/\n/g, '<br>')}</p>
         </div>
       `).join('')}
-      ${quote.specialTerms ? `
+      ${model.terms.specialTerms ? `
         <div class="quote-term-block important">
           <strong>個別特記事項</strong>
-          <p>${escapeHtml(quote.specialTerms).replace(/\n/g, '<br>')}</p>
+          <p>${escapeHtml(model.terms.specialTerms).replace(/\n/g, '<br>')}</p>
         </div>
       ` : ''}
       <div class="quote-acceptance-box">
         <p>上記内容および添付約款を確認し、合意します。</p>
-        <div><span>発行元担当者</span><span>${escapeHtml(quote.issuerSnapshot?.contactPerson || '-')}</span></div>
-        <div><span>顧客担当者</span><span>${escapeHtml(quote.acceptedByCustomerName || '-')}</span></div>
-        <div><span>確認日</span><span>${escapeHtml(quote.acceptedAt ? String(quote.acceptedAt).slice(0, 10) : '-')}</span></div>
-        <div><span>確認方法</span><span>${escapeHtml(quote.acceptanceMethod || '-')}</span></div>
+        <div><span>発行元担当者</span><span>${escapeHtml(model.terms.issuerContact)}</span></div>
+        <div><span>顧客担当者</span><span>${escapeHtml(model.terms.acceptedByCustomerName)}</span></div>
+        <div><span>確認日</span><span>${escapeHtml(model.terms.acceptedAt)}</span></div>
+        <div><span>確認方法</span><span>${escapeHtml(model.terms.acceptanceMethod)}</span></div>
       </div>
     </section>
   `;
 }
 
 export function renderQuotePreviewHtml(context) {
-  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt, validUntilDisplay } = context;
-  const lines = calculateQuoteTotals(quote).lines;
-  const pages = chunkLines(lines);
-  const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
-  const finalPageIndex = pages.length - 1;
-  const issuerName = issuer?.legalName || issuer?.name || '営業手帳';
-  const issuerAddress = issuer?.address || '';
-  const issuerContact = [issuer?.phone, issuer?.email].filter(Boolean).join(' / ');
-  const recipient = recipientFromContext(customer, contacts);
-  const showTotals = hasQuantityInput(lines);
-  const showExpiration = hasExpirationColumn(lines);
+  const model = buildQuoteDocumentModel(context, 'quote');
+  return renderQuoteDocumentHtml(model);
+}
 
+export function renderConfirmationPreviewHtml(context) {
+  const model = buildQuoteDocumentModel(context, 'confirmation');
+  return renderQuoteDocumentHtml(model, { includeTerms: true });
+}
+
+function renderQuoteDocumentHtml(model, { includeTerms = false } = {}) {
   return `
-    <article class="quote-preview-document quote-a4-preview">
+    <article class="quote-preview-document quote-a4-preview${model.documentType === 'confirmation' ? ' confirmation-preview-document' : ''}">
       <style>
         .quote-a4-preview { width: min(100%, 794px); background: #f3f4f6; color: #111827; border: 1px solid #dbe3ef; border-radius: 8px; padding: 16px; font-family: "Yu Gothic", "Meiryo", system-ui, sans-serif; box-sizing: border-box; }
         .quote-page { min-height: 1123px; background: #fff; padding: 32px; box-sizing: border-box; page-break-after: always; }
         .quote-page:last-child { page-break-after: auto; }
         .quote-header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #1d4ed8; padding-bottom: 14px; margin-bottom: 14px; }
-        .quote-logo-image { max-width: 120px; max-height: 46px; object-fit: contain; display: block; margin-bottom: 8px; }
+        .quote-logo-note { display: inline-block; border: 1px solid #d1d5db; color: #4b5563; font-size: 9pt; padding: 4px 8px; margin-bottom: 8px; }
         .quote-title { text-align: center; font-size: 24px; letter-spacing: .12em; margin: 12px 0; }
         .quote-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; margin: 12px 0; font-size: 12px; }
         .quote-recipient { grid-column: 1 / -1; line-height: 1.7; font-size: 13px; }
@@ -281,7 +369,7 @@ export function renderQuotePreviewHtml(context) {
         .quote-table th, .quote-table td { border-bottom: 1px solid #d1d5db; padding: 5px 4px; text-align: left; vertical-align: top; }
         .quote-table th { background: #eff6ff; color: #1e3a8a; font-weight: 700; }
         .quote-table .num, .quote-table .money { text-align: right; }
-        .quote-summary { display: grid; grid-template-columns: ${showTotals ? '1fr 260px' : '1fr'}; gap: 24px; margin-top: 16px; }
+        .quote-summary { display: grid; grid-template-columns: ${model.showTotals ? '1fr 260px' : '1fr'}; gap: 24px; margin-top: 16px; }
         .quote-total div { display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding: 5px 0; }
         .quote-total strong { font-size: 15px; }
         .quote-conditions { font-size: 10pt; line-height: 1.7; }
@@ -298,206 +386,178 @@ export function renderQuotePreviewHtml(context) {
         .quote-acceptance-box div { display: grid; grid-template-columns: 120px 1fr; border-top: 1px solid #e5e7eb; padding: 7px 0; }
         @media (max-width: 767px) { .quote-a4-preview { padding: 8px; } .quote-page { padding: 14px; min-height: auto; overflow-x: auto; } .quote-summary { grid-template-columns: 1fr; } }
       </style>
-      ${pages.map((pageLines, pageIndex) => `
+      ${model.pages.map((pageLines, pageIndex) => `
         <section class="quote-page">
           <div class="quote-header">
             <div>
-              ${issuer?.logoUrl ? `<img class="quote-logo-image" src="${escapeHtml(issuer.logoUrl)}" alt="${escapeHtml(issuerName)} logo">` : ''}
-              <p><strong>${escapeHtml(issuerName)}</strong><br>${escapeHtml(issuerAddress)}${issuerContact ? `<br>${escapeHtml(issuerContact)}` : ''}</p>
-              ${issuer?.registrationNumber ? `<p>登録番号: ${escapeHtml(issuer.registrationNumber)}</p>` : ''}
+              ${model.issuer.logoUrl ? '<span class="quote-logo-note">会社ロゴ登録済み</span>' : ''}
+              <p><strong>${escapeHtml(model.issuer.name)}</strong><br>${escapeHtml(model.issuer.address)}${model.issuer.contact ? `<br>${escapeHtml(model.issuer.contact)}` : ''}</p>
+              ${model.issuer.registrationNumber ? `<p>登録番号: ${escapeHtml(model.issuer.registrationNumber)}</p>` : ''}
             </div>
             <div>
-              <div>見積番号: ${escapeHtml(quote.quoteNumber || '-')}</div>
-              <div>作成日: ${escapeHtml(issueDate)}</div>
-              <div>有効期限: ${escapeHtml(validUntilDisplay || '-')}</div>
-              <div>Page ${pageIndex + 1} / ${pages.length}</div>
+              <div>見積番号: ${escapeHtml(model.quote.quoteNumber || '-')}</div>
+              <div>作成日: ${escapeHtml(model.issueDate)}</div>
+              <div>有効期限: ${escapeHtml(model.validUntilDisplay || '-')}</div>
+              <div>Page ${pageIndex + 1} / ${model.pages.length}</div>
             </div>
           </div>
           ${pageIndex === 0 ? `
-            <h2 class="quote-title">御見積書</h2>
+            <h2 class="quote-title">${escapeHtml(model.title)}</h2>
             <div class="quote-meta">
-              <div class="quote-recipient"><strong>宛先:</strong><br>${escapeHtml(recipient.text || '-').replace(/\n/g, '<br>')}</div>
-              <div><strong>請求先:</strong><br>${escapeHtml(customerOfficeSummary(billingCustomer) || '-')}</div>
-              <div><strong>納品先:</strong><br>${escapeHtml(customerOfficeSummary(shippingCustomer) || '-')}</div>
-              <div><strong>発行元担当者:</strong> ${escapeHtml(issuer?.contactPerson || '-')}</div>
+              <div class="quote-recipient"><strong>宛先:</strong><br>${escapeHtml(model.recipient.text || '-').replace(/\n/g, '<br>')}</div>
+              <div><strong>請求先:</strong><br>${escapeHtml(model.billingSummary)}</div>
+              <div><strong>納品先:</strong><br>${escapeHtml(model.shippingSummary)}</div>
+              <div><strong>発行元担当者:</strong> ${escapeHtml(model.issuer.contactPerson || '-')}</div>
             </div>
-          ` : `<h2 class="quote-title">御見積書 続き</h2>`}
+          ` : `<h2 class="quote-title">${escapeHtml(model.continuationTitle)}</h2>`}
           <table class="quote-table">
             <thead>
               <tr>
-                <th style="width: 4%;">No.</th>
-                <th style="width: 10%;">商品コード</th>
-                <th style="width: 22%;">商品名</th>
-                <th style="width: 13%;">規格/荷姿</th>
-                <th style="width: 8%;">温度帯</th>
-                ${showExpiration ? '<th style="width: 11%;">賞味期限</th>' : ''}
-                <th style="width: 7%;">数量</th>
-                <th style="width: 6%;">単位</th>
-                <th style="width: 11%;">単価（税抜）</th>
-                <th style="width: 10%;">金額</th>
-                <th style="width: 12%;">備考</th>
+                ${model.columns.map((column) => `<th style="width: ${column.htmlWidth};">${escapeHtml(column.label)}</th>`).join('')}
               </tr>
             </thead>
             <tbody>
-              ${pageLines.map((line, lineIndex) => renderLineCells(line, pageIndex * ROWS_PER_PAGE + lineIndex, quote, products, showExpiration)).join('')}
+              ${pageLines.map((line, lineIndex) => renderLineCells(model, line, pageIndex * ROWS_PER_PAGE + lineIndex)).join('')}
             </tbody>
           </table>
-          ${pageIndex === finalPageIndex ? `
+          ${pageIndex === model.finalPageIndex ? `
             <div class="quote-summary">
               <div class="quote-conditions">
-                <div><strong>支払条件:</strong> ${escapeHtml(quote.paymentTerms || '-')}</div>
-                <div><strong>配送条件:</strong> ${escapeHtml(quote.deliveryTerms || '-')}</div>
-                <div><strong>納期:</strong> ${escapeHtml(quote.deliveryDate || '-')}</div>
-                <div><strong>備考</strong><br>${escapeHtml(quote.remarks || quote.memo || '-').replace(/\n/g, '<br>')}</div>
-                ${issuer?.bankAccount ? `<div><strong>振込先</strong> ${escapeHtml(issuer.bankAccount)}</div>` : ''}
-                <div><strong>重要条件:</strong><br>${escapeHtml(quoteTermsSummaryText(quote, issuer)).replace(/\n/g, '<br>')}</div>
+                <div><strong>支払条件:</strong> ${escapeHtml(model.quote.paymentTerms || '-')}</div>
+                <div><strong>配送条件:</strong> ${escapeHtml(model.quote.deliveryTerms || '-')}</div>
+                <div><strong>納期:</strong> ${escapeHtml(model.quote.deliveryDate || '-')}</div>
+                ${model.quote.remarks || model.quote.memo ? `<div><strong>備考:</strong><br>${escapeHtml(model.quote.remarks || model.quote.memo).replace(/\n/g, '<br>')}</div>` : ''}
+                ${model.issuer.bankAccount ? `<div><strong>振込先:</strong> ${escapeHtml(model.issuer.bankAccount)}</div>` : ''}
+                <div><strong>重要条件:</strong><br>${escapeHtml(model.quoteTermsSummary).replace(/\n/g, '<br>')}</div>
               </div>
-              ${showTotals ? `<div class="quote-total">
-                <div><span>小計</span><span>${escapeHtml(money(financials.subtotal, quote.currency))}</span></div>
-                <div><span>値引き</span><span>${escapeHtml(money(quote.discount || 0, quote.currency))}</span></div>
-                <div><span>運賃</span><span>${escapeHtml(money(quote.freight || 0, quote.currency))}</span></div>
-                <div><span>消費税 ${escapeHtml(taxRateLabel(financials.taxBreakdown, quote.defaultTaxRate))}</span><span>${escapeHtml(money(financials.taxAmount, quote.currency))}</span></div>
-                <div><strong>合計</strong><strong>${escapeHtml(money(financials.grandTotal, quote.currency))}</strong></div>
+              ${model.showTotals ? `<div class="quote-total">
+                <div><span>小計</span><span>${escapeHtml(money(model.financials.subtotal, model.quote.currency))}</span></div>
+                <div><span>値引き</span><span>${escapeHtml(money(model.quote.discount || 0, model.quote.currency))}</span></div>
+                <div><span>運賃</span><span>${escapeHtml(money(model.quote.freight || 0, model.quote.currency))}</span></div>
+                <div><span>消費税 ${escapeHtml(taxRateLabel(model.financials.taxBreakdown, model.quote.defaultTaxRate))}</span><span>${escapeHtml(money(model.financials.taxAmount, model.quote.currency))}</span></div>
+                <div><strong>合計</strong><strong>${escapeHtml(money(model.financials.grandTotal, model.quote.currency))}</strong></div>
               </div>` : ''}
             </div>
-            <p class="quote-terms-summary">${escapeHtml(quoteTermsSummaryText(quote, issuer)).replace(/\n/g, '<br>')}</p>
           ` : ''}
           <div class="quote-footer">成約時には、別途発行する成約確認書および適用約款に基づきます。</div>
         </section>
       `).join('')}
+      ${includeTerms ? renderTermsHtml(model) : ''}
     </article>
   `;
 }
 
-export function renderConfirmationPreviewHtml(context) {
-  const html = renderQuotePreviewHtml(context)
-    .replace('quote-preview-document quote-a4-preview', 'quote-preview-document quote-a4-preview confirmation-preview-document');
-  return html.replace('</article>', `${renderTermsHtml(context.quote)}</article>`);
-}
-
-export function createQuotePdfFile(context, documentType = 'quote') {
-  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt, validUntilDisplay } = context;
-  const isConfirmation = documentType === 'confirmation';
-  const rows = calculateQuoteTotals(quote).lines;
-  const pages = chunkLines(rows);
-  const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
-  const issuerName = issuer?.legalName || issuer?.name || '営業手帳';
-  const issuerAddress = issuer?.address || '';
-  const issuerContact = [issuer?.phone, issuer?.email].filter(Boolean).join(' / ');
-  const documentTitle = isConfirmation ? '成約確認書' : '御見積書';
-  const recipient = recipientFromContext(customer, contacts);
-  const recipientLines = recipient.lines.length ? recipient.lines : ['-'];
-  const showTotals = hasQuantityInput(rows);
-  const showExpiration = hasExpirationColumn(rows);
-  const termsEntries = visibleTermsEntries(quote);
-  const termsPdfLines = [
-    `約款バージョン: ${quote.termsVersion || '-'} / 適用開始日: ${quote.termsEffectiveDate || '-'}`,
-    ...termsSummary(quote.termsSnapshot).flatMap((item) => splitText(`重要条件: ${item}`, 58)),
-    ...termsEntries.flatMap((entry) => [
+function termsPdfLines(model) {
+  return [
+    `約款バージョン: ${model.terms.version} / 適用開始日: ${model.terms.effectiveDate}`,
+    ...model.terms.summary.flatMap((item) => splitText(`重要条件: ${item}`, 58)),
+    ...model.terms.entries.flatMap((entry) => [
       `【${entry.label}】`,
       ...splitText(entry.value, 58),
     ]),
-    ...(quote.specialTerms ? ['【個別特記事項】', ...splitText(quote.specialTerms, 58)] : []),
+    ...(model.terms.specialTerms ? ['【個別特記事項】', ...splitText(model.terms.specialTerms, 58)] : []),
     '上記内容および添付約款を確認し、合意します。',
-    `発行元担当者: ${issuer?.contactPerson || '-'} / 顧客担当者: ${quote.acceptedByCustomerName || '-'}`,
-    `確認日: ${quote.acceptedAt ? String(quote.acceptedAt).slice(0, 10) : '-'} / 確認方法: ${quote.acceptanceMethod || '-'}`,
+    `発行元担当者: ${model.terms.issuerContact} / 顧客担当者: ${model.terms.acceptedByCustomerName}`,
+    `確認日: ${model.terms.acceptedAt} / 確認方法: ${model.terms.acceptanceMethod}`,
   ].filter((line) => line !== undefined && line !== null);
-  const termsPages = isConfirmation && termsPdfLines.length > 1 ? chunkLines(termsPdfLines, 34) : [];
-  const totalPdfPages = pages.length + termsPages.length;
-  const pdfPages = pages.map((pageRows, pageIndex) => {
-    const isLast = pageIndex === pages.length - 1;
+}
+
+function pdfCellLinesForRow(model, row, absoluteIndex) {
+  const lines = [];
+  model.columns.forEach((column) => {
+    if (column.pdfOnlyBelow) return;
+    const value = cellValue(column.key, row, absoluteIndex, model.quote, model.products);
+    lines.push({
+      text: truncate(value, column.pdfMax),
+      x: column.pdfX,
+      size: 8,
+    });
+  });
+  if (row.memo) {
+    lines.push({
+      text: `備考: ${truncate(row.memo, 44)}`,
+      x: 40,
+      yOffset: 9,
+      size: 7,
+    });
+  }
+  return lines;
+}
+
+export function createQuotePdfFile(context, documentType = 'quote') {
+  const model = buildQuoteDocumentModel(context, documentType);
+  const termsPages = documentType === 'confirmation' ? chunkLines(termsPdfLines(model), 34) : [];
+  const totalPdfPages = model.pages.length + termsPages.length;
+  const pdfPages = model.pages.map((pageRows, pageIndex) => {
+    const isLast = pageIndex === model.pages.length - 1;
     const lines = [
-      { text: documentTitle, x: 260, y: 800, size: 16 },
-      { text: issuerName, x: 40, y: 805, size: 9 },
-      { text: issuerAddress, x: 40, y: 790, size: 8 },
-      { text: issuerContact, x: 40, y: 777, size: 8 },
-      { text: issuer?.registrationNumber ? `登録番号: ${issuer.registrationNumber}` : '', x: 40, y: 764, size: 8 },
-      { text: `見積番号: ${quote.quoteNumber || '-'}`, x: 400, y: 805, size: 9 },
-      { text: `作成日: ${issueDate}`, x: 400, y: 790, size: 9 },
-      { text: `有効期限: ${validUntilDisplay || '-'}`, x: 400, y: 775, size: 9 },
+      { text: model.title, x: 260, y: 800, size: 16 },
+      { text: model.issuer.logoUrl ? '会社ロゴ登録済み' : '', x: 40, y: 820, size: 8 },
+      { text: model.issuer.name, x: 40, y: 805, size: 9 },
+      { text: model.issuer.address, x: 40, y: 790, size: 8 },
+      { text: model.issuer.contact, x: 40, y: 777, size: 8 },
+      { text: model.issuer.registrationNumber ? `登録番号: ${model.issuer.registrationNumber}` : '', x: 40, y: 764, size: 8 },
+      { text: `見積番号: ${model.quote.quoteNumber || '-'}`, x: 400, y: 805, size: 9 },
+      { text: `作成日: ${model.issueDate}`, x: 400, y: 790, size: 9 },
+      { text: `有効期限: ${model.validUntilDisplay || '-'}`, x: 400, y: 775, size: 9 },
       { text: `Page ${pageIndex + 1} / ${totalPdfPages}`, x: 400, y: 760, size: 9 },
     ];
 
     if (pageIndex === 0) {
+      const recipientLines = model.recipient.lines.length ? model.recipient.lines : ['-'];
       lines.push({ text: '宛先:', x: 40, y: 745, size: 9 });
       recipientLines.forEach((line, index) => {
         lines.push({ text: line, x: 78, y: 745 - index * 14, size: index === 0 ? 10 : 9 });
       });
-      lines.push({ text: `請求先: ${truncate(customerOfficeSummary(billingCustomer) || '-', 36)}`, x: 40, y: 710, size: 8 });
-      lines.push({ text: `納品先: ${truncate(customerOfficeSummary(shippingCustomer) || '-', 36)}`, x: 40, y: 697, size: 8 });
-      lines.push({ text: `発行元担当者: ${issuer?.contactPerson || '-'}`, x: 360, y: 715, size: 9 });
+      lines.push({ text: `請求先: ${truncate(model.billingSummary, 36)}`, x: 40, y: 710, size: 8 });
+      lines.push({ text: `納品先: ${truncate(model.shippingSummary, 36)}`, x: 40, y: 697, size: 8 });
+      lines.push({ text: `発行元担当者: ${model.issuer.contactPerson || '-'}`, x: 360, y: 715, size: 9 });
     } else {
-      lines.push({ text: `${documentTitle} 続き`, x: 40, y: 745, size: 10 });
+      lines.push({ text: model.continuationTitle, x: 40, y: 745, size: 10 });
     }
 
     const headerY = pageIndex === 0 ? 670 : 720;
-    const columns = showExpiration
-      ? [
-        ['No', 40], ['商品コード', 62], ['商品名', 122], ['規格/荷姿', 245], ['温度帯', 310], ['賞味期限', 355], ['数量', 420], ['単位', 455], ['単価（税抜）', 485], ['金額', 540],
-      ]
-      : [
-        ['No', 40], ['商品コード', 62], ['商品名', 122], ['規格/荷姿', 255], ['温度帯', 330], ['数量', 380], ['単位', 420], ['単価（税抜）', 455], ['金額', 525],
-      ];
-    columns.forEach(([text, x]) => lines.push({ text, x, y: headerY, size: 8 }));
+    model.columns
+      .filter((column) => !column.pdfOnlyBelow)
+      .forEach((column) => lines.push({ text: column.label, x: column.pdfX, y: headerY, size: 8 }));
 
-    pageRows.forEach((line, lineIndex) => {
+    pageRows.forEach((row, lineIndex) => {
       const y = headerY - 18 - lineIndex * 18;
-      if (showExpiration) {
-        lines.push(
-          { text: String(pageIndex * ROWS_PER_PAGE + lineIndex + 1), x: 40, y, size: 8 },
-          { text: truncate(line.productCode || '-', 12), x: 62, y, size: 8 },
-          { text: truncate(lineName(line, products), 22), x: 122, y, size: 8 },
-          { text: truncate(line.packageStyle || '-', 12), x: 245, y, size: 8 },
-          { text: line.temperatureZone || '-', x: 310, y, size: 8 },
-          { text: truncate(line.expirationText || '', 12), x: 355, y, size: 8 },
-          { text: String(line.quantity || '-'), x: 420, y, size: 8 },
-          { text: line.unit || '-', x: 455, y, size: 8 },
-          { text: money(line.unitPrice, quote.currency), x: 485, y, size: 8 },
-          { text: money(line.amount, quote.currency), x: 540, y, size: 8 },
-        );
-      } else {
-        lines.push(
-          { text: String(pageIndex * ROWS_PER_PAGE + lineIndex + 1), x: 40, y, size: 8 },
-          { text: truncate(line.productCode || '-', 12), x: 62, y, size: 8 },
-          { text: truncate(lineName(line, products), 24), x: 122, y, size: 8 },
-          { text: truncate(line.packageStyle || '-', 13), x: 255, y, size: 8 },
-          { text: line.temperatureZone || '-', x: 330, y, size: 8 },
-          { text: String(line.quantity || '-'), x: 380, y, size: 8 },
-          { text: line.unit || '-', x: 420, y, size: 8 },
-          { text: money(line.unitPrice, quote.currency), x: 455, y, size: 8 },
-          { text: money(line.amount, quote.currency), x: 525, y, size: 8 },
-        );
-      }
+      pdfCellLinesForRow(model, row, pageIndex * ROWS_PER_PAGE + lineIndex).forEach((cell) => {
+        lines.push({ ...cell, y: y - (cell.yOffset || 0) });
+      });
     });
 
     if (isLast) {
       const totalY = Math.max(110, headerY - 36 - pageRows.length * 18);
-      if (showTotals) {
+      if (model.showTotals) {
         lines.push(
-          { text: `小計 ${money(financials.subtotal, quote.currency)}`, x: 390, y: totalY, size: 9 },
-          { text: `値引き ${money(quote.discount || 0, quote.currency)}`, x: 390, y: totalY - 16, size: 9 },
-          { text: `運賃 ${money(quote.freight || 0, quote.currency)}`, x: 390, y: totalY - 32, size: 9 },
-          { text: `消費税 ${taxRateLabel(financials.taxBreakdown, quote.defaultTaxRate)}: ${money(financials.taxAmount, quote.currency)}`, x: 390, y: totalY - 48, size: 9 },
-          { text: `合計 ${money(financials.grandTotal, quote.currency)}`, x: 390, y: totalY - 66, size: 11 },
+          { text: `小計 ${money(model.financials.subtotal, model.quote.currency)}`, x: 390, y: totalY, size: 9 },
+          { text: `値引き ${money(model.quote.discount || 0, model.quote.currency)}`, x: 390, y: totalY - 16, size: 9 },
+          { text: `運賃 ${money(model.quote.freight || 0, model.quote.currency)}`, x: 390, y: totalY - 32, size: 9 },
+          { text: `消費税 ${taxRateLabel(model.financials.taxBreakdown, model.quote.defaultTaxRate)}: ${money(model.financials.taxAmount, model.quote.currency)}`, x: 390, y: totalY - 48, size: 9 },
+          { text: `合計 ${money(model.financials.grandTotal, model.quote.currency)}`, x: 390, y: totalY - 66, size: 11 },
         );
       }
       lines.push(
-        { text: `支払条件: ${quote.paymentTerms || '-'}`, x: 40, y: totalY, size: 9 },
-        { text: `配送条件: ${quote.deliveryTerms || '-'}`, x: 40, y: totalY - 16, size: 9 },
-        { text: `納期: ${quote.deliveryDate || '-'}`, x: 40, y: totalY - 32, size: 9 },
-        { text: `備考: ${truncate(quote.remarks || quote.memo || '-', 46)}`, x: 40, y: totalY - 48, size: 9 },
-        { text: `振込先: ${truncate(issuer?.bankAccount || '-', 46)}`, x: 40, y: totalY - 64, size: 9 },
-        { text: `重要条件: ${truncate(quoteTermsSummaryText(quote, issuer), 46) || '-'}`, x: 40, y: totalY - 80, size: 9 },
+        { text: `支払条件: ${model.quote.paymentTerms || '-'}`, x: 40, y: totalY, size: 9 },
+        { text: `配送条件: ${model.quote.deliveryTerms || '-'}`, x: 40, y: totalY - 16, size: 9 },
+        { text: `納期: ${model.quote.deliveryDate || '-'}`, x: 40, y: totalY - 32, size: 9 },
+        { text: `備考: ${truncate(model.quote.remarks || model.quote.memo || '-', 46)}`, x: 40, y: totalY - 48, size: 9 },
+        { text: `振込先: ${truncate(model.issuer.bankAccount || '-', 46)}`, x: 40, y: totalY - 64, size: 9 },
+        { text: `重要条件: ${truncate(model.quoteTermsSummary, 46) || '-'}`, x: 40, y: totalY - 80, size: 9 },
       );
     }
 
+    lines.push({ text: '成約時には、別途発行する成約確認書および適用約款に基づきます。', x: 250, y: 40, size: 7 });
     return lines;
   });
+
   termsPages.forEach((termsPage, termsPageIndex) => {
-    const pageNumber = pages.length + termsPageIndex + 1;
+    const pageNumber = model.pages.length + termsPageIndex + 1;
     pdfPages.push([
       { text: '取引条件・約款', x: 40, y: 805, size: 14 },
-      { text: `見積番号: ${quote.quoteNumber || '-'} / Page ${pageNumber} / ${totalPdfPages}`, x: 360, y: 805, size: 9 },
+      { text: `見積番号: ${model.quote.quoteNumber || '-'} / Page ${pageNumber} / ${totalPdfPages}`, x: 360, y: 805, size: 9 },
       ...termsPage.map((line, index) => ({
         text: line,
         x: 40,
@@ -506,10 +566,11 @@ export function createQuotePdfFile(context, documentType = 'quote') {
       })),
     ]);
   });
+
   const pdf = buildUnicodePdf(pdfPages);
   const blob = new Blob([pdf], { type: 'application/pdf' });
-  const prefix = isConfirmation ? 'confirmation' : 'quote';
-  const fileName = `${quote.quoteNumber || prefix}-${prefix}-${Date.now()}.pdf`.replace(/[\\/:*?"<>|]/g, '-');
+  const prefix = documentType === 'confirmation' ? 'confirmation' : 'quote';
+  const fileName = `${model.quote.quoteNumber || prefix}-${prefix}-${Date.now()}.pdf`.replace(/[\\/:*?"<>|]/g, '-');
   return new File([blob], fileName, { type: 'application/pdf' });
 }
 
@@ -556,6 +617,7 @@ function utf16Hex(value = '') {
 }
 
 function textOp({ text, x, y, size = 9 }) {
+  if (!text) return '';
   return `BT /F1 ${size} Tf 1 0 0 1 ${x} ${y} Tm <${utf16Hex(text)}> Tj ET`;
 }
 
@@ -580,7 +642,7 @@ function buildUnicodePdf(pages) {
     const content = [
       '0.15 w',
       '40 700 m 555 700 l S',
-      ...lines.map(textOp),
+      ...lines.map(textOp).filter(Boolean),
     ].join('\n');
     objects[pageId] = `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${A4_WIDTH} ${A4_HEIGHT}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`;
     objects[contentId] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
