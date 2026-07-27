@@ -28,10 +28,19 @@ function productInventorySummary(product, inventories) {
   };
 }
 
+function mainProductImage(product, productAssets = []) {
+  return (
+    productAssets.find((asset) => asset.productId === product.id && asset.assetKind === 'image' && asset.isMain) ||
+    productAssets.find((asset) => asset.productId === product.id && asset.assetKind === 'image') ||
+    product.imageFile
+  );
+}
+
 export default function Products({
   products,
   brands = [],
   inventories = [],
+  productAssets = [],
   removeProduct,
   onOpenProductDetail,
   onOpenInventory,
@@ -103,6 +112,20 @@ export default function Products({
   const desktopColumns = useMemo(
     () => [
       {
+        key: 'image',
+        label: '画像',
+        width: '86px',
+        minWidth: '86px',
+        render: (product) => {
+          const image = mainProductImage(product, productAssets);
+          return image?.publicUrl || image?.url ? (
+            <img className="product-thumb table-product-thumb" src={image.publicUrl || image.url} alt={product.name} loading="lazy" />
+          ) : (
+            <span className="product-thumb table-product-thumb placeholder">No Image</span>
+          );
+        },
+      },
+      {
         key: 'name',
         label: '商品名',
         width: '22%',
@@ -146,7 +169,7 @@ export default function Products({
           ].filter(Boolean).join(', ') || 'なし',
       },
     ],
-    [inventories],
+    [inventories, productAssets],
   );
 
   function resetPaging(handler) {
@@ -280,6 +303,7 @@ export default function Products({
                   product={product}
                   brands={brands}
                   inventories={inventories}
+                  productAssets={productAssets}
                   removeProduct={removeProduct}
                   onOpenProductDetail={onOpenProductDetail}
                   onOpenInventory={onOpenInventory}
@@ -307,17 +331,18 @@ export default function Products({
   );
 }
 
-function ProductCard({ product, inventories, removeProduct, onOpenProductDetail, onOpenInventory }) {
+function ProductCard({ product, inventories, productAssets = [], removeProduct, onOpenProductDetail, onOpenInventory }) {
   const stock = productInventorySummary(product, inventories);
   const inventory = inventories.find((item) => item.productId === product.id);
+  const image = mainProductImage(product, productAssets);
 
   return (
     <article className="product-card">
       <div className="product-card-main">
-        {product.imageFile?.url ? (
+        {image?.publicUrl || image?.url ? (
           <img
             className="product-thumb"
-            src={product.imageFile.url}
+            src={image.publicUrl || image.url}
             alt={`${product.name}の商品画像`}
             loading="lazy"
           />

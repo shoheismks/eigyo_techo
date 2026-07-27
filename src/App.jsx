@@ -12,6 +12,7 @@ import { useEvents } from './modules/calendar/hooks/useEvents.js';
 import { useInventory } from './modules/inventory/hooks/useInventory.js';
 import { useInvoices } from './modules/invoices/hooks/useInvoices.js';
 import { useBrands } from './modules/products/hooks/useBrands.js';
+import { useProductAssets } from './modules/products/hooks/useProductAssets.js';
 import { useProducts } from './modules/products/hooks/useProducts.js';
 import { useCustomerProductPrices } from './modules/prices/hooks/useCustomerProductPrices.js';
 import { applyResolvedPriceToLine, resolveCustomerProductPrice } from './modules/prices/services/customerProductPriceService.js';
@@ -151,6 +152,12 @@ function AuthenticatedApp() {
     syncState,
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
+  const {
+    records: productAssets,
+    addRecord: addProductAsset,
+    updateRecord: updateProductAsset,
+    removeRecord: removeProductAsset,
+  } = useProductAssets(userId);
   const {
     records: brands,
     addRecord: addBrand,
@@ -1185,6 +1192,7 @@ function ActivePage({
         brands={brands}
         customerProductPrices={customerProductPrices}
         inventories={inventories}
+        productAssets={productAssets}
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
         onOpenInventory={openInventoryPage}
@@ -1243,6 +1251,7 @@ function ActivePage({
         quotes={quotes}
         invoices={invoices}
         projects={projects}
+        productAssets={productAssets}
         customers={customers}
         suppliers={suppliers}
         addProduct={addProduct}
@@ -1251,6 +1260,9 @@ function ActivePage({
         updateAdoption={updateAdoption}
         updateSample={updateSample}
         updateQuote={updateQuote}
+        addProductAsset={addProductAsset}
+        updateProductAsset={updateProductAsset}
+        removeProductAsset={removeProductAsset}
         addInventory={addInventory}
         updateInventory={updateInventory}
         removeInventory={removeInventory}
@@ -1389,6 +1401,7 @@ function ActivePage({
         backupDatasets={{
           customers,
           products,
+          productAssets,
           brands,
           customerProductPrices,
           customerProductPriceHistory,
@@ -1417,6 +1430,7 @@ function ActivePage({
         restoreHandlers={{
           customers: { records: customers, add: addCustomer, update: updateCustomer },
           products: { records: products, add: addProduct, update: updateProduct },
+          productAssets: { records: productAssets, add: addProductAsset, update: updateProductAsset },
           brands: { records: brands, add: addBrand, update: updateBrand },
           customerProductPrices: { records: customerProductPrices, add: addCustomerProductPrice, update: updateCustomerProductPrice },
           customerProductPriceHistory: { records: customerProductPriceHistory, add: addCustomerProductPriceHistory, update: () => {} },

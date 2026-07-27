@@ -739,6 +739,11 @@ body,
     padding: 12px;
   }
 
+  .asset-upload-grid,
+  .asset-manager-grid {
+    grid-template-columns: 1fr;
+  }
+
   .karte-header {
     top: 48px;
     gap: 10px;

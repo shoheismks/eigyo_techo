@@ -94,7 +94,7 @@
 - 画面: `Products`, `ProductDetail`, `CustomerKarte`
 - 入力: 商品名、カテゴリー、メーカー、産地、温度帯、荷姿、原価、希望販売価格、単位、粗利率、説明、メモ、画像、資料、スペックシート。
 - 出力: 商品一覧、検索結果、商品詳細、見積履歴、サンプル履歴、採用顧客一覧。
-- 保存先: Supabase `products`。商品画像・資料・スペックシートはSupabase Storage。
+- 保存先: Supabase `products` / `product_assets`。商品画像・資料・スペックシートはSupabase Storage。
 - 関連データ: `quotes`, `samples`, `suppliers`, `attachments`
 - 今後の拡張: JANコード、アレルゲン、賞味期限、在庫連携、商品採用分析。
 

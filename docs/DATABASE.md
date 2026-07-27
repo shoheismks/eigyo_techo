@@ -10,6 +10,7 @@
 - contacts
 - business_cards
 - products
+- product_assets
 - suppliers
 - projects
 - quotes
@@ -47,6 +48,7 @@ erDiagram
   contacts ||--o{ attachments : has
   contacts ||--o{ events : attends
   products ||--o{ attachments : has
+  products ||--o{ product_assets : has
   suppliers ||--o{ attachments : has
   customers ||--o{ projects : has
   suppliers ||--o{ projects : has
@@ -212,6 +214,18 @@ erDiagram
 - RLS有無: あり。`auth.uid() = user_id`
 - 検索対象項目: `name`, `category`, `manufacturer_name`, `origin`, `temperature_zone`, `package_style`, `description`, `memo`, `tags`
 - 今後追加予定項目: `jan_code`, `allergen_info`, `shelf_life`, `inventory_link_id`, `supplier_product_code`
+
+## product_assets
+
+- 目的: 商品ごとの複数画像・営業資料を管理する。
+- 主キー: `id`
+- 主要カラム: `user_id`, `product_id`, `asset_kind`, `asset_type`, `file_name`, `description`, `sort_order`, `is_main`, `storage_bucket`, `storage_path`, `public_url`, `content_type`, `size_bytes`, `metadata`, `created_at`, `updated_at`
+- 外部キー: `product_id -> products.id`
+- 関連テーブル: `products`
+- Storage利用有無: あり。ファイル本体はSupabase Storage `app-attachments` に保存し、DBにはURLとメタ情報のみ保存する。
+- RLS有無: あり。`auth.uid() = user_id` のみアクセス可能。
+- 検索対象項目: `file_name`, `description`, `asset_type`
+- 今後追加予定項目: 画像変換サムネイル、資料バージョン、承認状態、公開期限。
 
 ## suppliers
 

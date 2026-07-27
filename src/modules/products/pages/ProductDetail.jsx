@@ -16,6 +16,12 @@ import {
   normalizeBrand,
   normalizeBrandName,
 } from '../hooks/useBrands.js';
+import {
+  PRODUCT_DOCUMENT_TYPES,
+  PRODUCT_IMAGE_TYPES,
+  normalizeProductAsset,
+  productAssetTypeLabel,
+} from '../hooks/useProductAssets.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import {
   INVENTORY_STATUSES,
@@ -93,6 +99,7 @@ export default function ProductDetail({
   samples = [],
   quotes = [],
   projects = [],
+  productAssets = [],
   customers = [],
   suppliers = [],
   addProduct,
@@ -101,6 +108,9 @@ export default function ProductDetail({
   updateAdoption,
   updateSample,
   updateQuote,
+  addProductAsset,
+  updateProductAsset,
+  removeProductAsset,
   addInventory,
   updateInventory,
   removeInventory,
@@ -120,6 +130,14 @@ export default function ProductDetail({
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState('all');
   const [uploadingField, setUploadingField] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [assetUploadKind, setAssetUploadKind] = useState('');
+  const [assetError, setAssetError] = useState('');
+  const [assetPreview, setAssetPreview] = useState(null);
+  const [assetDraft, setAssetDraft] = useState({
+    imageType: 'product',
+    documentType: 'specification',
+    description: '',
+  });
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -158,6 +176,25 @@ export default function ProductDetail({
         .filter((inventory) => inventory.productId === form.id)
         .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))),
     [form.id, inventories],
+  );
+  const relatedAssets = useMemo(
+    () =>
+      productAssets
+        .filter((asset) => asset.productId === form.id)
+        .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''))),
+    [form.id, productAssets],
+  );
+  const imageAssets = useMemo(
+    () => relatedAssets.filter((asset) => asset.assetKind === 'image'),
+    [relatedAssets],
+  );
+  const documentAssets = useMemo(
+    () => relatedAssets.filter((asset) => asset.assetKind === 'document'),
+    [relatedAssets],
+  );
+  const mainImageAsset = useMemo(
+    () => imageAssets.find((asset) => asset.isMain) || imageAssets[0] || null,
+    [imageAssets],
   );
   const activeBrands = useMemo(
     () =>
@@ -466,6 +503,91 @@ export default function ProductDetail({
     }));
   }
 
+  async function handleProductAssetFiles(files, assetKind = 'image') {
+    const fileList = Array.from(files ?? []).filter(Boolean);
+    if (fileList.length === 0 || isNew || !addProductAsset) {
+      return;
+    }
+
+    setAssetUploadKind(assetKind);
+    setAssetError('');
+    setSaveMessage('');
+    const currentAssets = productAssets.filter((asset) => asset.productId === form.id);
+    const currentImageCount = currentAssets.filter((asset) => asset.assetKind === 'image').length;
+    const baseSortOrder = currentAssets.reduce((max, asset) => Math.max(max, Number(asset.sortOrder) || 0), 0);
+
+    try {
+      for (const [index, file] of fileList.entries()) {
+        const uploaded = await uploadAttachment({
+          file,
+          userId,
+          ownerType: 'product',
+          ownerId: form.id,
+          field: assetKind === 'document' ? 'product-document' : 'product-image',
+        });
+
+        await addProductAsset(normalizeProductAsset({
+          userId,
+          productId: form.id,
+          assetKind,
+          assetType: assetKind === 'document' ? assetDraft.documentType : assetDraft.imageType,
+          fileName: uploaded.name,
+          description: assetDraft.description,
+          sortOrder: baseSortOrder + index + 1,
+          isMain: assetKind === 'image' && currentImageCount === 0 && index === 0,
+          storageBucket: 'app-attachments',
+          storagePath: uploaded.path,
+          publicUrl: uploaded.url,
+          contentType: uploaded.type,
+          sizeBytes: uploaded.size,
+          metadata: {
+            source: 'product-assets',
+            legacyField: uploaded.field,
+          },
+        }, userId));
+      }
+      setAssetDraft((current) => ({ ...current, description: '' }));
+      setSaveMessage('商品アセットを登録しました。');
+    } catch (error) {
+      setAssetError(error.message || '商品アセットのアップロードに失敗しました。');
+    } finally {
+      setAssetUploadKind('');
+    }
+  }
+
+  function handleAssetDrop(event, assetKind) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleProductAssetFiles(event.dataTransfer?.files, assetKind);
+  }
+
+  async function setMainProductImage(asset) {
+    if (!asset || !updateProductAsset) return;
+    setAssetError('');
+    try {
+      await Promise.all(
+        imageAssets.map((item) =>
+          updateProductAsset(item.id, {
+            ...item,
+            isMain: item.id === asset.id,
+            updatedAt: new Date().toISOString(),
+          }),
+        ),
+      );
+      setSaveMessage('メイン画像を更新しました。');
+    } catch (error) {
+      setAssetError(error.message || 'メイン画像の更新に失敗しました。');
+    }
+  }
+
+  function updateAssetField(asset, updates) {
+    updateProductAsset?.(asset.id, {
+      ...asset,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveMessage('');
@@ -728,6 +850,177 @@ export default function ProductDetail({
             />
           </label>
         </section>
+
+        <section className="detail-section product-assets-section">
+          <div className="section-heading">
+            <div>
+              <h2>商品アセット</h2>
+              <p className="inline-helper">複数画像・営業資料をStorageに保存し、商品ごとに整理します。</p>
+            </div>
+            <span className="info-badge">{relatedAssets.length}件</span>
+          </div>
+
+          {isNew ? (
+            <p className="inline-helper">商品を登録後に、画像・資料を追加できます。</p>
+          ) : (
+            <>
+              <div className="asset-upload-grid">
+                <div
+                  className="asset-drop-zone"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => handleAssetDrop(event, 'image')}
+                >
+                  <div className="section-heading compact-heading">
+                    <h3>画像を追加</h3>
+                    <span className="info-badge">{imageAssets.length}枚</span>
+                  </div>
+                  <label className="field-label">
+                    画像種別
+                    <select value={assetDraft.imageType} onChange={(event) => setAssetDraft((current) => ({ ...current, imageType: event.target.value }))}>
+                      {PRODUCT_IMAGE_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    説明
+                    <input value={assetDraft.description} placeholder="例: スライス断面、調理例など" onChange={(event) => setAssetDraft((current) => ({ ...current, description: event.target.value }))} />
+                  </label>
+                  <label className="field-label file-field">
+                    複数画像を選択
+                    <input type="file" accept="image/*" multiple onChange={(event) => handleProductAssetFiles(event.target.files, 'image')} />
+                    <span>ドラッグ&ドロップにも対応</span>
+                  </label>
+                </div>
+
+                <div
+                  className="asset-drop-zone"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => handleAssetDrop(event, 'document')}
+                >
+                  <div className="section-heading compact-heading">
+                    <h3>資料を追加</h3>
+                    <span className="info-badge">{documentAssets.length}件</span>
+                  </div>
+                  <label className="field-label">
+                    資料種別
+                    <select value={assetDraft.documentType} onChange={(event) => setAssetDraft((current) => ({ ...current, documentType: event.target.value }))}>
+                      {PRODUCT_DOCUMENT_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    説明
+                    <input value={assetDraft.description} placeholder="例: 提案用、最新版、店舗向けなど" onChange={(event) => setAssetDraft((current) => ({ ...current, description: event.target.value }))} />
+                  </label>
+                  <label className="field-label file-field">
+                    複数資料を選択
+                    <input type="file" multiple onChange={(event) => handleProductAssetFiles(event.target.files, 'document')} />
+                    <span>PDF、画像、Office資料などを登録できます</span>
+                  </label>
+                </div>
+              </div>
+
+              {assetUploadKind && <p className="notice-text">商品アセットをアップロード中...</p>}
+              {assetError && <p className="error-text">{assetError}</p>}
+
+              <div className="asset-manager-grid">
+                <div>
+                  <div className="section-heading compact-heading">
+                    <h3>画像</h3>
+                    <span className="info-badge">{imageAssets.length}枚</span>
+                  </div>
+                  {imageAssets.length > 0 ? (
+                    <div className="product-asset-gallery">
+                      {imageAssets.map((asset) => (
+                        <article className={`product-asset-card ${asset.isMain ? 'main-asset' : ''}`} key={asset.id}>
+                          <button type="button" className="asset-image-button" onClick={() => setAssetPreview(asset)}>
+                            <img src={asset.publicUrl} alt={asset.description || asset.fileName || form.name} loading="lazy" />
+                          </button>
+                          <div className="lead-badges">
+                            <span className={`info-badge ${asset.isMain ? 'ready' : 'muted'}`}>{asset.isMain ? 'メイン画像' : productAssetTypeLabel(asset.assetKind, asset.assetType)}</span>
+                          </div>
+                          <label className="field-label">
+                            種別
+                            <select value={asset.assetType} onChange={(event) => updateAssetField(asset, { assetType: event.target.value })}>
+                              {PRODUCT_IMAGE_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
+                            </select>
+                          </label>
+                          <label className="field-label">
+                            説明
+                            <input value={asset.description} onChange={(event) => updateAssetField(asset, { description: event.target.value })} />
+                          </label>
+                          <label className="field-label">
+                            並び順
+                            <input inputMode="numeric" value={asset.sortOrder} onChange={(event) => updateAssetField(asset, { sortOrder: Number(event.target.value) || 0 })} />
+                          </label>
+                          <div className="mail-action-row">
+                            <button type="button" className="ghost-button compact-button" onClick={() => setMainProductImage(asset)}>メインにする</button>
+                            <button type="button" className="ghost-button danger compact-button" onClick={() => removeProductAsset?.(asset.id)}>削除</button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="inline-helper">画像アセットは未登録です。</p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="section-heading compact-heading">
+                    <h3>資料</h3>
+                    <span className="info-badge">{documentAssets.length}件</span>
+                  </div>
+                  {documentAssets.length > 0 ? (
+                    <div className="product-document-list">
+                      {documentAssets.map((asset) => (
+                        <article className="product-document-card" key={asset.id}>
+                          <div className="history-meta">
+                            <span>{asset.fileName || '資料'}</span>
+                            <small>{productAssetTypeLabel(asset.assetKind, asset.assetType)}</small>
+                          </div>
+                          <label className="field-label">
+                            資料種別
+                            <select value={asset.assetType} onChange={(event) => updateAssetField(asset, { assetType: event.target.value })}>
+                              {PRODUCT_DOCUMENT_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
+                            </select>
+                          </label>
+                          <label className="field-label">
+                            説明
+                            <input value={asset.description} onChange={(event) => updateAssetField(asset, { description: event.target.value })} />
+                          </label>
+                          <label className="field-label">
+                            並び順
+                            <input inputMode="numeric" value={asset.sortOrder} onChange={(event) => updateAssetField(asset, { sortOrder: Number(event.target.value) || 0 })} />
+                          </label>
+                          <div className="mail-action-row">
+                            <a className="ghost-button compact-button external-button" href={asset.publicUrl} target="_blank" rel="noreferrer">閲覧</a>
+                            <a className="ghost-button compact-button external-button" href={asset.publicUrl} download={asset.fileName || true}>ダウンロード</a>
+                            <button type="button" className="ghost-button danger compact-button" onClick={() => removeProductAsset?.(asset.id)}>削除</button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="inline-helper">資料アセットは未登録です。</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+
+        {assetPreview && (
+          <div className="modal-backdrop" role="presentation" onClick={() => setAssetPreview(null)}>
+            <div className="modal-panel asset-preview-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+              <div className="section-heading">
+                <div>
+                  <h2>{assetPreview.fileName || '商品画像'}</h2>
+                  <span>{assetPreview.description || productAssetTypeLabel(assetPreview.assetKind, assetPreview.assetType)}</span>
+                </div>
+                <button type="button" className="text-button" onClick={() => setAssetPreview(null)}>閉じる</button>
+              </div>
+              <img className="asset-preview-image" src={assetPreview.publicUrl} alt={assetPreview.description || assetPreview.fileName || form.name} />
+            </div>
+          </div>
+        )}
 
         <section className="detail-section">
           <h2>価格</h2>
