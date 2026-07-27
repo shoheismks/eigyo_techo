@@ -1,28 +1,10 @@
 import { Component, Suspense, lazy, useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout.jsx';
+import { AppDataProvider, useAppData } from './context/AppDataContext.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { useAdoptions } from './modules/products/hooks/useAdoptions.js';
-import { useAttachments } from './shared/hooks/useAttachments.js';
-import { useBusinessCards } from './modules/businessCards/hooks/useBusinessCards.js';
-import { useComplaints } from './modules/claims/hooks/useComplaints.js';
-import { useContacts } from './modules/contacts/hooks/useContacts.js';
-import { useCustomers } from './modules/customers/hooks/useCustomers.js';
-import { useProjects } from './modules/deals/hooks/useProjects.js';
-import { useEvents } from './modules/calendar/hooks/useEvents.js';
-import { useInventory } from './modules/inventory/hooks/useInventory.js';
-import { useInvoices } from './modules/invoices/hooks/useInvoices.js';
-import { useBrands } from './modules/products/hooks/useBrands.js';
-import { useProductAssets } from './modules/products/hooks/useProductAssets.js';
-import { useProducts } from './modules/products/hooks/useProducts.js';
-import { useCustomerProductPrices } from './modules/prices/hooks/useCustomerProductPrices.js';
 import { applyResolvedPriceToLine, resolveCustomerProductPrice } from './modules/prices/services/customerProductPriceService.js';
-import { DEFAULT_QUOTE_TAX_RATE, useQuotes } from './modules/quotes/hooks/useQuotes.js';
-import { buildSalesOrderDraft, useSalesOrders } from './modules/salesOrders/hooks/useSalesOrders.js';
-import { useSamples } from './modules/samples/hooks/useSamples.js';
-import { useShipments } from './modules/shipments/hooks/useShipments.js';
-import { useDeliveryNotes } from './modules/deliveryNotes/hooks/useDeliveryNotes.js';
-import { useIssuers } from './modules/settings/hooks/useIssuers.js';
-import { useSuppliers } from './modules/suppliers/hooks/useSuppliers.js';
+import { DEFAULT_QUOTE_TAX_RATE } from './modules/quotes/hooks/useQuotes.js';
+import { buildSalesOrderDraft } from './modules/salesOrders/hooks/useSalesOrders.js';
 import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
 import { buildInvoiceDraftFromQuote } from './modules/invoices/services/invoicePdfService.js';
 import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
@@ -124,7 +106,18 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
+  const { userId } = useAuth();
+
+  return (
+    <AppDataProvider userId={userId}>
+      <AuthenticatedShell />
+    </AppDataProvider>
+  );
+}
+
+function AuthenticatedShell() {
   const { signOut, user, userId } = useAuth();
+  const appData = useAppData();
   const [activePage, setActivePage] = useState(() => (isImportPath() ? 'Import' : 'Home'));
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -150,141 +143,101 @@ function AuthenticatedApp() {
     reloadFromCloud,
     syncError,
     syncState,
-  } = useCustomers(userId);
-  const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
-  const {
-    records: rawProductAssets = [],
-    addRecord: addProductAsset,
-    updateRecord: updateProductAsset,
-    removeRecord: removeProductAsset,
-  } = useProductAssets(userId);
-  const productAssets = Array.isArray(rawProductAssets) ? rawProductAssets : [];
-  const {
-    records: brands,
-    addRecord: addBrand,
-    updateRecord: updateBrand,
-    removeRecord: removeBrand,
-  } = useBrands(userId);
-  const {
-    records: customerProductPrices,
-    history: customerProductPriceHistory,
-    addRecord: addCustomerProductPrice,
-    updateRecord: updateCustomerProductPrice,
-    removeRecord: removeCustomerProductPrice,
-    deactivateRecord: deactivateCustomerProductPrice,
-    addHistoryRecord: addCustomerProductPriceHistory,
-  } = useCustomerProductPrices(userId);
-  const {
-    records: inventories,
-    addRecord: addInventory,
-    updateRecord: updateInventory,
-    removeRecord: removeInventory,
-    reload: reloadInventory,
+    products,
+    addProduct,
+    updateProduct,
+    removeProduct,
+    productAssets,
+    addProductAsset,
+    updateProductAsset,
+    removeProductAsset,
+    brands,
+    addBrand,
+    updateBrand,
+    removeBrand,
+    customerProductPrices,
+    customerProductPriceHistory,
+    addCustomerProductPrice,
+    updateCustomerProductPrice,
+    removeCustomerProductPrice,
+    deactivateCustomerProductPrice,
+    addCustomerProductPriceHistory,
+    inventories,
+    addInventory,
+    updateInventory,
+    removeInventory,
+    reloadInventory,
     inventoryLots,
     inventoryMovements,
     inventoryReservations,
     stocktakes,
     stocktakeLines,
-  } = useInventory(userId);
-  const {
-    records: adoptions,
-    addRecord: addAdoption,
-    updateRecord: updateAdoption,
-    removeRecord: removeAdoption,
-  } = useAdoptions(userId);
-  const {
-    records: samples,
-    addRecord: addSample,
-    updateRecord: updateSample,
-    removeRecord: removeSample,
-  } = useSamples(userId);
-  const {
-    records: quotes,
-    addRecord: addQuote,
-    updateRecord: updateQuote,
-    removeRecord: removeQuote,
-  } = useQuotes(userId);
-  const {
-    records: invoices,
-    addRecord: addInvoice,
-    updateRecord: updateInvoice,
-    removeRecord: removeInvoice,
-  } = useInvoices(userId);
-  const {
-    records: salesOrders,
-    addRecord: addSalesOrder,
-    updateRecord: updateSalesOrder,
-    removeRecord: removeSalesOrder,
+    adoptions,
+    addAdoption,
+    updateAdoption,
+    removeAdoption,
+    samples,
+    addSample,
+    updateSample,
+    removeSample,
+    quotes,
+    addQuote,
+    updateQuote,
+    removeQuote,
+    invoices,
+    addInvoice,
+    updateInvoice,
+    removeInvoice,
+    salesOrders,
+    addSalesOrder,
+    updateSalesOrder,
+    removeSalesOrder,
     reserveLineFefo,
     reserveLineLot,
     releaseLineReservations,
     reallocateLineFefo,
-  } = useSalesOrders(userId);
-  const {
-    records: shipments,
+    shipments,
     createShipmentFromOrder,
     updateShipmentStatus,
     shipShipment,
     cancelShipment,
-    reload: reloadShipments,
-  } = useShipments(userId);
-  const {
-    records: deliveryNotes,
-    addRecord: addDeliveryNote,
-    updateRecord: updateDeliveryNote,
-    removeRecord: removeDeliveryNote,
-    createDeliveryNoteFromShipment,
-    reload: reloadDeliveryNotes,
-  } = useDeliveryNotes(userId);
-  const {
-    records: issuers,
-    addRecord: addIssuer,
-    updateRecord: updateIssuer,
-    removeRecord: removeIssuer,
-  } = useIssuers(userId);
-  const {
-    records: projects,
-    addRecord: addProject,
-    updateRecord: updateProject,
-    removeRecord: removeProject,
-  } = useProjects(userId);
-  const {
-    records: contacts,
-    addRecord: addContact,
-    updateRecord: updateContact,
-    removeRecord: removeContact,
-  } = useContacts(userId);
-  const {
-    records: suppliers,
-    addRecord: addSupplier,
-    updateRecord: updateSupplier,
-    removeRecord: removeSupplier,
-  } = useSuppliers(userId);
-  const {
-    records: businessCards,
-    addRecord: addBusinessCard,
-    updateRecord: updateBusinessCard,
-  } = useBusinessCards(userId);
-  const {
-    records: complaints,
-    addRecord: addComplaint,
-    updateRecord: updateComplaint,
-    removeRecord: removeComplaint,
-  } = useComplaints(userId);
-  const {
-    records: events,
-    addRecord: addEvent,
-    updateRecord: updateEvent,
-    removeRecord: removeEvent,
-  } = useEvents(userId);
-  const {
-    records: attachments,
-    addRecord: addAttachment,
-    updateRecord: updateAttachment,
-  } = useAttachments(userId);
-
-  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
-  const selectedProduct = products.find((product) => product.id === selectedProductId);
+    reloadShipments,
+    deliveryNotes,
+    addDeliveryNote,
+    updateDeliveryNote,
+    removeDeliveryNote,
+    reloadDeliveryNotes,
+    issuers,
+    addIssuer,
+    updateIssuer,
+    removeIssuer,
+    projects,
+    addProject,
+    updateProject,
+    removeProject,
+    contacts,
+    addContact,
+    updateContact,
+    removeContact,
+    suppliers,
+    addSupplier,
+    updateSupplier,
+    removeSupplier,
+    businessCards,
+    addBusinessCard,
+    updateBusinessCard,
+    complaints,
+    addComplaint,
+    updateComplaint,
+    removeComplaint,
+    events,
+    addEvent,
+    updateEvent,
+    removeEvent,
+    attachments,
+    addAttachment,
+    updateAttachment,
+  } = appData;
 
   useEffect(() => {
     if (!userId) return;
@@ -655,130 +608,29 @@ function AuthenticatedApp() {
         <PageErrorBoundary resetKey={activePage} onReset={() => setActivePage('Home')}>
           <Suspense fallback={<PageLoading />}>
             <ActivePage
-            activePage={activePage}
-            importError={importError}
-            setActivePage={setActivePage}
-            onCreateQuote={openQuoteForm}
-            onCreateInvoice={openInvoiceForm}
-            onCreateSalesOrder={openSalesOrderForm}
-            salesOrderDraft={salesOrderDraft}
-            setSalesOrderDraft={setSalesOrderDraft}
-            inventoryAction={inventoryAction}
-            setInventoryAction={setInventoryAction}
-            addCustomer={addCustomer}
-            isSaved={isSaved}
-            customers={customers}
-            initialSearchQuery={globalCustomerSearch}
-            updateCustomer={updateCustomer}
-            removeCustomer={removeCustomer}
-            openCustomerDetail={openCustomerDetail}
-            openCustomerKarte={openCustomerKarte}
-            selectedCustomer={selectedCustomer}
-            selectedCustomerId={selectedCustomerId}
-            products={products}
-            brands={brands}
-            productAssets={productAssets}
-            customerProductPrices={customerProductPrices}
-            customerProductPriceHistory={customerProductPriceHistory}
-            inventories={inventories}
-            inventoryLots={inventoryLots}
-            inventoryMovements={inventoryMovements}
-            inventoryReservations={inventoryReservations}
-            stocktakes={stocktakes}
-            stocktakeLines={stocktakeLines}
-            addInventory={addInventory}
-            updateInventory={updateInventory}
-            removeInventory={removeInventory}
-            addProduct={addProduct}
-            updateProduct={updateProduct}
-            removeProduct={removeProduct}
-            addProductAsset={addProductAsset}
-            updateProductAsset={updateProductAsset}
-            removeProductAsset={removeProductAsset}
-            addBrand={addBrand}
-            updateBrand={updateBrand}
-            removeBrand={removeBrand}
-            addCustomerProductPrice={addCustomerProductPrice}
-            updateCustomerProductPrice={updateCustomerProductPrice}
-            removeCustomerProductPrice={removeCustomerProductPrice}
-            deactivateCustomerProductPrice={deactivateCustomerProductPrice}
-            adoptions={adoptions}
-            addAdoption={addAdoption}
-            updateAdoption={updateAdoption}
-            removeAdoption={removeAdoption}
-            projects={projects}
-            addProject={addProject}
-            updateProject={updateProject}
-            removeProject={removeProject}
-            samples={samples}
-            addSample={addSample}
-            updateSample={updateSample}
-            removeSample={removeSample}
-            quotes={quotes}
-            invoices={invoices}
-            salesOrders={salesOrders}
-            shipments={shipments}
-            deliveryNotes={deliveryNotes}
-            issuers={issuers}
-            addIssuer={addIssuer}
-            updateIssuer={updateIssuer}
-            removeIssuer={removeIssuer}
-            addQuote={addQuote}
-            updateQuote={updateQuote}
-            removeQuote={removeQuote}
-            addInvoice={addInvoice}
-            updateInvoice={updateInvoice}
-            removeInvoice={removeInvoice}
-            addSalesOrder={addSalesOrder}
-            updateSalesOrder={updateSalesOrder}
-            removeSalesOrder={removeSalesOrder}
-            reserveLineFefo={reserveLineFefo}
-            reserveLineLot={reserveLineLot}
-            releaseLineReservations={releaseLineReservations}
-            reallocateLineFefo={reallocateLineFefo}
-            createShipmentFromOrder={createShipmentFromOrder}
-            updateShipmentStatus={updateShipmentStatus}
-            shipShipment={shipShipment}
-            cancelShipment={cancelShipment}
-            reloadShipments={reloadShipments}
-            reloadDeliveryNotes={reloadDeliveryNotes}
-            createDeliveryNoteFromShipment={handleCreateDeliveryNoteFromShipment}
-            addDeliveryNote={addDeliveryNote}
-            updateDeliveryNote={updateDeliveryNote}
-            removeDeliveryNote={removeDeliveryNote}
-            reloadInventory={reloadInventory}
-            openProductDetail={openProductDetail}
-            openInventoryPage={openInventoryPage}
-            selectedProduct={selectedProduct}
-            contacts={contacts}
-            addContact={addContact}
-            updateContact={updateContact}
-            removeContact={removeContact}
-            suppliers={suppliers}
-            addSupplier={addSupplier}
-            updateSupplier={updateSupplier}
-            removeSupplier={removeSupplier}
-            businessCards={businessCards}
-            addBusinessCard={addBusinessCard}
-            updateBusinessCard={updateBusinessCard}
-            complaints={complaints}
-            addComplaint={addComplaint}
-            updateComplaint={updateComplaint}
-            removeComplaint={removeComplaint}
-            events={events}
-            addEvent={addEvent}
-            updateEvent={updateEvent}
-            removeEvent={removeEvent}
-            attachments={attachments}
-            addAttachment={addAttachment}
-            updateAttachment={updateAttachment}
-            syncState={syncState}
-            syncError={syncError}
-            reloadFromCloud={reloadFromCloud}
-            user={user}
-            userId={userId}
-            signOut={signOut}
-            onResetTutorial={resetTutorial}
+              activePage={activePage}
+              appData={appData}
+              importError={importError}
+              initialSearchQuery={globalCustomerSearch}
+              inventoryAction={inventoryAction}
+              onCreateDeliveryNoteFromShipment={handleCreateDeliveryNoteFromShipment}
+              onCreateInvoice={openInvoiceForm}
+              onCreateQuote={openQuoteForm}
+              onCreateSalesOrder={openSalesOrderForm}
+              onOpenCustomerDetail={openCustomerDetail}
+              onOpenCustomerKarte={openCustomerKarte}
+              onOpenInventoryPage={openInventoryPage}
+              onOpenProductDetail={openProductDetail}
+              onResetTutorial={resetTutorial}
+              salesOrderDraft={salesOrderDraft}
+              selectedCustomerId={selectedCustomerId}
+              selectedProductId={selectedProductId}
+              setActivePage={setActivePage}
+              setInventoryAction={setInventoryAction}
+              setSalesOrderDraft={setSalesOrderDraft}
+              signOut={signOut}
+              user={user}
+              userId={userId}
             />
           </Suspense>
         </PageErrorBoundary>
@@ -815,36 +667,46 @@ function AuthenticatedApp() {
 
 function ActivePage({
   activePage,
+  appData,
   importError,
-  setActivePage,
-  onCreateQuote,
-  onCreateInvoice,
-  onCreateSalesOrder,
-  salesOrderDraft,
-  setSalesOrderDraft,
+  initialSearchQuery,
   inventoryAction,
+  onCreateDeliveryNoteFromShipment,
+  onCreateInvoice,
+  onCreateQuote,
+  onCreateSalesOrder,
+  onOpenCustomerDetail,
+  onOpenCustomerKarte,
+  onOpenInventoryPage,
+  onOpenProductDetail,
+  onResetTutorial,
+  salesOrderDraft,
+  selectedCustomerId,
+  selectedProductId,
+  setActivePage,
   setInventoryAction,
+  setSalesOrderDraft,
+  signOut,
+  user,
+  userId,
+}) {
+  const {
   addCustomer,
   isSaved,
   customers,
-  initialSearchQuery,
   updateCustomer,
   removeCustomer,
-  openCustomerDetail,
-  openCustomerKarte,
-  selectedCustomer,
-  selectedCustomerId,
   products,
   brands,
-  productAssets = [],
-  customerProductPrices = [],
-  customerProductPriceHistory = [],
+  productAssets,
+  customerProductPrices,
+  customerProductPriceHistory,
   inventories,
-  inventoryLots = [],
-  inventoryMovements = [],
-  inventoryReservations = [],
-  stocktakes = [],
-  stocktakeLines = [],
+  inventoryLots,
+  inventoryMovements,
+  inventoryReservations,
+  stocktakes,
+  stocktakeLines,
   addInventory,
   updateInventory,
   removeInventory,
@@ -901,14 +763,10 @@ function ActivePage({
   cancelShipment,
   reloadShipments,
   reloadDeliveryNotes,
-  createDeliveryNoteFromShipment,
   addDeliveryNote,
   updateDeliveryNote,
   removeDeliveryNote,
   reloadInventory,
-  openProductDetail,
-  openInventoryPage,
-  selectedProduct,
   contacts,
   addContact,
   updateContact,
@@ -934,11 +792,16 @@ function ActivePage({
   syncState,
   syncError,
   reloadFromCloud,
-  user,
-  userId,
-  signOut,
-  onResetTutorial,
-}) {
+  } = appData;
+
+  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+  const selectedProduct = products.find((product) => product.id === selectedProductId);
+  const openCustomerDetail = onOpenCustomerDetail;
+  const openCustomerKarte = onOpenCustomerKarte;
+  const openInventoryPage = onOpenInventoryPage;
+  const openProductDetail = onOpenProductDetail;
+  const createDeliveryNoteFromShipment = onCreateDeliveryNoteFromShipment;
+
   if (activePage === 'Import') {
     return <ImportPage error={importError} onGoCustomers={() => setActivePage('Customers')} />;
   }
