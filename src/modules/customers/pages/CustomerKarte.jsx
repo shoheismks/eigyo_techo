@@ -24,6 +24,7 @@ import {
   emptyQuote,
   emptyQuoteLine,
   normalizeQuote,
+  quoteValidUntilDisplay,
 } from '../../quotes/hooks/useQuotes.js';
 import {
   buildQuotePdfContext,
@@ -404,6 +405,8 @@ function createQuoteForm(customerId = '', user, quotes = []) {
     issueDate: todayString(),
     submittedDate: todayString(),
     validUntil: addDaysString(todayString(), 14),
+    validUntilMode: 'date',
+    validUntilText: '',
     taxRate: DEFAULT_QUOTE_TAX_RATE,
     defaultTaxRate: DEFAULT_QUOTE_TAX_RATE,
     taxDisplayMode: 'tax_excluded',
@@ -684,7 +687,11 @@ export default function CustomerKarte({
 
     return [...filteredQuotes].sort((a, b) => {
       if (quoteSort === 'amount-desc') return (parsePrice(b.grandTotal || b.totalAmount) || 0) - (parsePrice(a.grandTotal || a.totalAmount) || 0);
-      if (quoteSort === 'valid-asc') return String(a.validUntil || '9999-12-31').localeCompare(String(b.validUntil || '9999-12-31'));
+      if (quoteSort === 'valid-asc') {
+        const aValue = a.validUntilMode === 'text' ? '9999-12-31' : a.validUntil || '9999-12-31';
+        const bValue = b.validUntilMode === 'text' ? '9999-12-31' : b.validUntil || '9999-12-31';
+        return String(aValue).localeCompare(String(bValue));
+      }
       if (quoteSort === 'status-asc') return String(a.status || '').localeCompare(String(b.status || ''));
       return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     });
@@ -1052,6 +1059,16 @@ export default function CustomerKarte({
   }
 
   function updateQuoteField(field, value) {
+    if (field === 'validUntilMode') {
+      setQuoteForm((current) => ({
+        ...current,
+        validUntilMode: value,
+        validUntil: value === 'date' ? current.validUntil || addDaysString(todayString(), 14) : current.validUntil,
+        validUntilText: value === 'text' ? current.validUntilText : '',
+      }));
+      return;
+    }
+
     setQuoteForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -1453,6 +1470,8 @@ export default function CustomerKarte({
       issueDate: todayString(),
       submittedDate: todayString(),
       validUntil: addDaysString(todayString(), 14),
+      validUntilMode: 'date',
+      validUntilText: '',
       fileUrl: '',
       fileName: '',
       pdfUrl: '',
@@ -2379,8 +2398,22 @@ export default function CustomerKarte({
               </label>
               <label className="field-label">
                 有効期限
-                <input type="date" value={quoteForm.validUntil} onChange={(event) => updateQuoteField('validUntil', event.target.value)} />
+                <select value={quoteForm.validUntilMode || 'date'} onChange={(event) => updateQuoteField('validUntilMode', event.target.value)}>
+                  <option value="date">日付</option>
+                  <option value="text">自由入力</option>
+                </select>
               </label>
+              {(quoteForm.validUntilMode || 'date') === 'text' ? (
+                <label className="field-label">
+                  有効期限の内容
+                  <input value={quoteForm.validUntilText || ''} placeholder="次回提出時まで / 相場変動時まで / 在庫限り / 都度確認" onChange={(event) => updateQuoteField('validUntilText', event.target.value)} />
+                </label>
+              ) : (
+                <label className="field-label">
+                  有効期限の日付
+                  <input type="date" value={quoteForm.validUntil || ''} onChange={(event) => updateQuoteField('validUntil', event.target.value)} />
+                </label>
+              )}
               <label className="field-label">
                 通貨
                 <input value={quoteForm.currency} onChange={(event) => updateQuoteField('currency', event.target.value)} />
@@ -3543,7 +3576,8 @@ function QuoteListV1({
     <div className="karte-card-list sample-card-list">
       {quotes.map((quote) => {
         const inactive = ['採用', '失注', '期限切れ'].includes(quote.status);
-        const validLabel = dueLabel(quote.validUntil, inactive);
+        const validLabel = quote.validUntilMode === 'text' ? quoteValidUntilDisplay(quote) : dueLabel(quote.validUntil, inactive);
+        const validClassName = quote.validUntilMode === 'text' ? 'info-badge' : `info-badge ${dueClass(quote.validUntil, inactive)}`;
         const totals = calculateQuoteTotals(quote);
 
         return (
@@ -3553,7 +3587,7 @@ function QuoteListV1({
               <small>{quote.status || '-'}</small>
             </div>
             <div className="lead-badges">
-              {validLabel && <span className={`info-badge ${dueClass(quote.validUntil, inactive)}`}>有効期限 {validLabel}</span>}
+              {validLabel && <span className={validClassName}>有効期限 {validLabel}</span>}
               {quote.fileUrl && <span className="info-badge ready">添付あり</span>}
               {quote.pdfUrl && <span className="info-badge ready">PDFあり</span>}
               {(quote.inventoryIds ?? []).length > 0 && <span className="info-badge ready">在庫連携あり</span>}
@@ -3585,7 +3619,7 @@ function QuoteListV1({
               <div><dt>利用在庫</dt><dd>{inventoryNames(quote)}</dd></div>
               <div><dt>作成日</dt><dd>{formatDate(quote.issueDate)}</dd></div>
               <div><dt>提出日</dt><dd>{formatDate(quote.submittedDate)}</dd></div>
-              <div><dt>有効期限</dt><dd>{formatDate(quote.validUntil)}</dd></div>
+              <div><dt>有効期限</dt><dd>{quoteValidUntilDisplay(quote) || '-'}</dd></div>
               <div><dt>小計</dt><dd>{formatPrice(totals.subtotal) || '-'}</dd></div>
               <div><dt>消費税</dt><dd>{formatPrice(totals.taxAmount) || '-'}</dd></div>
               <div><dt>税込合計</dt><dd>{formatPrice(totals.grandTotal) || '-'}</dd></div>
@@ -3745,7 +3779,8 @@ function QuoteList({ quotes, products, inventories = [], suppliers = [], contact
     <div className="karte-card-list sample-card-list">
       {quotes.map((quote) => {
         const inactive = ['採用', '失注', '期限切れ'].includes(quote.status);
-        const validLabel = dueLabel(quote.validUntil, inactive);
+        const validLabel = quote.validUntilMode === 'text' ? quoteValidUntilDisplay(quote) : dueLabel(quote.validUntil, inactive);
+        const validClassName = quote.validUntilMode === 'text' ? 'info-badge' : `info-badge ${dueClass(quote.validUntil, inactive)}`;
 
         return (
         <article className="karte-mini-card quote-card" key={quote.id}>
@@ -3754,7 +3789,7 @@ function QuoteList({ quotes, products, inventories = [], suppliers = [], contact
             <small>{quote.status || '-'}</small>
           </div>
           <div className="lead-badges">
-            {validLabel && <span className={`info-badge ${dueClass(quote.validUntil, inactive)}`}>有効期限 {validLabel}</span>}
+            {validLabel && <span className={validClassName}>有効期限 {validLabel}</span>}
             {quote.fileUrl && <span className="info-badge ready">見積ファイルあり</span>}
             {quote.pdfUrl && <span className="info-badge ready">PDFあり</span>}
             {(quote.productIds ?? []).length > 0 && <span className="info-badge ready">商品連携あり</span>}
@@ -3778,7 +3813,7 @@ function QuoteList({ quotes, products, inventories = [], suppliers = [], contact
             <div><dt>参照在庫</dt><dd>{inventoryNames(quote)}</dd></div>
             <div><dt>担当者</dt><dd>{contactNames(quote)}</dd></div>
             <div><dt>提出日</dt><dd>{formatDate(quote.submittedDate || quote.date || quote.createdAt)}</dd></div>
-            <div><dt>有効期限</dt><dd>{formatDate(quote.validUntil)}</dd></div>
+            <div><dt>有効期限</dt><dd>{quoteValidUntilDisplay(quote) || '-'}</dd></div>
             <div><dt>数量</dt><dd>{quote.quantity || '-'} {quote.unit || ''}</dd></div>
             <div><dt>単価</dt><dd>{quote.unitPrice || '-'}</dd></div>
             <div><dt>原価</dt><dd>{quote.costPrice || '-'}</dd></div>

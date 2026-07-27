@@ -102,6 +102,8 @@ function createInitialQuote({ draft, quotes, user, issuers = [] }) {
     issueDate: draft?.issueDate || todayString(),
     submittedDate: draft?.submittedDate || todayString(),
     validUntil: draft?.validUntil || addDaysString(todayString(), 14),
+    validUntilMode: draft?.validUntilMode || 'date',
+    validUntilText: draft?.validUntilText || '',
     taxRate: defaultTaxRate,
     defaultTaxRate,
     taxDisplayMode: 'tax_excluded',
@@ -245,6 +247,16 @@ export default function QuoteFormModal({
 
   function updateField(field, value) {
     setSaveState('作成中');
+    if (field === 'validUntilMode') {
+      setForm((current) => ({
+        ...current,
+        validUntilMode: value,
+        validUntil: value === 'date' ? current.validUntil || addDaysString(todayString(), 14) : current.validUntil,
+        validUntilText: value === 'text' ? current.validUntilText : '',
+      }));
+      return;
+    }
+
     if (field === 'issuerId') {
       const issuer = issuers.find((item) => item.id === value);
       const nextTermsSnapshot = createTermsSnapshotFromIssuer(issuer);
@@ -713,7 +725,12 @@ export default function QuoteFormModal({
           <label className="field-label">見積番号<input value={form.quoteNumber} onChange={(event) => updateField('quoteNumber', event.target.value)} /></label>
           <label className="field-label">案件<input value={form.projectName} onChange={(event) => updateField('projectName', event.target.value)} /></label>
           <label className="field-label">ステータス<select value={form.status} onChange={(event) => updateField('status', event.target.value)}>{QUOTE_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
-          <label className="field-label">有効期限<input type="date" value={form.validUntil} onChange={(event) => updateField('validUntil', event.target.value)} /></label>
+          <label className="field-label">有効期限の入力方式<select value={form.validUntilMode || 'date'} onChange={(event) => updateField('validUntilMode', event.target.value)}><option value="date">日付</option><option value="text">自由入力</option></select></label>
+          {(form.validUntilMode || 'date') === 'text' ? (
+            <label className="field-label">有効期限<input value={form.validUntilText || ''} placeholder="次回提出時まで / 相場変動時まで / 在庫限り / 都度確認" onChange={(event) => updateField('validUntilText', event.target.value)} /></label>
+          ) : (
+            <label className="field-label">有効期限<input type="date" value={form.validUntil || ''} onChange={(event) => updateField('validUntil', event.target.value)} /></label>
+          )}
         </div>
 
         <div className="date-grid">

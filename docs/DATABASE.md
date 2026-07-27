@@ -248,7 +248,7 @@ erDiagram
 
 - 目的: 顧客への見積履歴と関連ファイルを管理する。
 - 主キー: `id`
-- 主要カラム: `user_id`, `customer_id`, `supplier_id`, `product_ids`, `contact_ids`, `quote_number`, `submitted_date`, `valid_until`, `currency`, `total_amount`, `gross_margin_rate`, `status`, `file_url`, `file_name`, `memo`, `lost_reason`, `created_by`, `created_by_name`, `created_at`, `updated_at`
+- 主要カラム: `user_id`, `customer_id`, `supplier_id`, `product_ids`, `contact_ids`, `quote_number`, `submitted_date`, `valid_until`, `valid_until_mode`, `valid_until_text`, `currency`, `total_amount`, `gross_margin_rate`, `status`, `file_url`, `file_name`, `memo`, `lost_reason`, `created_by`, `created_by_name`, `created_at`, `updated_at`
 - 外部キー: `user_id -> users.id`, `customer_id -> customers.id`, `supplier_id -> suppliers.id`
 - 関連テーブル: `customers`, `suppliers`, `products`, `contacts`, `attachments`, `notifications`
 - Storage利用有無: あり。見積PDFや関連資料をSupabase Storageに保存する。
@@ -542,7 +542,7 @@ Version1.0の見積作成では、`quotes` を見積ヘッダー、見積明細�
 
 - 目的: 顧客ごとの見積作成、再編集、PDF再出力、採用/失注管理を行う。
 - 主キー: `id`
-- 主要カラム: `user_id`, `customer_id`, `supplier_id`, `project_name`, `quote_number`, `issue_date`, `submitted_date`, `valid_until`, `status`, `quote_lines`, `product_ids`, `contact_ids`, `inventory_ids`, `freight`, `discount`, `tax_rate`, `subtotal`, `tax_amount`, `total_amount`, `grand_total`, `inventory_cost_total`, `gross_margin_amount`, `gross_margin_rate`, `payment_terms`, `delivery_terms`, `remarks`, `lost_reason`, `pdf_url`, `pdf_file_name`, `pdf_storage_path`, `pdf_generated_at`, `pdf_history`, `submitted_at`, `accepted_at`, `created_by`, `created_by_name`, `updated_by`, `updated_by_name`
+- 主要カラム: `user_id`, `customer_id`, `supplier_id`, `project_name`, `quote_number`, `issue_date`, `submitted_date`, `valid_until`, `valid_until_mode`, `valid_until_text`, `status`, `quote_lines`, `product_ids`, `contact_ids`, `inventory_ids`, `freight`, `discount`, `tax_rate`, `subtotal`, `tax_amount`, `total_amount`, `grand_total`, `inventory_cost_total`, `gross_margin_amount`, `gross_margin_rate`, `payment_terms`, `delivery_terms`, `remarks`, `lost_reason`, `pdf_url`, `pdf_file_name`, `pdf_storage_path`, `pdf_generated_at`, `pdf_history`, `submitted_at`, `accepted_at`, `created_by`, `created_by_name`, `updated_by`, `updated_by_name`
 - 外部キー: `user_id -> users.id`, `customer_id -> customers.id`, `supplier_id -> suppliers.id`
 - 関連テーブル: `customers`, `contacts`, `products`, `suppliers`, `inventories`, `attachments`
 - Storage利用有無: あり。PDF本体と任意添付はSupabase Storageへ保存し、DBにはURLとpathのみ保存する。

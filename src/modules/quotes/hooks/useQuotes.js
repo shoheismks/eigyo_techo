@@ -102,6 +102,8 @@ export const emptyQuote = {
   issueDate: '',
   submittedDate: '',
   validUntil: '',
+  validUntilMode: 'date',
+  validUntilText: '',
   currency: 'JPY',
   freight: '',
   storageFee: '',
@@ -321,6 +323,14 @@ export function calculateQuoteTotals(quote = {}) {
   };
 }
 
+export function quoteValidUntilDisplay(quote = {}) {
+  const mode = quote.validUntilMode ?? quote.valid_until_mode ?? 'date';
+  if (mode === 'text') {
+    return quote.validUntilText ?? quote.valid_until_text ?? '';
+  }
+  return quote.validUntil ?? quote.valid_until ?? '';
+}
+
 export function normalizeQuote(quote = {}, userId = '') {
   const defaultTaxRate = quote.defaultTaxRate ?? quote.default_tax_rate ?? quote.taxRate ?? quote.tax_rate ?? DEFAULT_QUOTE_TAX_RATE;
   const roundingMode = quote.roundingMode ?? quote.rounding_mode ?? 'round';
@@ -359,6 +369,8 @@ export function normalizeQuote(quote = {}, userId = '') {
     issueDate: quote.issueDate ?? quote.issue_date ?? '',
     submittedDate: quote.submittedDate ?? quote.submitted_date ?? '',
     validUntil: quote.validUntil ?? quote.valid_until ?? '',
+    validUntilMode: quote.validUntilMode ?? quote.valid_until_mode ?? 'date',
+    validUntilText: quote.validUntilText ?? quote.valid_until_text ?? '',
     freight: quote.freight ?? '',
     storageFee: quote.storageFee ?? '',
     customsFee: quote.customsFee ?? '',
@@ -450,7 +462,9 @@ function toRow(quote) {
     quote_number: quote.quoteNumber || null,
     issue_date: quote.issueDate || null,
     submitted_date: quote.submittedDate || null,
-    valid_until: quote.validUntil || null,
+    valid_until: quote.validUntilMode === 'text' ? null : quote.validUntil || null,
+    valid_until_mode: quote.validUntilMode || 'date',
+    valid_until_text: quote.validUntilMode === 'text' ? quote.validUntilText || null : null,
     currency: quote.currency,
     freight: nullableNumber(quote.freight),
     storage_fee: nullableNumber(quote.storageFee),
@@ -550,6 +564,8 @@ function fromRow(row) {
     issueDate: row.issue_date,
     submittedDate: row.submitted_date,
     validUntil: row.valid_until,
+    validUntilMode: row.valid_until_mode ?? 'date',
+    validUntilText: row.valid_until_text ?? '',
     currency: row.currency,
     freight: row.freight ?? '',
     storageFee: row.storage_fee ?? '',

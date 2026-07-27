@@ -1,4 +1,4 @@
-import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals } from '../hooks/useQuotes.js';
+import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals, quoteValidUntilDisplay } from '../hooks/useQuotes.js';
 import { productDisplayName } from '../../products/hooks/useProducts.js';
 import { DEFAULT_QUOTE_TERMS_SUMMARY, TERMS_FIELDS, normalizeVisibleTerms, termsSummary } from './termsTemplateService.js';
 import { formatDocumentRecipient } from '../../../shared/utils/documentRecipient.js';
@@ -147,9 +147,11 @@ export function buildQuotePdfContext({
   const transactionCustomer = quote.transactionCustomerSnapshot || customer;
   const billingCustomer = quote.billingCustomerSnapshot || transactionCustomer;
   const shippingCustomer = quote.shippingCustomerSnapshot || transactionCustomer;
+  const validUntilDisplay = quoteValidUntilDisplay(quote);
 
   return {
     quote: { ...quote, quoteLines },
+    validUntilDisplay,
     customer: transactionCustomer,
     billingCustomer,
     shippingCustomer,
@@ -252,7 +254,7 @@ function renderTermsHtml(quote = {}) {
 }
 
 export function renderQuotePreviewHtml(context) {
-  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt } = context;
+  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt, validUntilDisplay } = context;
   const lines = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(lines);
   const issueDate = quote.issueDate || quote.submittedDate || generatedAt.slice(0, 10);
@@ -307,7 +309,7 @@ export function renderQuotePreviewHtml(context) {
             <div>
               <div>見積番号: ${escapeHtml(quote.quoteNumber || '-')}</div>
               <div>作成日: ${escapeHtml(issueDate)}</div>
-              <div>有効期限: ${escapeHtml(quote.validUntil || '-')}</div>
+              <div>有効期限: ${escapeHtml(validUntilDisplay || '-')}</div>
               <div>Page ${pageIndex + 1} / ${pages.length}</div>
             </div>
           </div>
@@ -374,7 +376,7 @@ export function renderConfirmationPreviewHtml(context) {
 }
 
 export function createQuotePdfFile(context, documentType = 'quote') {
-  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt } = context;
+  const { quote, customer, billingCustomer, shippingCustomer, contacts, products, issuer, financials, generatedAt, validUntilDisplay } = context;
   const isConfirmation = documentType === 'confirmation';
   const rows = calculateQuoteTotals(quote).lines;
   const pages = chunkLines(rows);
@@ -412,7 +414,7 @@ export function createQuotePdfFile(context, documentType = 'quote') {
       { text: issuer?.registrationNumber ? `登録番号: ${issuer.registrationNumber}` : '', x: 40, y: 764, size: 8 },
       { text: `見積番号: ${quote.quoteNumber || '-'}`, x: 400, y: 805, size: 9 },
       { text: `作成日: ${issueDate}`, x: 400, y: 790, size: 9 },
-      { text: `有効期限: ${quote.validUntil || '-'}`, x: 400, y: 775, size: 9 },
+      { text: `有効期限: ${validUntilDisplay || '-'}`, x: 400, y: 775, size: 9 },
       { text: `Page ${pageIndex + 1} / ${totalPdfPages}`, x: 400, y: 760, size: 9 },
     ];
 
