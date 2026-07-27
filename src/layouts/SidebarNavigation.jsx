@@ -14,7 +14,7 @@ const customerPages = [
 ];
 const productPages = ['Products', 'ProductDetail', 'CustomerProductPrices'];
 const pipelinePages = ['Pipeline'];
-const salesOrderPages = ['SalesOrders', 'Shipments', 'DeliveryNotes'];
+const salesOrderPages = ['SalesOrders', 'Shipments', 'DeliveryNotes', 'Invoices'];
 const inventoryPages = ['Inventory'];
 
 const navGroups = [
@@ -22,33 +22,60 @@ const navGroups = [
     label: '営業',
     items: [
       { key: 'Home', label: 'ダッシュボード', helper: '今日やること' },
-      { key: 'Customers', label: '顧客', helper: '取引先・担当者' },
+      {
+        key: 'Customers',
+        label: '顧客',
+        helper: '取引先・担当者',
+        subItems: [
+          { key: 'LeadSearch', label: '営業先検索' },
+          { key: 'Contacts', label: '担当者' },
+          { key: 'BusinessCards', label: '名刺' },
+          { key: 'Complaints', label: 'クレーム' },
+          { key: 'MailAI', label: 'AIメール' },
+        ],
+      },
       { key: 'Pipeline', label: '案件', helper: '商談・フォロー' },
       { key: 'Calendar', label: 'カレンダー', helper: '予定管理' },
     ],
   },
   {
-    label: '販売',
+    label: '販売・物流',
     items: [
-      { key: 'Products', label: '商品', helper: '商品マスター' },
-      { key: 'CustomerProductPrices', label: '顧客別価格', helper: '取引先別単価' },
+      {
+        key: 'Products',
+        label: '商品',
+        helper: '商品・価格',
+        subItems: [{ key: 'CustomerProductPrices', label: '顧客別価格' }],
+      },
       { key: 'Inventory', label: '在庫管理', helper: '入庫・出庫・棚卸' },
-      { key: 'Pipeline', label: '見積', helper: '見積作成' },
-      { key: 'Pipeline', label: '成約確認書', helper: '約款・確認書' },
-      { key: 'SalesOrders', label: '受注', helper: '受注一覧・詳細' },
-      { key: 'Shipments', label: '出荷', helper: '出荷一覧・ピッキング' },
-      { key: 'DeliveryNotes', label: '納品書', helper: '納品書PDF' },
-      { key: 'Invoices', label: '請求書', helper: '請求・入金確認' },
+      {
+        key: 'SalesOrders',
+        label: '受注・帳票',
+        helper: '受注から納品まで',
+        subItems: [
+          { key: 'Shipments', label: '出荷' },
+          { key: 'DeliveryNotes', label: '納品書' },
+          { key: 'Invoices', label: '請求書' },
+        ],
+      },
     ],
   },
   {
-    label: 'マスター',
+    label: '仕入・分析',
     items: [
       { key: 'Suppliers', label: '仕入先', helper: '仕入先管理' },
-      { key: 'Settings', label: '発行元', helper: '帳票発行元' },
-      { key: 'Settings', label: '設定', helper: '同期・ログアウト' },
       { key: 'Analytics', label: '分析', helper: '営業状況' },
-      { key: 'Help', label: 'ヘルプ', helper: '操作マニュアル' },
+    ],
+  },
+  {
+    label: '設定',
+    items: [
+      {
+        key: 'Settings',
+        label: '設定',
+        helper: '同期・発行元',
+        subItems: [{ key: 'Help', label: 'ヘルプ' }],
+      },
     ],
   },
 ];
@@ -58,14 +85,12 @@ function activeGroupFor(page) {
   if (productPages.includes(page)) return 'Products';
   if (pipelinePages.includes(page)) return 'Pipeline';
   if (salesOrderPages.includes(page)) return 'SalesOrders';
-  if (page === 'DeliveryNotes') return 'SalesOrders';
   if (inventoryPages.includes(page)) return 'Inventory';
-  if (page === 'Invoices') return 'Invoices';
   if (page === 'Suppliers') return 'Suppliers';
   if (page === 'Calendar') return 'Calendar';
   if (page === 'Analytics') return 'Analytics';
+  if (page === 'Help') return 'Settings';
   if (page === 'Settings') return 'Settings';
-  if (page === 'Help') return 'Help';
   return 'Home';
 }
 
@@ -84,17 +109,35 @@ export default function SidebarNavigation({ activePage, onNavigate, user }) {
         {navGroups.map((group) => (
           <section className="sidebar-nav-group" key={group.label}>
             <p>{group.label}</p>
-            {group.items.map((item) => (
-              <button
-                type="button"
-                key={`${group.label}-${item.label}`}
-                className={activeGroup === item.key ? 'active' : ''}
-                onClick={() => onNavigate(item.key)}
-              >
-                <span>{item.label}</span>
-                <small>{item.helper}</small>
-              </button>
-            ))}
+            {group.items.map((item) => {
+              const isActive = activeGroup === item.key;
+              return (
+                <div className="sidebar-nav-item" key={`${group.label}-${item.key}`}>
+                  <button
+                    type="button"
+                    className={isActive ? 'active' : ''}
+                    onClick={() => onNavigate(item.key)}
+                  >
+                    <span>{item.label}</span>
+                    <small>{item.helper}</small>
+                  </button>
+                  {isActive && item.subItems?.length > 0 && (
+                    <div className="sidebar-subnav" aria-label={`${item.label}の詳細メニュー`}>
+                      {item.subItems.map((subItem) => (
+                        <button
+                          type="button"
+                          key={subItem.key}
+                          className={activePage === subItem.key ? 'active' : ''}
+                          onClick={() => onNavigate(subItem.key)}
+                        >
+                          <span>{subItem.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </section>
         ))}
       </div>

@@ -62,6 +62,24 @@
     gap: 8px;
   }
 
+  .sidebar-nav-group {
+    display: grid;
+    gap: 6px;
+  }
+
+  .sidebar-nav-group p {
+    margin: 10px 8px 2px;
+    color: #7f95b4;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+  }
+
+  .sidebar-nav-item {
+    display: grid;
+    gap: 5px;
+  }
+
   .sidebar-nav-list button {
     min-height: 54px;
     display: grid;
@@ -94,6 +112,25 @@
 
   .sidebar-nav-list button.active small {
     color: #c8ddff;
+  }
+
+  .sidebar-subnav {
+    display: grid;
+    gap: 5px;
+    margin: -1px 0 4px 12px;
+    padding-left: 10px;
+    border-left: 1px solid rgba(102, 163, 255, 0.22);
+  }
+
+  .sidebar-subnav button {
+    min-height: 34px;
+    padding: 7px 9px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .sidebar-subnav button span {
+    font-size: 0.78rem;
+    font-weight: 850;
   }
 
   .app-main {
