@@ -2,29 +2,20 @@ import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals, quoteValidUntilDisplay } 
 import { productDisplayName } from '../../products/hooks/useProducts.js';
 import { DEFAULT_QUOTE_TERMS_SUMMARY, TERMS_FIELDS, normalizeVisibleTerms, termsSummary } from './termsTemplateService.js';
 import { formatDocumentRecipient } from '../../../shared/utils/documentRecipient.js';
+import {
+  DOCUMENT_ROWS_PER_PAGE,
+  chunkDocumentRows,
+  createPdfFileFromPages,
+  documentMoney,
+  escapeHtml,
+  numberValue,
+  truncateText,
+} from '../../../shared/services/documentModelService.js';
 
-const A4_WIDTH = 595;
-const A4_HEIGHT = 842;
-const ROWS_PER_PAGE = 20;
-
-function escapeHtml(value = '') {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function numberValue(value) {
-  if (value === '' || value === null || value === undefined) return 0;
-  const parsed = Number(String(value).replace(/,/g, ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+const ROWS_PER_PAGE = DOCUMENT_ROWS_PER_PAGE;
 
 function money(value, currency = 'JPY') {
-  if (value === '' || value === null || value === undefined) return '-';
-  const text = numberValue(value).toLocaleString('ja-JP');
-  return currency === 'JPY' ? `${text}円` : `${text} ${currency}`;
+  return documentMoney(value, currency);
 }
 
 function taxRateLabel(taxBreakdown = [], defaultTaxRate = DEFAULT_QUOTE_TAX_RATE) {
@@ -70,8 +61,7 @@ function customerOfficeSummary(customer = {}) {
 }
 
 function truncate(value = '', length = 28) {
-  const text = String(value || '');
-  return text.length > length ? `${text.slice(0, length - 1)}…` : text;
+  return truncateText(value, length);
 }
 
 function productName(productId, products = []) {
@@ -155,11 +145,7 @@ export function buildQuotePdfContext({
 }
 
 function chunkLines(lines, size = ROWS_PER_PAGE) {
-  const chunks = [];
-  for (let index = 0; index < lines.length; index += size) {
-    chunks.push(lines.slice(index, index + size));
-  }
-  return chunks.length > 0 ? chunks : [[]];
+  return chunkDocumentRows(lines, size);
 }
 
 function lineName(line, products = []) {
@@ -567,11 +553,9 @@ export function createQuotePdfFile(context, documentType = 'quote') {
     ]);
   });
 
-  const pdf = buildUnicodePdf(pdfPages);
-  const blob = new Blob([pdf], { type: 'application/pdf' });
   const prefix = documentType === 'confirmation' ? 'confirmation' : 'quote';
   const fileName = `${model.quote.quoteNumber || prefix}-${prefix}-${Date.now()}.pdf`.replace(/[\\/:*?"<>|]/g, '-');
-  return new File([blob], fileName, { type: 'application/pdf' });
+  return createPdfFileFromPages(pdfPages, fileName);
 }
 
 export function createConfirmationPdfFile(context) {
@@ -602,66 +586,4 @@ export function downloadConfirmationPdf(context) {
   link.remove();
   URL.revokeObjectURL(url);
   return file.name;
-}
-
-function utf16Hex(value = '') {
-  return [...String(value)].map((char) => {
-    const code = char.codePointAt(0);
-    if (code > 0xffff) {
-      const high = Math.floor((code - 0x10000) / 0x400) + 0xd800;
-      const low = ((code - 0x10000) % 0x400) + 0xdc00;
-      return `${high.toString(16).padStart(4, '0')}${low.toString(16).padStart(4, '0')}`;
-    }
-    return code.toString(16).padStart(4, '0');
-  }).join('');
-}
-
-function textOp({ text, x, y, size = 9 }) {
-  if (!text) return '';
-  return `BT /F1 ${size} Tf 1 0 0 1 ${x} ${y} Tm <${utf16Hex(text)}> Tj ET`;
-}
-
-function buildUnicodePdf(pages) {
-  const objects = [];
-  const catalogId = 1;
-  const pagesId = 2;
-  const fontId = 3;
-  const cidFontId = 4;
-  const descriptorId = 5;
-  const pageIds = [];
-
-  objects[catalogId] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
-  objects[fontId] = `<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [${cidFontId} 0 R] >>`;
-  objects[cidFontId] = `<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 5 >> /FontDescriptor ${descriptorId} 0 R >>`;
-  objects[descriptorId] = '<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 4 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>';
-
-  pages.forEach((lines) => {
-    const pageId = objects.length;
-    const contentId = pageId + 1;
-    pageIds.push(pageId);
-    const content = [
-      '0.15 w',
-      '40 700 m 555 700 l S',
-      ...lines.map(textOp).filter(Boolean),
-    ].join('\n');
-    objects[pageId] = `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${A4_WIDTH} ${A4_HEIGHT}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`;
-    objects[contentId] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
-  });
-
-  objects[pagesId] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
-
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  for (let index = 1; index < objects.length; index += 1) {
-    offsets[index] = pdf.length;
-    pdf += `${index} 0 obj\n${objects[index]}\nendobj\n`;
-  }
-
-  const xrefOffset = pdf.length;
-  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
-  for (let index = 1; index < objects.length; index += 1) {
-    pdf += `${String(offsets[index]).padStart(10, '0')} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return pdf;
 }
