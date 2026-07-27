@@ -153,11 +153,12 @@ function AuthenticatedApp() {
   } = useCustomers(userId);
   const { products, addProduct, updateProduct, removeProduct } = useProducts(userId);
   const {
-    records: productAssets,
+    records: rawProductAssets = [],
     addRecord: addProductAsset,
     updateRecord: updateProductAsset,
     removeRecord: removeProductAsset,
   } = useProductAssets(userId);
+  const productAssets = Array.isArray(rawProductAssets) ? rawProductAssets : [];
   const {
     records: brands,
     addRecord: addBrand,
@@ -676,6 +677,7 @@ function AuthenticatedApp() {
             selectedCustomerId={selectedCustomerId}
             products={products}
             brands={brands}
+            productAssets={productAssets}
             customerProductPrices={customerProductPrices}
             customerProductPriceHistory={customerProductPriceHistory}
             inventories={inventories}
@@ -690,6 +692,9 @@ function AuthenticatedApp() {
             addProduct={addProduct}
             updateProduct={updateProduct}
             removeProduct={removeProduct}
+            addProductAsset={addProductAsset}
+            updateProductAsset={updateProductAsset}
+            removeProductAsset={removeProductAsset}
             addBrand={addBrand}
             updateBrand={updateBrand}
             removeBrand={removeBrand}
@@ -831,6 +836,7 @@ function ActivePage({
   selectedCustomerId,
   products,
   brands,
+  productAssets = [],
   customerProductPrices = [],
   customerProductPriceHistory = [],
   inventories,
@@ -845,6 +851,9 @@ function ActivePage({
   addProduct,
   updateProduct,
   removeProduct,
+  addProductAsset,
+  updateProductAsset,
+  removeProductAsset,
   addBrand,
   updateBrand,
   removeBrand,

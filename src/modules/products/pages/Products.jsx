@@ -29,9 +29,10 @@ function productInventorySummary(product, inventories) {
 }
 
 function mainProductImage(product, productAssets = []) {
+  const assets = Array.isArray(productAssets) ? productAssets : [];
   return (
-    productAssets.find((asset) => asset.productId === product.id && asset.assetKind === 'image' && asset.isMain) ||
-    productAssets.find((asset) => asset.productId === product.id && asset.assetKind === 'image') ||
+    assets.find((asset) => asset.productId === product.id && asset.assetKind === 'image' && asset.isMain) ||
+    assets.find((asset) => asset.productId === product.id && asset.assetKind === 'image') ||
     product.imageFile
   );
 }
@@ -53,6 +54,10 @@ export default function Products({
   const [sortKey, setSortKey] = useState('updated');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedPreviewId, setSelectedPreviewId] = useState('');
+  const safeProductAssets = useMemo(
+    () => (Array.isArray(productAssets) ? productAssets : []),
+    [productAssets],
+  );
 
   const manufacturers = useMemo(
     () => uniqueValues(products, 'manufacturerName'),
@@ -117,7 +122,7 @@ export default function Products({
         width: '86px',
         minWidth: '86px',
         render: (product) => {
-          const image = mainProductImage(product, productAssets);
+          const image = mainProductImage(product, safeProductAssets);
           return image?.publicUrl || image?.url ? (
             <img className="product-thumb table-product-thumb" src={image.publicUrl || image.url} alt={product.name} loading="lazy" />
           ) : (
@@ -169,7 +174,7 @@ export default function Products({
           ].filter(Boolean).join(', ') || 'なし',
       },
     ],
-    [inventories, productAssets],
+    [inventories, safeProductAssets],
   );
 
   function resetPaging(handler) {
@@ -303,7 +308,7 @@ export default function Products({
                   product={product}
                   brands={brands}
                   inventories={inventories}
-                  productAssets={productAssets}
+                  productAssets={safeProductAssets}
                   removeProduct={removeProduct}
                   onOpenProductDetail={onOpenProductDetail}
                   onOpenInventory={onOpenInventory}

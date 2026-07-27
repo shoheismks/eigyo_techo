@@ -145,6 +145,10 @@ export default function ProductDetail({
     productSnapshot(normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId)),
   );
   const isNew = !product;
+  const safeProductAssets = useMemo(
+    () => (Array.isArray(productAssets) ? productAssets : []),
+    [productAssets],
+  );
 
   useEffect(() => {
     const nextForm = normalizeProduct(product ?? { ...emptyProduct, id: crypto.randomUUID(), userId }, userId);
@@ -179,10 +183,10 @@ export default function ProductDetail({
   );
   const relatedAssets = useMemo(
     () =>
-      productAssets
+      safeProductAssets
         .filter((asset) => asset.productId === form.id)
         .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || String(a.createdAt || '').localeCompare(String(b.createdAt || ''))),
-    [form.id, productAssets],
+    [form.id, safeProductAssets],
   );
   const imageAssets = useMemo(
     () => relatedAssets.filter((asset) => asset.assetKind === 'image'),
@@ -512,7 +516,7 @@ export default function ProductDetail({
     setAssetUploadKind(assetKind);
     setAssetError('');
     setSaveMessage('');
-    const currentAssets = productAssets.filter((asset) => asset.productId === form.id);
+    const currentAssets = safeProductAssets.filter((asset) => asset.productId === form.id);
     const currentImageCount = currentAssets.filter((asset) => asset.assetKind === 'image').length;
     const baseSortOrder = currentAssets.reduce((max, asset) => Math.max(max, Number(asset.sortOrder) || 0), 0);
 
