@@ -10,6 +10,9 @@ export default function DesktopTable({
   rowClassName,
   emptyMessage = 'No data',
   className = '',
+  sortKey = '',
+  sortDirection = 'asc',
+  onSort,
 }) {
   const tableStyle = { minWidth: typeof minWidth === 'number' ? `${minWidth}px` : minWidth };
   const actionStyle = { width: typeof actionWidth === 'number' ? `${actionWidth}px` : actionWidth };
@@ -21,13 +24,25 @@ export default function DesktopTable({
           <tr>
             {columns.map((column) => (
               <th
+                className={column.sortable ? 'sortable' : ''}
                 key={column.key}
                 style={{
                   width: column.width,
                   minWidth: column.minWidth,
                 }}
               >
-                {column.label}
+                {column.sortable && onSort ? (
+                  <button
+                    type="button"
+                    className="desktop-table-sort-button"
+                    onClick={() => onSort(column.key)}
+                  >
+                    <span>{column.label}</span>
+                    <small>{sortKey === column.key ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</small>
+                  </button>
+                ) : (
+                  column.label
+                )}
               </th>
             ))}
             {actions && <th style={actionStyle}>操作</th>}

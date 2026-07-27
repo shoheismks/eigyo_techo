@@ -198,6 +198,312 @@
     font-size: 0.72rem;
   }
 
+  .desktop-table-sort-button {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    text-align: left;
+  }
+
+  .desktop-table-sort-button small {
+    color: #6f85a4;
+    font-size: 0.68rem;
+  }
+
+  .customers-common-table {
+    border-color: rgba(94, 130, 190, 0.3);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(18, 31, 52, 0.96), rgba(10, 16, 27, 0.98));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  }
+
+  .customers-common-table .desktop-data-table {
+    min-width: 1320px;
+  }
+
+  .customers-common-table .desktop-data-table th {
+    position: sticky !important;
+    top: 0;
+    z-index: 3;
+    height: 48px;
+    background: #14233b;
+    color: #b7c6dc;
+    border-bottom-color: rgba(144, 170, 208, 0.28);
+  }
+
+  .customers-common-table .desktop-data-table td {
+    height: 64px;
+    padding: 12px 14px;
+    background: rgba(15, 24, 39, 0.8);
+    border-bottom-color: rgba(144, 170, 208, 0.16);
+    font-size: 0.84rem;
+  }
+
+  .customers-common-table .desktop-data-table tbody tr:hover td {
+    background: rgba(34, 64, 105, 0.72);
+  }
+
+  .customers-common-table .desktop-data-table tbody tr.selected td {
+    background: rgba(40, 120, 255, 0.2);
+  }
+
+  .customer-code-cell,
+  .customer-follow-cell,
+  .customer-name-cell {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .customer-code-cell strong,
+  .customer-follow-cell strong,
+  .customer-name-cell strong {
+    color: #f7fbff;
+    font-size: 0.9rem;
+    font-weight: 900;
+  }
+
+  .customer-code-cell small,
+  .customer-follow-cell small,
+  .customer-name-cell small {
+    color: #8fa4c3;
+    font-size: 0.7rem;
+    line-height: 1.35;
+  }
+
+  .customer-name-cell {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .customer-name-cell.depth-0 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .customer-rank-badge,
+  .customer-status-badge,
+  .customer-tag-badge,
+  .customer-complaint-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 26px;
+    border: 1px solid rgba(120, 150, 194, 0.34);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #dfe9f7;
+    padding: 3px 8px;
+    font-weight: 850;
+    line-height: 1.1;
+  }
+
+  .customer-rank-badge {
+    display: inline-grid;
+    min-width: 42px;
+    padding: 4px 8px;
+    text-align: center;
+  }
+
+  .customer-rank-badge small {
+    color: #aabbd2;
+    font-size: 0.65rem;
+  }
+
+  .customer-rank-badge.rank-s {
+    border-color: rgba(255, 107, 123, 0.7);
+    background: rgba(255, 107, 123, 0.14);
+    color: #ffb7c0;
+  }
+
+  .customer-rank-badge.rank-a {
+    border-color: rgba(255, 211, 106, 0.7);
+    background: rgba(255, 211, 106, 0.13);
+    color: #ffe2a0;
+  }
+
+  .customer-rank-badge.rank-b {
+    border-color: rgba(102, 163, 255, 0.72);
+    background: rgba(40, 120, 255, 0.16);
+    color: #cfe1ff;
+  }
+
+  .customer-rank-badge.rank-c {
+    border-color: rgba(94, 226, 160, 0.58);
+    background: rgba(94, 226, 160, 0.12);
+    color: #bdf6d9;
+  }
+
+  .customer-status-badge.status-active {
+    border-color: rgba(255, 154, 61, 0.65);
+    background: rgba(255, 154, 61, 0.13);
+    color: #ffd0a1;
+  }
+
+  .customer-status-badge.status-reply,
+  .customer-status-badge.status-won {
+    border-color: rgba(94, 226, 160, 0.62);
+    background: rgba(94, 226, 160, 0.12);
+    color: #bdf6d9;
+  }
+
+  .customer-status-badge.status-lost,
+  .customer-complaint-badge.has-complaint {
+    border-color: rgba(255, 107, 123, 0.65);
+    background: rgba(255, 107, 123, 0.12);
+    color: #ffb7c0;
+  }
+
+  .customer-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .customer-tag-badge {
+    border-color: rgba(146, 102, 255, 0.6);
+    background: rgba(146, 102, 255, 0.14);
+    color: #d7c8ff;
+    font-size: 0.72rem;
+  }
+
+  .customer-tag-badge.muted {
+    border-color: rgba(144, 170, 208, 0.3);
+    background: rgba(255, 255, 255, 0.03);
+    color: #9db0c9;
+  }
+
+  .customer-action-menu {
+    position: relative;
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .customer-action-trigger {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(144, 170, 208, 0.34);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #dfe9f7;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .customer-action-menu-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 10;
+    width: 148px;
+    display: none;
+    padding: 6px;
+    border: 1px solid rgba(144, 170, 208, 0.28);
+    border-radius: 10px;
+    background: #0c1423;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  }
+
+  .customer-action-menu:hover .customer-action-menu-panel,
+  .customer-action-menu:focus-within .customer-action-menu-panel {
+    display: grid;
+    gap: 4px;
+  }
+
+  .customer-action-menu-panel button {
+    min-height: 32px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #dfe9f7;
+    padding: 6px 8px;
+    text-align: left;
+  }
+
+  .customer-action-menu-panel button:hover {
+    background: rgba(40, 120, 255, 0.18);
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)) {
+    position: relative;
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    justify-content: center;
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu))::before {
+    content: '︙';
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(144, 170, 208, 0.34);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #dfe9f7;
+    font-size: 1.1rem;
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)) .ghost-button {
+    display: none;
+    width: 100%;
+    min-height: 32px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #dfe9f7;
+    padding: 6px 8px;
+    text-align: left;
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):hover,
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):focus-within {
+    position: relative;
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):hover::before,
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):focus-within::before {
+    border-color: rgba(102, 163, 255, 0.65);
+    background: rgba(40, 120, 255, 0.18);
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):hover .ghost-button,
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):focus-within .ghost-button {
+    display: block;
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):hover {
+    width: 148px;
+    height: auto;
+    display: grid;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid rgba(144, 170, 208, 0.28);
+    border-radius: 10px;
+    background: #0c1423;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)):hover::before {
+    display: none;
+  }
+
+  .customers-common-table .desktop-table-actions:not(:has(.customer-action-menu)) .ghost-button:hover {
+    background: rgba(40, 120, 255, 0.18);
+  }
+
   .desktop-table-empty {
     color: var(--muted);
     text-align: center;

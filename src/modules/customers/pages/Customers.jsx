@@ -83,6 +83,53 @@ function includesText(value, keyword) {
   return String(value ?? '').toLowerCase().includes(keyword);
 }
 
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+function shortText(value, fallback = '-') {
+  const text = String(value ?? '').trim();
+  if (!text) return fallback;
+  return text.length > 28 ? `${text.slice(0, 28)}...` : text;
+}
+
+function rankBadgeClass(rank) {
+  return `customer-rank-badge rank-${String(rank || 'D').toLowerCase()}`;
+}
+
+function statusBadgeClass(status) {
+  const value = String(status || '');
+  if (value.includes('成約') || value.includes('取引')) return 'customer-status-badge status-won';
+  if (value.includes('商談') || value.includes('見積')) return 'customer-status-badge status-active';
+  if (value.includes('返信')) return 'customer-status-badge status-reply';
+  if (value.includes('失注') || value.includes('NG')) return 'customer-status-badge status-lost';
+  return 'customer-status-badge status-neutral';
+}
+
+function complaintLabel(customer) {
+  return hasComplaint(customer) ? 'あり' : 'なし';
+}
+
+function customerSortValue(customer, key) {
+  if (key === 'customerCode') return customer.customerCode || '';
+  if (key === 'companyName') return displayCustomerOfficeName(customer) || customer.companyName || '';
+  if (key === 'industry') return customer.industry || '';
+  if (key === 'area') return customer.area || '';
+  if (key === 'rank') return customer.customerRank || customer.rank || 'D';
+  if (key === 'status') return customer.status || '';
+  if (key === 'follow') return followDate(customer) || '9999-12-31';
+  if (key === 'contact') return customer.contactName || customer.contactPerson || customer.salesOwner || '';
+  if (key === 'createdAt') return customer.createdAt || '';
+  return customer[key] || '';
+}
+
 export default function Customers({
   customers,
   addCustomer,
@@ -103,6 +150,7 @@ export default function Customers({
   const [followFilter, setFollowFilter] = useState(ALL);
   const [officeFilter, setOfficeFilter] = useState(ALL);
   const [sortMode, setSortMode] = useState('created');
+  const [tableSort, setTableSort] = useState({ key: '', direction: 'asc' });
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedPreviewId, setSelectedPreviewId] = useState('');
   const [loadingCustomerId, setLoadingCustomerId] = useState('');
@@ -218,6 +266,20 @@ export default function Customers({
       );
     });
 
+    if (tableSort.key) {
+      return [...nextCustomers].sort((a, b) => {
+        const first = customerSortValue(a, tableSort.key);
+        const second = customerSortValue(b, tableSort.key);
+        const direction = tableSort.direction === 'asc' ? 1 : -1;
+
+        if (typeof first === 'number' && typeof second === 'number') {
+          return (first - second) * direction;
+        }
+
+        return String(first).localeCompare(String(second), 'ja-JP', { numeric: true }) * direction;
+      });
+    }
+
     if (sortMode === 'score') {
       return [...nextCustomers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
     }
@@ -239,6 +301,7 @@ export default function Customers({
     searchQuery,
     sortMode,
     statusFilter,
+    tableSort,
     tagFilter,
   ]);
 
@@ -323,6 +386,116 @@ export default function Customers({
     ],
     [customers],
   );
+
+  const customerDesktopColumns = useMemo(
+    () => [
+      {
+        key: 'customerCode',
+        label: '顧客コード',
+        minWidth: '150px',
+        sortable: true,
+        render: (customer) => (
+          <div className="customer-code-cell">
+            <strong>{customer.customerCode || customer.branchCode || '-'}</strong>
+            <small>登録日: {formatDate(customer.createdAt)}</small>
+          </div>
+        ),
+      },
+      {
+        key: 'companyName',
+        label: '会社名',
+        minWidth: '220px',
+        sortable: true,
+        render: (customer) => (
+          <div className={`customer-name-cell depth-${customer.officeDepth || 0}`}>
+            {customer.officeDepth > 0 && <span className="office-tree-branch">└</span>}
+            <div>
+              <strong>{displayCustomerOfficeName(customer)}</strong>
+              <small>{officeTypeLabel(customer.officeType)}{getChildOffices(customer, customers).length > 0 ? ` / ${getChildOffices(customer, customers).length}拠点` : ''}</small>
+            </div>
+          </div>
+        ),
+      },
+      { key: 'industry', label: '業種', minWidth: '130px', sortable: true, render: (customer) => customer.industry || '-' },
+      { key: 'area', label: '地域', minWidth: '110px', sortable: true, render: (customer) => customer.area || '-' },
+      {
+        key: 'rank',
+        label: '重要度',
+        minWidth: '90px',
+        sortable: true,
+        render: (customer) => {
+          const rank = customer.customerRank || customer.rank || 'D';
+          return (
+            <span className={rankBadgeClass(rank)}>
+              <strong>{rank}</strong>
+              <small>{customer.score ?? 0}</small>
+            </span>
+          );
+        },
+      },
+      {
+        key: 'status',
+        label: 'ステータス',
+        minWidth: '120px',
+        sortable: true,
+        render: (customer) => <span className={statusBadgeClass(customer.status)}>{customer.status || '-'}</span>,
+      },
+      {
+        key: 'follow',
+        label: '次回フォロー',
+        minWidth: '155px',
+        sortable: true,
+        className: (customer) => (isOverdue(customer) ? 'danger' : ''),
+        render: (customer) => (
+          <div className="customer-follow-cell">
+            <strong>{formatDate(followDate(customer))}</strong>
+            <small>{shortText(customer.pipelineMemo || customer.nextAction || customer.memo, '内容未設定')}</small>
+          </div>
+        ),
+      },
+      {
+        key: 'contact',
+        label: '担当者',
+        minWidth: '125px',
+        sortable: true,
+        render: (customer) => customer.contactName || customer.contactPerson || customer.salesOwner || '未設定',
+      },
+      {
+        key: 'tags',
+        label: 'タグ',
+        minWidth: '150px',
+        render: (customer) => {
+          const tags = (customer.tags ?? []).slice(0, 2);
+          if (tags.length === 0) return '-';
+          return (
+            <div className="customer-tag-list">
+              {tags.map((tag) => <span className="customer-tag-badge" key={tag}>{tag}</span>)}
+              {(customer.tags ?? []).length > 2 && <span className="customer-tag-badge muted">+{(customer.tags ?? []).length - 2}</span>}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'complaint',
+        label: 'クレーム',
+        minWidth: '95px',
+        render: (customer) => (
+          <span className={`customer-complaint-badge ${hasComplaint(customer) ? 'has-complaint' : ''}`}>
+            {complaintLabel(customer)}
+          </span>
+        ),
+      },
+    ],
+    [customers],
+  );
+
+  function handleTableSort(key) {
+    setTableSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+    setVisibleCount(PAGE_SIZE);
+  }
 
   async function handleDiscoverContact(customer) {
     setLoadingCustomerId(customer.id);
@@ -489,6 +662,7 @@ export default function Customers({
     setFollowFilter(ALL);
     setOfficeFilter(ALL);
     setSortMode('created');
+    setTableSort({ key: '', direction: 'asc' });
     setVisibleCount((count) => Math.max(count, PAGE_SIZE));
     closeCreateModal();
   }
@@ -573,7 +747,10 @@ export default function Customers({
         </label>
         <label className="field-label">
           並び替え
-          <select value={sortMode} onChange={resetPaging((event) => setSortMode(event.target.value))}>
+          <select value={sortMode} onChange={resetPaging((event) => {
+            setSortMode(event.target.value);
+            setTableSort({ key: '', direction: 'asc' });
+          })}>
             <option value="created">追加順</option>
             <option value="score">高スコア順</option>
             <option value="follow">次回フォロー日順</option>
@@ -605,13 +782,17 @@ export default function Customers({
                   )}
                 </>
               )}
+              actionWidth="72px"
               className="customers-common-table"
-              columns={desktopColumns}
-              minWidth={1120}
+              columns={customerDesktopColumns}
+              minWidth={1320}
               onRowClick={(customer) => setSelectedPreviewId(customer.id)}
               rowClassName={(customer) => (customer.isDoNotContact ? 'ng-row' : '')}
               rows={visibleCustomers}
               selectedRowId={selectedPreviewCustomer?.id}
+              sortDirection={tableSort.direction}
+              sortKey={tableSort.key}
+              onSort={handleTableSort}
             />
 
             <div className="card-list-mobile">
