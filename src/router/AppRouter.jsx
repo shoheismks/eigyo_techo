@@ -86,6 +86,7 @@ export default function AppRouter({
   updateCustomerProductPrice,
   removeCustomerProductPrice,
   deactivateCustomerProductPrice,
+  addCustomerProductPriceHistory,
   adoptions,
   addAdoption,
   updateAdoption,
