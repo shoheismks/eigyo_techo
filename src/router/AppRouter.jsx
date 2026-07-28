@@ -592,6 +592,7 @@ export default function AppRouter({
         complaints={complaints}
         events={events}
         quotes={quotes}
+        salesOrders={salesOrders}
         samples={samples}
         inventories={inventories}
         setActivePage={setActivePage}
