@@ -9,18 +9,21 @@ const pageTitles = {
   Customers: '顧客',
   CustomerKarte: '顧客カルテ',
   CustomerDetail: '顧客編集',
-  Pipeline: '案件',
+  Pipeline: '営業',
+  SalesOrders: '受注',
+  Shipments: '出荷',
   DeliveryNotes: '納品書',
   Invoices: '請求書',
   Products: '商品',
-  Inventory: '在庫管理',
   ProductDetail: '商品編集',
-  Suppliers: '仕入先',
-  Calendar: 'カレンダー',
+  CustomerProductPrices: '顧客別価格',
+  Inventory: '在庫・物流',
+  Suppliers: '仕入',
+  Calendar: 'スケジュール',
   Analytics: '分析',
   Settings: '設定',
   Help: 'ヘルプ',
-  LeadSearch: '会社追加',
+  LeadSearch: '営業先検索',
   CompanyEnrich: '企業情報補完',
   BusinessCards: '名刺',
   Contacts: '担当者',
@@ -47,6 +50,7 @@ export default function AppLayout({
   children,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function handleAction(actionKey) {
     onAddAction(actionKey);
@@ -61,13 +65,33 @@ export default function AppLayout({
     }
   }
 
+  function handleNavigate(pageKey) {
+    onNavigate(pageKey);
+    setSidebarOpen(false);
+  }
+
   return (
     <div className="app-shell desktop-layout mobile-layout">
       <div className="app-frame app-layout">
-        <SidebarNavigation activePage={activePage} onNavigate={onNavigate} user={user} />
+        <SidebarNavigation
+          activePage={activePage}
+          onNavigate={handleNavigate}
+          user={user}
+          mobileOpen={sidebarOpen}
+          onMobileClose={() => setSidebarOpen(false)}
+        />
 
         <main className="app-main">
           <header className="app-topbar">
+            <button
+              type="button"
+              className="mobile-menu-button"
+              aria-label="メニューを開く"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+
             <div className="app-topbar-title">
               <strong>{pageTitleFor(activePage)}</strong>
               <span>営業手帳 / {APP_VERSION_LABEL}</span>
@@ -121,7 +145,7 @@ export default function AppLayout({
 
         <BottomNavigation
           activePage={activePage}
-          onNavigate={onNavigate}
+          onNavigate={handleNavigate}
           onAdd={() => setAddMenuOpen(true)}
         />
         <AddActionMenu
