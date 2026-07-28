@@ -8,7 +8,7 @@ import {
   upsertRecords,
 } from '../services/recordSyncService.js';
 
-export function createRecordHook({ tableName, storageKey, normalize, toRow, fromRow }) {
+export function createRecordHook({ tableName, storageKey, normalize, toRow, fromRow, orderColumn = 'updated_at' }) {
   function readLocal(userId = '') {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -42,7 +42,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
 
       try {
         setSyncState('syncing');
-        const remoteRecords = await fetchRecords(tableName, userId, fromRow);
+        const remoteRecords = await fetchRecords(tableName, userId, fromRow, orderColumn);
 
         if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
           return;
@@ -78,7 +78,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
           setSyncState('syncing');
           setSyncError('');
           const localRecords = readLocal(userId);
-          const remoteRecords = await fetchRecords(tableName, userId, fromRow);
+          const remoteRecords = await fetchRecords(tableName, userId, fromRow, orderColumn);
           const mergedRecords = mergeByUpdatedAt(localRecords, remoteRecords)
             .map((record) => normalize(record, userId));
 
@@ -86,7 +86,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
             await upsertRecords(tableName, mergedRecords, toRow);
           }
 
-          const refreshedRecords = await fetchRecords(tableName, userId, fromRow);
+          const refreshedRecords = await fetchRecords(tableName, userId, fromRow, orderColumn);
           const nextRecords = refreshedRecords.length > 0 ? refreshedRecords : mergedRecords;
 
           if (ignore) {

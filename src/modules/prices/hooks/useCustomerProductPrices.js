@@ -162,6 +162,7 @@ const usePriceHistoryRecords = createRecordHook({
   normalize: normalizeCustomerProductPriceHistory,
   toRow: historyToRow,
   fromRow: historyFromRow,
+  orderColumn: 'created_at',
 });
 
 export function useCustomerProductPrices(userId = '') {

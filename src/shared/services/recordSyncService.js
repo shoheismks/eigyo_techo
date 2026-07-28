@@ -8,7 +8,7 @@ export function hasCloudConfig() {
   return hasSupabaseConfig && Boolean(supabase);
 }
 
-export async function fetchRecords(tableName, userId = '', fromRow = (row) => row) {
+export async function fetchRecords(tableName, userId = '', fromRow = (row) => row, orderColumn = 'updated_at') {
   if (!canUseCloud()) {
     return [];
   }
@@ -16,7 +16,7 @@ export async function fetchRecords(tableName, userId = '', fromRow = (row) => ro
   let query = supabase
     .from(tableName)
     .select('*')
-    .order('updated_at', { ascending: false });
+    .order(orderColumn, { ascending: false });
 
   if (userId) {
     query = query.eq('user_id', userId);
