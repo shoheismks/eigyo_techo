@@ -158,6 +158,7 @@ export default function Customers({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(INITIAL_CUSTOMER_FORM);
   const [formError, setFormError] = useState('');
+  const [openActionMenuId, setOpenActionMenuId] = useState('');
 
   useEffect(() => {
     if (initialSearchQuery) {
@@ -178,6 +179,27 @@ export default function Customers({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCreateModalOpen]);
+
+  useEffect(() => {
+    if (!openActionMenuId) return undefined;
+
+    function handlePointerDown() {
+      setOpenActionMenuId('');
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setOpenActionMenuId('');
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openActionMenuId]);
 
   const tagOptions = useMemo(
     () => [ALL, ...new Set(customers.flatMap((customer) => customer.tags ?? []).filter(Boolean))],
@@ -773,14 +795,32 @@ export default function Customers({
           <>
             <DesktopTable
               actions={(customer) => (
-                <>
-                  <button type="button" className="ghost-button" onClick={() => onOpenKarte(customer.id)}>カルテ</button>
-                  <button type="button" className="ghost-button" onClick={() => onOpenDetail(customer.id)}>編集</button>
-                  <button type="button" className="ghost-button" onClick={onOpenPipeline}>案件</button>
-                  {!customer.isDoNotContact && (
-                    <button type="button" className="ghost-button" onClick={onCreateMail}>メール</button>
+                <div
+                  className={`customer-action-menu ${openActionMenuId === customer.id ? 'is-open' : ''}`}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="customer-action-trigger"
+                    aria-haspopup="menu"
+                    aria-expanded={openActionMenuId === customer.id}
+                    aria-label="顧客の操作メニュー"
+                    onClick={() => setOpenActionMenuId((currentId) => (currentId === customer.id ? '' : customer.id))}
+                  >
+                    ︙
+                  </button>
+                  {openActionMenuId === customer.id && (
+                    <div className="customer-action-menu-panel" role="menu">
+                      <button type="button" role="menuitem" onClick={() => { setOpenActionMenuId(''); onOpenKarte(customer.id); }}>カルテ</button>
+                      <button type="button" role="menuitem" onClick={() => { setOpenActionMenuId(''); onOpenDetail(customer.id); }}>編集</button>
+                      <button type="button" role="menuitem" onClick={() => { setOpenActionMenuId(''); onOpenPipeline?.(); }}>案件</button>
+                      {!customer.isDoNotContact && (
+                        <button type="button" role="menuitem" onClick={() => { setOpenActionMenuId(''); onCreateMail?.(); }}>メール</button>
+                      )}
+                    </div>
                   )}
-                </>
+                </div>
               )}
               actionWidth="72px"
               className="customers-common-table"
@@ -1063,3 +1103,4 @@ export default function Customers({
     </main>
   );
 }
+

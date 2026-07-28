@@ -421,6 +421,7 @@
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
   }
 
+  .customer-action-menu.is-open .customer-action-menu-panel,
   .customer-action-menu:hover .customer-action-menu-panel,
   .customer-action-menu:focus-within .customer-action-menu-panel {
     display: grid;
