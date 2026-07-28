@@ -78,6 +78,101 @@
   box-shadow: 0 0 0 1px rgba(102, 163, 255, 0.25), 0 12px 30px rgba(40, 120, 255, 0.22);
 }
 
+.karte-header-actions {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  min-width: 180px;
+}
+
+.karte-action-dropdown {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+  z-index: 30;
+}
+
+.karte-action-trigger {
+  min-width: 148px;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(102, 163, 255, 0.25), 0 12px 30px rgba(40, 120, 255, 0.22);
+}
+
+.karte-action-trigger span {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.karte-action-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 80;
+  width: min(280px, calc(100vw - 32px));
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(144, 170, 208, 0.28);
+  border-radius: 12px;
+  background: #0b1220;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.46);
+  padding: 8px;
+}
+
+.karte-action-menu-item {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #dfe9f7;
+  padding: 8px 10px;
+  text-align: left;
+  text-decoration: none;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.karte-action-menu-item:hover,
+.karte-action-menu-item:focus-visible {
+  background: rgba(40, 120, 255, 0.18);
+  color: var(--white);
+  outline: none;
+}
+
+.karte-action-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(144, 170, 208, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #b7c6dc;
+  font-size: 0.72rem;
+  font-weight: 1000;
+}
+
+.karte-action-icon.primary {
+  border-color: rgba(102, 163, 255, 0.55);
+  background: rgba(40, 120, 255, 0.18);
+  color: #d7e7ff;
+}
+
 .karte-tabs {
   position: sticky;
   top: 102px;

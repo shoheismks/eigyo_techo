@@ -599,6 +599,7 @@ export default function CustomerKarte({
   const [karteTab, setKarteTab] = useState('overview');
   const [showCompletedContractBalances, setShowCompletedContractBalances] = useState(false);
   const [contractBalanceScope, setContractBalanceScope] = useState('office');
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
@@ -715,7 +716,29 @@ export default function CustomerKarte({
     setQuoteFile(null);
     setQuotePreviewHtml('');
     setQuoteError('');
+    setActionMenuOpen(false);
   }, [customerId, user?.email, user?.id]);
+
+  useEffect(() => {
+    if (!actionMenuOpen) return undefined;
+
+    function closeActionMenu() {
+      setActionMenuOpen(false);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        closeActionMenu();
+      }
+    }
+
+    window.addEventListener('pointerdown', closeActionMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', closeActionMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actionMenuOpen]);
 
   if (!karte) {
     return (
@@ -1655,6 +1678,75 @@ export default function CustomerKarte({
     window.print();
   }
 
+  const karteActions = [
+    {
+      id: 'google',
+      label: 'Google検索',
+      icon: 'G',
+      href: googleSearchUrl(customer.companyName),
+      external: true,
+    },
+    customer.website && {
+      id: 'website',
+      label: '公式サイト',
+      icon: 'W',
+      href: customer.website,
+      external: true,
+    },
+    {
+      id: 'summary',
+      label: 'A4サマリー',
+      icon: 'A4',
+      onSelect: handleOpenPrintPreview,
+    },
+    {
+      id: 'quote',
+      label: '見積作成',
+      icon: 'Q',
+      tone: 'primary',
+      onSelect: () => onCreateQuote?.({ customerId: customer.id }),
+    },
+    {
+      id: 'order',
+      label: '受注作成',
+      icon: 'O',
+      tone: 'primary',
+      onSelect: () => onCreateSalesOrder?.({ customerId: customer.id }),
+    },
+    {
+      id: 'invoice',
+      label: '請求書作成',
+      icon: 'I',
+      tone: 'primary',
+      onSelect: () => onCreateInvoice?.({ customerId: customer.id }),
+    },
+    {
+      id: 'project',
+      label: '案件追加',
+      icon: 'P',
+      tone: 'primary',
+      onSelect: () => setKarteTab('projects'),
+    },
+    canCreateMail && {
+      id: 'mail',
+      label: 'AIメール作成',
+      icon: 'AI',
+      onSelect: () => setActivePage('MailAI'),
+    },
+    {
+      id: 'contact',
+      label: '担当者追加',
+      icon: 'C',
+      onSelect: startAddContact,
+    },
+    {
+      id: 'sample',
+      label: 'サンプル追加',
+      icon: 'S',
+      onSelect: startAddSample,
+    },
+  ].filter(Boolean);
+
   return (
     <main className={`page karte-page karte-tab-${karteTab}`}>
       <header className={`karte-header ${isHighRank ? 'high-rank' : ''} ${hasComplaints ? 'has-complaint' : ''}`}>
@@ -1673,14 +1765,11 @@ export default function CustomerKarte({
           </div>
         </div>
         <div className="karte-header-actions">
-          <a className="ghost-button external-button" href={googleSearchUrl(customer.companyName)} target="_blank" rel="noreferrer">Google検索</a>
-          {customer.website && <a className="ghost-button external-button" href={customer.website} target="_blank" rel="noreferrer">公式サイト</a>}
-          <button className="ghost-button" type="button" onClick={handleOpenPrintPreview}>A4サマリー</button>
-          <button className="primary-button karte-main-action" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
-          <button className="primary-button karte-main-action" type="button" onClick={() => onCreateSalesOrder?.({ customerId: customer.id })}>受注作成</button>
-          <button className="primary-button karte-main-action" type="button" onClick={() => onCreateInvoice?.({ customerId: customer.id })}>請求書作成</button>
-          <button className="primary-button karte-main-action" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
-          {canCreateMail && <button className="primary-button" type="button" onClick={() => setActivePage('MailAI')}>AIメール作成</button>}
+          <KarteActionDropdown
+            actions={karteActions}
+            open={actionMenuOpen}
+            onOpenChange={setActionMenuOpen}
+          />
         </div>
       </header>
 
@@ -3130,24 +3219,75 @@ export default function CustomerKarte({
             </div>
           </div>
 
-          <div className="karte-side-card">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Quick Action</p>
-                <h2>よく使う操作</h2>
-              </div>
-            </div>
-            <div className="karte-side-actions">
-              <button className="primary-button" type="button" onClick={() => onCreateQuote?.({ customerId: customer.id })}>見積作成</button>
-              <button className="primary-button" type="button" onClick={() => onCreateInvoice?.({ customerId: customer.id })}>請求書作成</button>
-              <button className="primary-button" type="button" onClick={() => setKarteTab('projects')}>案件追加</button>
-              <button className="ghost-button" type="button" onClick={startAddContact}>担当者追加</button>
-              <button className="ghost-button" type="button" onClick={startAddSample}>サンプル追加</button>
-            </div>
-          </div>
         </aside>
       </div>
     </main>
+  );
+}
+
+function KarteActionDropdown({ actions, open, onOpenChange }) {
+  function handleSelect(action) {
+    onOpenChange(false);
+    action.onSelect?.();
+  }
+
+  return (
+    <div
+      className={`karte-action-dropdown ${open ? 'is-open' : ''}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="primary-button karte-action-trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+      >
+        <span aria-hidden="true">+</span>
+        アクション
+      </button>
+      {open && (
+        <div className="karte-action-menu" role="menu" aria-label="顧客カルテのアクション">
+          {actions.map((action) => {
+            const content = (
+              <>
+                <span className={`karte-action-icon ${action.tone || ''}`} aria-hidden="true">{action.icon}</span>
+                <span>{action.label}</span>
+              </>
+            );
+
+            if (action.href) {
+              return (
+                <a
+                  className="karte-action-menu-item"
+                  href={action.href}
+                  key={action.id}
+                  rel={action.external ? 'noreferrer' : undefined}
+                  role="menuitem"
+                  target={action.external ? '_blank' : undefined}
+                  onClick={() => onOpenChange(false)}
+                >
+                  {content}
+                </a>
+              );
+            }
+
+            return (
+              <button
+                className="karte-action-menu-item"
+                key={action.id}
+                role="menuitem"
+                type="button"
+                onClick={() => handleSelect(action)}
+              >
+                {content}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
