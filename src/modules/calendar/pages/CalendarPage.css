@@ -61,6 +61,25 @@
   grid-column: 1 / -1;
 }
 
+.calendar-weekday-picker {
+  grid-column: 1 / -1;
+}
+
+.calendar-weekday-picker > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.calendar-weekday-picker .switch-row {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.76);
+}
+
 .calendar-event-meta em {
   display: inline-flex;
   align-items: center;
@@ -214,6 +233,11 @@
 
   .calendar-recurrence-fields {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-weekday-picker > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .calendar-action-menu {

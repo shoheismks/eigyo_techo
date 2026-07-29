@@ -19,6 +19,15 @@ const VIEW_LABELS = {
 };
 
 const DEFAULT_COLORS = ['#2878ff', '#5ee2a0', '#ffd36a', '#af87ff', '#ff8a3d', '#ff6b7b'];
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: '月' },
+  { value: 2, label: '火' },
+  { value: 3, label: '水' },
+  { value: 4, label: '木' },
+  { value: 5, label: '金' },
+  { value: 6, label: '土' },
+  { value: 0, label: '日' },
+];
 const CALENDAR_VIEW_STORAGE_KEY = 'eigyo-techo-calendar-view-mode';
 const CALENDAR_DATE_STORAGE_KEY = 'eigyo-techo-calendar-base-date';
 
@@ -208,6 +217,42 @@ function addRecurringInterval(date, frequency) {
   return next;
 }
 
+function normalizeWeekdays(values) {
+  return [...new Set((values || []).map((value) => Number(value)).filter((value) => value >= 0 && value <= 6))].sort();
+}
+
+function startDateWeekday(event) {
+  const start = dateKeyToLocalDate(eventDate(event));
+  return start ? start.getDay() : 1;
+}
+
+function startDateMonthDay(event) {
+  const start = dateKeyToLocalDate(eventDate(event));
+  return start ? start.getDate() : 1;
+}
+
+function recurrenceNeedsDailyScan(frequency) {
+  return ['weekdays', 'weekday_select', 'monthly_day'].includes(frequency);
+}
+
+function recurringEventMatchesDate(event, date) {
+  const frequency = event.recurrenceFrequency;
+  if (frequency === 'weekdays') {
+    const weekday = date.getDay();
+    return weekday >= 1 && weekday <= 5;
+  }
+  if (frequency === 'weekday_select') {
+    const weekdays = normalizeWeekdays(event.recurrenceWeekdays);
+    const selected = weekdays.length > 0 ? weekdays : [startDateWeekday(event)];
+    return selected.includes(date.getDay());
+  }
+  if (frequency === 'monthly_day') {
+    const monthDay = Number(event.recurrenceMonthDay) || startDateMonthDay(event);
+    return date.getDate() === monthDay;
+  }
+  return false;
+}
+
 function shiftDateTimeToDate(value, dateKey) {
   if (!value) return '';
   const source = new Date(value);
@@ -274,6 +319,31 @@ function expandRecurringEvent(event, rangeStartKey, rangeEndKey) {
     : null;
   const hardEnd = recurrenceEnd && recurrenceEnd < rangeEnd ? recurrenceEnd : rangeEnd;
   const results = [];
+  const scanStart = start > rangeStart ? start : rangeStart;
+
+  if (recurrenceNeedsDailyScan(event.recurrenceFrequency)) {
+    let current = new Date(scanStart);
+    let index = 0;
+    while (current <= hardEnd && index < 500) {
+      if (recurringEventMatchesDate(event, current)) {
+        const dateKey = toDateKey(current);
+        results.push({
+          ...base,
+          id: occurrenceId(event, dateKey, index),
+          source: 'event',
+          occurrenceDate: dateKey,
+          date: dateKey,
+          startAt: shiftDateTimeToDate(event.startAt, dateKey),
+          endAt: shiftEndAt(event, dateKey),
+          seriesEvent: base,
+        });
+      }
+      current.setDate(current.getDate() + 1);
+      index += 1;
+    }
+    return results;
+  }
+
   let current = new Date(start);
   let index = 0;
   let guard = 0;
@@ -526,6 +596,14 @@ export default function CalendarPage({
       recurrenceFrequency: form.recurrenceFrequency || 'none',
       recurrenceEndType: form.recurrenceFrequency === 'none' ? 'none' : (form.recurrenceEndType || 'none'),
       recurrenceEndDate: form.recurrenceFrequency !== 'none' && form.recurrenceEndType === 'date' ? form.recurrenceEndDate : '',
+      recurrenceWeekdays: form.recurrenceFrequency === 'weekday_select'
+        ? normalizeWeekdays(form.recurrenceWeekdays).length > 0
+          ? normalizeWeekdays(form.recurrenceWeekdays)
+          : [startDateWeekday(form)]
+        : [],
+      recurrenceMonthDay: form.recurrenceFrequency === 'monthly_day'
+        ? Math.min(31, Math.max(1, Number(form.recurrenceMonthDay) || startDateMonthDay(form)))
+        : '',
       createdBy: form.createdBy || user?.id || '',
       createdByName: form.createdByName || user?.email || '',
     }, user?.id ?? '');
@@ -1242,6 +1320,13 @@ function EventEditor({
     updateForm('contactIds', [...values]);
   }
 
+  function toggleRecurrenceWeekday(weekday) {
+    const values = new Set(normalizeWeekdays(form.recurrenceWeekdays));
+    if (values.has(weekday)) values.delete(weekday);
+    else values.add(weekday);
+    updateForm('recurrenceWeekdays', normalizeWeekdays([...values]));
+  }
+
   return (
     <div className="calendar-editor-backdrop">
       <form className="calendar-editor" onSubmit={onSave}>
@@ -1324,6 +1409,35 @@ function EventEditor({
             <label className="field-label">
               終了日
               <input type="date" value={form.recurrenceEndDate || ''} onChange={(event) => updateForm('recurrenceEndDate', event.target.value)} />
+            </label>
+          )}
+          {(form.recurrenceFrequency || 'none') === 'weekday_select' && (
+            <div className="field-label calendar-weekday-picker">
+              曜日
+              <div>
+                {WEEKDAY_OPTIONS.map((weekday) => (
+                  <label className="switch-row" key={weekday.value}>
+                    <input
+                      checked={normalizeWeekdays(form.recurrenceWeekdays).includes(weekday.value)}
+                      type="checkbox"
+                      onChange={() => toggleRecurrenceWeekday(weekday.value)}
+                    />
+                    {weekday.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {(form.recurrenceFrequency || 'none') === 'monthly_day' && (
+            <label className="field-label">
+              毎月の日
+              <input
+                max="31"
+                min="1"
+                type="number"
+                value={form.recurrenceMonthDay || startDateMonthDay(form)}
+                onChange={(event) => updateForm('recurrenceMonthDay', event.target.value)}
+              />
             </label>
           )}
         </div>
