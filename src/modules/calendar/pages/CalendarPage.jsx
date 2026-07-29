@@ -225,6 +225,35 @@ function shiftEndAt(event, dateKey) {
   return new Date(shiftedStart.getTime() + (end.getTime() - start.getTime())).toISOString();
 }
 
+function moveEventToDate(event, dateKey, hour = null) {
+  const startSource = event.startAt || addHours(eventDate(event) || dateKey, 9, 1).startAt;
+  const start = new Date(startSource);
+  const end = event.endAt ? new Date(event.endAt) : new Date(start.getTime() + 60 * 60 * 1000);
+  const duration = Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())
+    ? 60 * 60 * 1000
+    : Math.max(15 * 60 * 1000, end.getTime() - start.getTime());
+  const nextStart = new Date(`${dateKey}T00:00:00`);
+  nextStart.setHours(hour ?? start.getHours(), hour === null ? start.getMinutes() : 0, 0, 0);
+  const nextEnd = new Date(nextStart.getTime() + duration);
+  return {
+    startAt: nextStart.toISOString(),
+    endAt: nextEnd.toISOString(),
+    nextFollowDate: event.nextFollowDate === eventDate(event) ? dateKey : event.nextFollowDate,
+  };
+}
+
+function resizeEventEnd(event, deltaY) {
+  const start = new Date(event.startAt || new Date());
+  const currentEnd = event.endAt ? new Date(event.endAt) : new Date(start.getTime() + 60 * 60 * 1000);
+  const steps = Math.round(deltaY / 20);
+  const deltaMinutes = steps * 30;
+  const nextEnd = new Date(currentEnd.getTime() + deltaMinutes * 60 * 1000);
+  if (nextEnd.getTime() <= start.getTime()) {
+    nextEnd.setTime(start.getTime() + 15 * 60 * 1000);
+  }
+  return { endAt: nextEnd.toISOString() };
+}
+
 function occurrenceId(event, dateKey, index) {
   return `${event.id}__${dateKey}__${index}`;
 }
@@ -290,6 +319,28 @@ function eventTimeLabel(event) {
   return end ? `${start} - ${end}` : start;
 }
 
+function formatEventForClipboard(event, customers, contacts) {
+  const contactNames = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
+  return [
+    `予定名: ${event.title || event.eventType || event.type || ''}`,
+    `日時: ${event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date || ''}${event.endAt ? ` - ${toDateTimeLocal(event.endAt).replace('T', ' ')}` : ''}`,
+    `顧客: ${customerName(customers, event.customerId)}`,
+    `担当者: ${contactNames || '-'}`,
+    `場所: ${event.location || '-'}`,
+    `メモ: ${event.memo || '-'}`,
+  ].join('\n');
+}
+
+function clampMenuPosition(x, y) {
+  if (typeof window === 'undefined') return { x, y };
+  const width = 220;
+  const height = 300;
+  return {
+    x: Math.min(Math.max(8, x), window.innerWidth - width - 8),
+    y: Math.min(Math.max(8, y), window.innerHeight - height - 8),
+  };
+}
+
 function projectName(projects, projectId) {
   return projects.find((project) => project.id === projectId)?.title || '';
 }
@@ -340,6 +391,12 @@ export default function CalendarPage({
   const [form, setForm] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [eventListOpen, setEventListOpen] = useState(false);
+  const [dragState, setDragState] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const [resizeState, setResizeState] = useState(null);
+  const [actionMenu, setActionMenu] = useState(null);
+  const [savingEventId, setSavingEventId] = useState('');
+  const [calendarToast, setCalendarToast] = useState('');
 
   const systemEvents = useMemo(
     () => buildSystemEvents({ customers, samples, quotes, complaints }),
@@ -370,6 +427,46 @@ export default function CalendarPage({
   useEffect(() => {
     window.localStorage.setItem(CALENDAR_DATE_STORAGE_KEY, baseDate);
   }, [baseDate]);
+
+  useEffect(() => {
+    if (!actionMenu) return undefined;
+
+    function closeMenu() {
+      setActionMenu(null);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') closeMenu();
+    }
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actionMenu]);
+
+  useEffect(() => {
+    if (!resizeState) return undefined;
+
+    function handlePointerUp(event) {
+      finishResize(event.clientY);
+    }
+
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    return () => window.removeEventListener('pointerup', handlePointerUp);
+  }, [resizeState]);
+
+  function showToast(message) {
+    setCalendarToast(message);
+    window.setTimeout(() => setCalendarToast(''), 2400);
+  }
+
+  function editableEvent(event) {
+    const baseEvent = event.seriesEvent || event;
+    return baseEvent.source === 'event' ? baseEvent : null;
+  }
 
   function eventsForDay(dateKey) {
     return mergedEvents.filter((event) => (event.date || eventDate(event)) === dateKey);
@@ -452,6 +549,130 @@ export default function CalendarPage({
     if (!editingEvent) return;
     removeEvent(editingEvent.id);
     closeForm();
+  }
+
+  function confirmRecurringChange(event, actionLabel) {
+    if (!isRecurringEvent(event)) return true;
+    return window.confirm(`繰り返し予定です。${actionLabel}は系列全体に適用します。よろしいですか？`);
+  }
+
+  function applyEventUpdate(event, updates, actionLabel = '予定を更新') {
+    const baseEvent = editableEvent(event);
+    if (!baseEvent) return false;
+    if (!confirmRecurringChange(baseEvent, actionLabel)) return false;
+
+    setSavingEventId(baseEvent.id);
+    try {
+      updateEvent(baseEvent.id, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+      window.setTimeout(() => {
+        setSavingEventId('');
+        showToast('予定を保存しました');
+      }, 350);
+      return true;
+    } catch (error) {
+      setSavingEventId('');
+      showToast(`保存に失敗しました: ${error.message}`);
+      return false;
+    }
+  }
+
+  function startDrag(event, dragEvent) {
+    const baseEvent = editableEvent(event);
+    if (!baseEvent) return;
+    dragEvent.dataTransfer.effectAllowed = 'move';
+    dragEvent.dataTransfer.setData('text/plain', baseEvent.id);
+    setDragState({ event, baseEvent });
+  }
+
+  function finishDrop(dateKey, hour = null) {
+    if (!dragState) return;
+    const updates = moveEventToDate(dragState.event, dateKey, hour);
+    if (window.confirm('予定の日時を変更します。よろしいですか？')) {
+      applyEventUpdate(dragState.event, updates, '日時変更');
+    }
+    setDragState(null);
+    setDropTarget(null);
+  }
+
+  function startResize(event, pointerEvent) {
+    const baseEvent = editableEvent(event);
+    if (!baseEvent) return;
+    pointerEvent.preventDefault();
+    pointerEvent.stopPropagation();
+    setResizeState({ event, baseEvent, startY: pointerEvent.clientY });
+  }
+
+  function finishResize(clientY) {
+    if (!resizeState) return;
+    const updates = resizeEventEnd(resizeState.event, clientY - resizeState.startY);
+    if (window.confirm('予定の終了時間を変更します。よろしいですか？')) {
+      applyEventUpdate(resizeState.event, updates, '終了時間変更');
+    }
+    setResizeState(null);
+  }
+
+  function openActionMenu(event, calendarEvent) {
+    const baseEvent = editableEvent(calendarEvent);
+    if (!baseEvent) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDetailEvent(null);
+    const point = clampMenuPosition(event.clientX || 24, event.clientY || 24);
+    setActionMenu({ event: calendarEvent, baseEvent, ...point });
+  }
+
+  async function copyEvent(calendarEvent) {
+    const baseEvent = calendarEvent.seriesEvent || calendarEvent;
+    const text = formatEventForClipboard(calendarEvent, customers, contacts);
+    try {
+      await navigator.clipboard?.writeText(text);
+      showToast('予定をコピーしました');
+    } catch {
+      window.prompt('予定内容をコピーしてください', text);
+    }
+    setActionMenu(null);
+  }
+
+  function duplicateEvent(calendarEvent) {
+    const baseEvent = calendarEvent.seriesEvent || calendarEvent;
+    const now = new Date().toISOString();
+    addEvent(normalizeEvent({
+      ...baseEvent,
+      id: crypto.randomUUID(),
+      title: `${baseEvent.title || '予定'} copy`,
+      startAt: calendarEvent.startAt || baseEvent.startAt,
+      endAt: calendarEvent.endAt || baseEvent.endAt,
+      recurrenceFrequency: 'none',
+      recurrenceEndType: 'none',
+      recurrenceEndDate: '',
+      createdAt: now,
+      updatedAt: now,
+    }, user?.id ?? ''));
+    showToast('予定を複製しました');
+    setActionMenu(null);
+  }
+
+  function changeEventColor(calendarEvent, color) {
+    applyEventUpdate(calendarEvent, { color }, '色変更');
+    setActionMenu(null);
+  }
+
+  function completeEvent(calendarEvent) {
+    applyEventUpdate(calendarEvent, { status: EVENT_STATUSES[1] || '完了', completedAt: new Date().toISOString() }, '完了');
+    setActionMenu(null);
+  }
+
+  function removeCalendarEvent(calendarEvent) {
+    const baseEvent = editableEvent(calendarEvent);
+    if (!baseEvent) return;
+    if (!confirmRecurringChange(baseEvent, '削除')) return;
+    if (!window.confirm('予定を削除します。よろしいですか？')) return;
+    removeEvent(baseEvent.id);
+    showToast('予定を削除しました');
+    setActionMenu(null);
   }
 
   function completeAsDeal() {
@@ -570,7 +791,20 @@ export default function CalendarPage({
           </div>
           <div className="calendar-list">
             {listEvents.map((event) => (
-              <CalendarEventButton contacts={contacts} customers={customers} event={event} key={event.id} onClick={() => openDetail(event)} />
+              <CalendarEventButton
+                contacts={contacts}
+                customers={customers}
+                event={event}
+                key={event.id}
+                onClick={() => openDetail(event)}
+                onContextMenu={(clickEvent) => openActionMenu(clickEvent, event)}
+                onDragEnd={() => {
+                  setDragState(null);
+                  setDropTarget(null);
+                }}
+                onDragStart={(dragEvent) => startDrag(event, dragEvent)}
+                onResizeStart={(pointerEvent) => startResize(event, pointerEvent)}
+              />
             ))}
           </div>
           {listEvents.length === 0 && <CalendarEmpty />}
@@ -579,8 +813,18 @@ export default function CalendarPage({
         <section className="calendar-day-schedule">
           {Array.from({ length: 12 }, (_, index) => index + 8).map((hour) => (
             <div
-              className="calendar-time-slot"
+              className={`calendar-time-slot ${dropTarget?.dateKey === baseDate && dropTarget?.hour === hour ? 'calendar-drop-target' : ''}`}
               key={hour}
+              onDragLeave={() => setDropTarget(null)}
+              onDragOver={(event) => {
+                if (!dragState) return;
+                event.preventDefault();
+                setDropTarget({ dateKey: baseDate, hour });
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                finishDrop(baseDate, hour);
+              }}
               onClick={() => openAdd(baseDate, hour)}
             >
               <span>{String(hour).padStart(2, '0')}:00</span>
@@ -598,6 +842,13 @@ export default function CalendarPage({
                         clickEvent.stopPropagation();
                         openDetail(event);
                       }}
+                      onContextMenu={(clickEvent) => openActionMenu(clickEvent, event)}
+                      onDragEnd={() => {
+                        setDragState(null);
+                        setDropTarget(null);
+                      }}
+                      onDragStart={(dragEvent) => startDrag(event, dragEvent)}
+                      onResizeStart={(pointerEvent) => startResize(event, pointerEvent)}
                     />
                   ))}
               </div>
@@ -621,8 +872,18 @@ export default function CalendarPage({
               return (
                 <article
                   aria-label={calendarDateAriaLabel(day, dayEvents.length)}
-                  className={calendarDayClassName(day, today)}
+                  className={`${calendarDayClassName(day, today)} ${dropTarget?.dateKey === day.dateKey && dropTarget?.hour === null ? 'calendar-drop-target' : ''}`}
                   key={day.dateKey}
+                  onDragLeave={() => setDropTarget(null)}
+                  onDragOver={(event) => {
+                    if (!dragState) return;
+                    event.preventDefault();
+                    setDropTarget({ dateKey: day.dateKey, hour: null });
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    finishDrop(day.dateKey, null);
+                  }}
                   onClick={(clickEvent) => {
                     if (clickEvent.target instanceof Element && clickEvent.target.closest('.calendar-event')) return;
                     openAdd(day.dateKey);
@@ -647,6 +908,13 @@ export default function CalendarPage({
                           clickEvent.stopPropagation();
                           openDetail(event);
                         }}
+                        onContextMenu={(clickEvent) => openActionMenu(clickEvent, event)}
+                        onDragEnd={() => {
+                          setDragState(null);
+                          setDropTarget(null);
+                        }}
+                        onDragStart={(dragEvent) => startDrag(event, dragEvent)}
+                        onResizeStart={(pointerEvent) => startResize(event, pointerEvent)}
                       />
                     ))}
                     {dayEvents.length > limit && <small className="calendar-more">+{dayEvents.length - limit}件</small>}
@@ -671,6 +939,27 @@ export default function CalendarPage({
           }}
         />
       )}
+
+      {actionMenu && (
+        <CalendarEventActionMenu
+          event={actionMenu.event}
+          x={actionMenu.x}
+          y={actionMenu.y}
+          onChangeColor={(color) => changeEventColor(actionMenu.event, color)}
+          onClose={() => setActionMenu(null)}
+          onComplete={() => completeEvent(actionMenu.event)}
+          onCopy={() => copyEvent(actionMenu.event)}
+          onDelete={() => removeCalendarEvent(actionMenu.event)}
+          onDuplicate={() => duplicateEvent(actionMenu.event)}
+          onEdit={() => {
+            setActionMenu(null);
+            openEdit(actionMenu.event);
+          }}
+        />
+      )}
+
+      {savingEventId && <div className="calendar-save-indicator">保存中...</div>}
+      {calendarToast && <div className="calendar-toast">{calendarToast}</div>}
 
       {detailEvent && (
         <CalendarEventPopover
@@ -701,6 +990,46 @@ export default function CalendarPage({
         />
       )}
     </section>
+  );
+}
+
+function CalendarEventActionMenu({
+  x,
+  y,
+  onClose,
+  onEdit,
+  onCopy,
+  onDuplicate,
+  onChangeColor,
+  onComplete,
+  onDelete,
+}) {
+  return (
+    <div
+      className="calendar-action-menu"
+      role="menu"
+      style={{ left: x, top: y }}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <button type="button" role="menuitem" onClick={onEdit}>✎ 編集</button>
+      <button type="button" role="menuitem" onClick={onCopy}>⧉ コピー</button>
+      <button type="button" role="menuitem" onClick={onDuplicate}>＋ 複製</button>
+      <div className="calendar-menu-colors" aria-label="色変更">
+        {DEFAULT_COLORS.map((color) => (
+          <button
+            aria-label={`色変更 ${color}`}
+            key={color}
+            style={{ background: color }}
+            type="button"
+            onClick={() => onChangeColor(color)}
+          />
+        ))}
+      </div>
+      <button type="button" role="menuitem" onClick={onComplete}>✓ 完了</button>
+      <button className="danger" type="button" role="menuitem" onClick={onDelete}>削除</button>
+      <button className="muted" type="button" role="menuitem" onClick={onClose}>閉じる</button>
+    </div>
   );
 }
 
@@ -749,14 +1078,56 @@ function CalendarEventListPopover({ events, customers, contacts, onClose, onOpen
   );
 }
 
-function CalendarEventButton({ event, customers, contacts, compact = false, onClick }) {
+function CalendarEventButton({
+  event,
+  customers,
+  contacts,
+  compact = false,
+  onClick,
+  onContextMenu,
+  onDragEnd,
+  onDragStart,
+  onResizeStart,
+}) {
   const names = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
   const baseEvent = event.seriesEvent || event;
+  const editable = baseEvent.source === 'event';
+  let longPressTimer = null;
+
+  function startLongPress(touchEvent) {
+    if (!editable || !onContextMenu) return;
+    const touch = touchEvent.touches?.[0];
+    if (!touch) return;
+    longPressTimer = window.setTimeout(() => {
+      onContextMenu({
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      });
+    }, 650);
+  }
+
+  function cancelLongPress() {
+    if (longPressTimer) window.clearTimeout(longPressTimer);
+  }
+
   return (
     <button
       type="button"
       className={`calendar-event ${event.tone || event.eventType || 'event'} priority-${priorityClass(event.priority)} ${compact ? 'compact' : ''}`}
+      draggable={editable}
       onClick={onClick}
+      onContextMenu={onContextMenu}
+      onDragEnd={(dragEvent) => {
+        cancelLongPress();
+        onDragEnd?.(dragEvent);
+      }}
+      onDragStart={editable ? onDragStart : undefined}
+      onTouchCancel={cancelLongPress}
+      onTouchEnd={cancelLongPress}
+      onTouchMove={cancelLongPress}
+      onTouchStart={startLongPress}
       style={{ borderLeftColor: event.color || undefined }}
       title={[event.title || event.type || event.eventType, customerName(customers, event.customerId), names].filter(Boolean).join(' / ')}
     >
@@ -767,6 +1138,13 @@ function CalendarEventButton({ event, customers, contacts, compact = false, onCl
       </span>
       <strong>{event.title || event.type || event.eventType}</strong>
       {!compact && <small>{customerName(customers, event.customerId)}{names ? ` / ${names}` : ''}</small>}
+      {editable && (
+        <span
+          aria-hidden="true"
+          className="calendar-event-resize-handle"
+          onPointerDown={onResizeStart}
+        />
+      )}
     </button>
   );
 }
