@@ -530,6 +530,7 @@ export default function CustomerKarte({
   projects = [],
   complaints,
   events = [],
+  tasks = [],
   attachments,
   samples = [],
   quotes = [],
@@ -555,6 +556,9 @@ export default function CustomerKarte({
   updateBusinessCard,
   addComplaint,
   updateComplaint,
+  addTask,
+  updateTask,
+  removeTask,
   addInventory,
   updateInventory,
   setActivePage,
@@ -826,6 +830,9 @@ export default function CustomerKarte({
     .filter((event) => event.startAt || event.nextFollowDate)
     .sort((a, b) => String(a.startAt || a.nextFollowDate).localeCompare(String(b.startAt || b.nextFollowDate)))
     .slice(0, 5);
+  const customerTasks = tasks
+    .filter((task) => task.customerId === customer.id && !task.deletedAt)
+    .sort((a, b) => String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31')));
   const urgentTasks = [
     nextFollowDate && {
       id: 'follow',
@@ -844,6 +851,15 @@ export default function CustomerKarte({
       date: sample.followUpDate,
       title: sample.sampleName || 'サンプル',
       detail: sample.nextAction || sample.status || '-',
+    })),
+  ].filter(Boolean).sort((a, b) => String(a.date || '9999-12-31').localeCompare(String(b.date || '9999-12-31')));
+  const visibleUrgentTasks = [
+    ...urgentTasks,
+    ...customerTasks.filter((task) => task.status !== '完了').slice(0, 4).map((task) => ({
+      id: task.id,
+      date: task.dueDate,
+      title: task.title || 'タスク',
+      detail: [task.status, task.priority, task.assigneeName].filter(Boolean).join(' / '),
     })),
   ].filter(Boolean).sort((a, b) => String(a.date || '9999-12-31').localeCompare(String(b.date || '9999-12-31')));
   const kpiItems = [
@@ -2153,6 +2169,7 @@ export default function CustomerKarte({
           samples={samples}
           complaints={complaints}
           events={events}
+          tasks={tasks}
           attachments={attachments}
           addProject={addProject}
           updateProject={updateProject}
@@ -3187,10 +3204,10 @@ export default function CustomerKarte({
                 <p className="eyebrow">Next Action</p>
                 <h2>次回予定・TODO</h2>
               </div>
-              <span className={`info-badge ${dueClass(urgentTasks[0]?.date)}`}>{urgentTasks[0]?.date ? formatDate(urgentTasks[0].date) : '-'}</span>
+              <span className={`info-badge ${dueClass(visibleUrgentTasks[0]?.date)}`}>{visibleUrgentTasks[0]?.date ? formatDate(visibleUrgentTasks[0].date) : '-'}</span>
             </div>
             <div className="karte-task-list">
-              {urgentTasks.length > 0 ? urgentTasks.slice(0, 6).map((task) => (
+              {visibleUrgentTasks.length > 0 ? visibleUrgentTasks.slice(0, 6).map((task) => (
                 <button className="karte-task-item" type="button" key={task.id} onClick={() => setKarteTab(task.title === 'サンプル' ? 'samples' : 'projects')}>
                   <span>{formatDate(task.date)}</span>
                   <strong>{task.title}</strong>

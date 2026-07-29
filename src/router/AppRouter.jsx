@@ -151,6 +151,10 @@ export default function AppRouter({
   addEvent,
   updateEvent,
   removeEvent,
+  tasks,
+  addTask,
+  updateTask,
+  removeTask,
   attachments,
   addAttachment,
   updateAttachment,
@@ -238,6 +242,7 @@ export default function AppRouter({
           projects={projects}
           complaints={complaints}
           events={events}
+          tasks={tasks}
           attachments={attachments}
           updateCustomer={updateCustomer}
           addProject={addProject}
@@ -249,6 +254,9 @@ export default function AppRouter({
           updateBusinessCard={updateBusinessCard}
           addComplaint={addComplaint}
           updateComplaint={updateComplaint}
+          addTask={addTask}
+          updateTask={updateTask}
+          removeTask={removeTask}
           addAttachment={addAttachment}
           addSample={addSample}
           updateSample={updateSample}
@@ -288,6 +296,7 @@ export default function AppRouter({
         samples={samples}
         complaints={complaints}
         events={events}
+        tasks={tasks}
         attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}
@@ -318,6 +327,7 @@ export default function AppRouter({
         samples={samples}
         complaints={complaints}
         events={events}
+        tasks={tasks}
         attachments={attachments}
         projects={projects}
         addProject={addProject}
@@ -553,6 +563,7 @@ export default function AppRouter({
         samples={samples}
         complaints={complaints}
         events={events}
+        tasks={tasks}
         attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}
@@ -620,6 +631,7 @@ export default function AppRouter({
         customers={customers}
         contacts={contacts}
         events={events}
+        tasks={tasks}
         samples={samples}
         projects={projects}
         quotes={quotes}
@@ -627,6 +639,9 @@ export default function AppRouter({
         addEvent={addEvent}
         updateEvent={updateEvent}
         removeEvent={removeEvent}
+        addTask={addTask}
+        updateTask={updateTask}
+        removeTask={removeTask}
         updateCustomer={updateCustomer}
         user={user}
         onOpenKarte={openCustomerKarte}
@@ -676,6 +691,7 @@ export default function AppRouter({
           adoptions,
           attachments,
           events,
+          tasks,
         }}
         restoreHandlers={{
           customers: { records: customers, add: addCustomer, update: updateCustomer },
@@ -699,6 +715,7 @@ export default function AppRouter({
           adoptions: { records: adoptions, add: addAdoption, update: updateAdoption },
           attachments: { records: attachments, add: addAttachment, update: updateAttachment },
           events: { records: events, add: addEvent, update: updateEvent },
+          tasks: { records: tasks, add: addTask, update: updateTask },
         }}
         onResetTutorial={onResetTutorial}
       />

@@ -249,6 +249,7 @@ function buildProjectTimeline({
   samples = [],
   complaints = [],
   events = [],
+  tasks = [],
   attachments = [],
 }) {
   const items = [];
@@ -451,6 +452,7 @@ export default function ProjectPanel({
   samples = [],
   complaints = [],
   events = [],
+  tasks = [],
   attachments = [],
   addProject,
   updateProject,
@@ -552,6 +554,14 @@ export default function ProjectPanel({
   }, [contacts, events, projects, quotes]);
 
   const editingDashboard = editingProject ? projectDashboards.get(editingProject.id) : null;
+  const editingProjectTasks = useMemo(
+    () => editingProject
+      ? tasks
+          .filter((task) => task.projectId === editingProject.id && !task.deletedAt)
+          .sort((a, b) => String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31')))
+      : [],
+    [editingProject, tasks],
+  );
 
   const columns = useMemo(
     () => [
@@ -762,6 +772,27 @@ export default function ProjectPanel({
 
           {editingProject && editingDashboard && (
             <ProjectDecisionDashboard dashboard={editingDashboard} />
+          )}
+
+          {editingProject && (
+            <section className="project-editor-wide desktop-panel">
+              <div className="section-heading">
+                <div>
+                  <h3>関連タスク</h3>
+                  <span>{editingProjectTasks.length}件</span>
+                </div>
+              </div>
+              <div className="karte-card-list">
+                {editingProjectTasks.length > 0 ? editingProjectTasks.map((task) => (
+                  <article className={`karte-mini-card task-priority-${task.priority}`} key={task.id}>
+                    <h3>{task.title || 'タスク'}</h3>
+                    <p>{task.dueDate || '-'} / {task.status} / {task.priority}</p>
+                    <p>{task.assigneeName || '-'}</p>
+                    {task.content && <p>{task.content}</p>}
+                  </article>
+                )) : <p className="inline-helper">この案件に紐づくタスクはまだありません。</p>}
+              </div>
+            </section>
           )}
 
           {editingProject && (

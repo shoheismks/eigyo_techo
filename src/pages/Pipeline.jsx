@@ -31,6 +31,7 @@ export default function Pipeline({
   samples = [],
   complaints = [],
   events = [],
+  tasks = [],
   attachments = [],
   projects = [],
   addProject,
@@ -138,6 +139,7 @@ export default function Pipeline({
         samples={samples}
         complaints={complaints}
         events={events}
+        tasks={tasks}
         attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}

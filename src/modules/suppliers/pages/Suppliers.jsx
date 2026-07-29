@@ -46,6 +46,7 @@ export default function Suppliers({
   samples = [],
   complaints = [],
   events = [],
+  tasks = [],
   attachments = [],
   addSupplier,
   updateSupplier,
@@ -264,6 +265,7 @@ export default function Suppliers({
         samples={samples}
         complaints={complaints}
         events={events}
+        tasks={tasks}
         attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}

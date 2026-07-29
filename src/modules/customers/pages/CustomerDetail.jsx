@@ -127,6 +127,7 @@ export default function CustomerDetail({
   samples = [],
   complaints = [],
   events = [],
+  tasks = [],
   attachments = [],
   addProject,
   updateProject,
@@ -488,6 +489,7 @@ export default function CustomerDetail({
         samples={samples}
         complaints={complaints}
         events={events}
+        tasks={tasks}
         attachments={attachments}
         addProject={addProject}
         updateProject={updateProject}

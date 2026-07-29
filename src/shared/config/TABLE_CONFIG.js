@@ -126,6 +126,15 @@ export const TABLE_CONFIG = {
     defaultSort: { key: 'startAt', direction: 'asc' },
     displayName: '予定',
   },
+  tasks: {
+    orderColumn: 'updated_at',
+    realtime: true,
+    audit: true,
+    softDelete: true,
+    searchable: ['title', 'content', 'status', 'priority', 'assignee_name'],
+    defaultSort: { key: 'dueDate', direction: 'asc' },
+    displayName: 'タスク',
+  },
   suppliers: {
     orderColumn: 'updated_at',
     realtime: true,

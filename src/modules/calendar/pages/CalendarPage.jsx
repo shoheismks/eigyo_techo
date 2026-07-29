@@ -8,6 +8,12 @@ import {
   emptyEvent,
   normalizeEvent,
 } from '../hooks/useEvents.js';
+import {
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  emptyTask,
+  normalizeTask,
+} from '../hooks/useTasks.js';
 import { getCalendarDateMeta } from '../services/japaneseHolidayService.js';
 import './CalendarPage.css';
 
@@ -173,6 +179,18 @@ function createFormForDate(dateKey, user) {
     endAt,
     createdBy: user?.id ?? '',
     createdByName: user?.email ?? '',
+  }, user?.id ?? '');
+}
+
+function createTaskFormForDate(dateKey, user) {
+  return normalizeTask({
+    ...emptyTask,
+    recordedDate: toDateKey(new Date()),
+    dueDate: /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : toDateKey(new Date()),
+    createdBy: user?.id ?? '',
+    createdByName: user?.email ?? '',
+    assigneeId: user?.id ?? '',
+    assigneeName: user?.email ?? '',
   }, user?.id ?? '');
 }
 
@@ -418,6 +436,7 @@ function projectName(projects, projectId) {
 
 function eventTypeIcon(event = {}) {
   const type = event.eventType || event.type || '';
+  if (event.source === 'task' || type === 'タスク') return 'TASK';
   if (type.includes('電話')) return 'TEL';
   if (type.includes('メール')) return 'MAIL';
   if (type.includes('訪問')) return 'VISIT';
@@ -433,9 +452,33 @@ function eventTypeIcon(event = {}) {
 }
 
 function priorityClass(priority = '') {
+  if (priority === '高') return 'high';
+  if (priority === '低') return 'low';
   if (String(priority).includes('高') || String(priority).includes('鬮')) return 'high';
   if (String(priority).includes('低') || String(priority).includes('菴')) return 'low';
   return 'normal';
+}
+
+function taskToCalendarItem(task) {
+  return {
+    id: `task-${task.id}`,
+    taskId: task.id,
+    date: task.dueDate,
+    title: task.title || 'タスク',
+    eventType: 'タスク',
+    type: 'タスク',
+    customerId: task.customerId,
+    dealId: task.projectId,
+    projectId: task.projectId,
+    status: task.status,
+    priority: task.priority,
+    memo: task.content,
+    source: 'task',
+    tone: 'task',
+    color: task.priority === '高' ? '#ef4444' : task.priority === '低' ? '#38bdf8' : '#f59e0b',
+    assigneeName: task.assigneeName,
+    originalTask: task,
+  };
 }
 
 export default function CalendarPage({
@@ -443,12 +486,16 @@ export default function CalendarPage({
   contacts = [],
   projects = [],
   events = [],
+  tasks = [],
   samples = [],
   quotes = [],
   complaints = [],
   addEvent,
   updateEvent,
   removeEvent,
+  addTask,
+  updateTask,
+  removeTask,
   updateCustomer,
   onOpenKarte,
   onOpenProject,
@@ -461,6 +508,10 @@ export default function CalendarPage({
   const [detailEvent, setDetailEvent] = useState(null);
   const [form, setForm] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskEditorOpen, setTaskEditorOpen] = useState(false);
+  const [taskFilters, setTaskFilters] = useState({ assignee: '', status: '', priority: '' });
   const [eventListOpen, setEventListOpen] = useState(false);
   const [dragState, setDragState] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
@@ -481,12 +532,27 @@ export default function CalendarPage({
     () => expandCalendarEvents(events, visibleRange.start, visibleRange.end),
     [events, visibleRange.end, visibleRange.start],
   );
+  const taskAssignees = useMemo(
+    () => [...new Set(tasks.map((task) => task.assigneeName).filter(Boolean))].sort(),
+    [tasks],
+  );
+  const filteredTaskItems = useMemo(
+    () => tasks
+      .filter((task) => !task.deletedAt && task.dueDate)
+      .filter((task) => task.dueDate >= visibleRange.start && task.dueDate <= visibleRange.end)
+      .filter((task) => !taskFilters.assignee || task.assigneeName === taskFilters.assignee)
+      .filter((task) => !taskFilters.status || task.status === taskFilters.status)
+      .filter((task) => !taskFilters.priority || task.priority === taskFilters.priority)
+      .map(taskToCalendarItem),
+    [taskFilters.assignee, taskFilters.priority, taskFilters.status, tasks, visibleRange.end, visibleRange.start],
+  );
   const mergedEvents = useMemo(
     () => [
       ...expandedUserEvents,
       ...systemEvents,
+      ...filteredTaskItems,
     ].sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b))),
-    [expandedUserEvents, systemEvents],
+    [expandedUserEvents, filteredTaskItems, systemEvents],
   );
   const listEvents = useMemo(() => mergedEvents.filter((event) => event.status !== '中止'), [mergedEvents]);
   const calendarTitle = viewMode === 'week' ? formatWeekTitle(baseDate) : viewMode === 'day' ? formatDateLabel(baseDate) : formatMonthTitle(baseDate);
@@ -556,9 +622,22 @@ export default function CalendarPage({
     setEditorOpen(true);
   }
 
+  function openTaskAdd(dateKey) {
+    const safeDateKey = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : today;
+    setEditingTask(null);
+    setTaskForm(createTaskFormForDate(safeDateKey, user));
+    setTaskEditorOpen(true);
+  }
+
   function openEdit(event) {
     setDetailEvent(null);
     const baseEvent = event.seriesEvent || event;
+    if (baseEvent.source === 'task') {
+      setEditingTask(baseEvent.originalTask);
+      setTaskForm(normalizeTask(baseEvent.originalTask, user?.id ?? ''));
+      setTaskEditorOpen(true);
+      return;
+    }
     if (baseEvent.source !== 'event') {
       if (baseEvent.customerId) onOpenKarte?.(baseEvent.customerId);
       return;
@@ -566,6 +645,42 @@ export default function CalendarPage({
     setEditingEvent(baseEvent);
     setForm(normalizeEvent(baseEvent, user?.id ?? ''));
     setEditorOpen(true);
+  }
+
+  function closeTaskForm() {
+    setEditingTask(null);
+    setTaskForm(null);
+    setTaskEditorOpen(false);
+  }
+
+  function updateTaskForm(field, value) {
+    setTaskForm((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  function saveTask(event) {
+    event.preventDefault();
+    if (!taskForm?.title?.trim()) return;
+
+    const normalized = normalizeTask({
+      ...taskForm,
+      title: taskForm.title.trim(),
+      createdBy: taskForm.createdBy || user?.id || '',
+      createdByName: taskForm.createdByName || user?.email || '',
+    }, user?.id ?? '');
+
+    if (editingTask) {
+      updateTask?.(editingTask.id, normalized);
+    } else {
+      addTask?.(normalized);
+    }
+
+    closeTaskForm();
+  }
+
+  function deleteTask() {
+    if (!editingTask) return;
+    removeTask?.(editingTask.id);
+    closeTaskForm();
   }
 
   function openDetail(event) {
@@ -855,12 +970,39 @@ export default function CalendarPage({
             <button className="primary-button compact-button" type="button" onClick={() => openAdd(baseDate)}>
               予定追加
             </button>
+            <button className="ghost-button compact-button" type="button" onClick={() => openTaskAdd(baseDate)}>
+              タスク追加
+            </button>
             <button className="ghost-button compact-button" type="button" onClick={() => setEventListOpen(true)}>
               予定一覧
             </button>
           </div>
         </div>
       </div>
+
+      <section className="calendar-task-filters" aria-label="タスク絞り込み">
+        <label className="field-label">
+          対応者
+          <select value={taskFilters.assignee} onChange={(event) => setTaskFilters((current) => ({ ...current, assignee: event.target.value }))}>
+            <option value="">すべて</option>
+            {taskAssignees.map((assignee) => <option key={assignee} value={assignee}>{assignee}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          ステータス
+          <select value={taskFilters.status} onChange={(event) => setTaskFilters((current) => ({ ...current, status: event.target.value }))}>
+            <option value="">すべて</option>
+            {TASK_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          優先度
+          <select value={taskFilters.priority} onChange={(event) => setTaskFilters((current) => ({ ...current, priority: event.target.value }))}>
+            <option value="">すべて</option>
+            {TASK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+        </label>
+      </section>
 
       {viewMode === 'list' ? (
         <section className="desktop-panel">
@@ -909,7 +1051,7 @@ export default function CalendarPage({
               <span>{String(hour).padStart(2, '0')}:00</span>
               <div>
                 {eventsForDay(baseDate)
-                  .filter((event) => new Date(event.startAt || `${baseDate}T00:00:00`).getHours() === hour)
+                  .filter((event) => event.source === 'task' ? hour === 8 : new Date(event.startAt || `${baseDate}T00:00:00`).getHours() === hour)
                   .map((event) => (
                     <CalendarEventButton
                       compact
@@ -1068,6 +1210,19 @@ export default function CalendarPage({
           updateForm={updateForm}
         />
       )}
+
+      {taskEditorOpen && taskForm && (
+        <TaskEditor
+          customers={customers}
+          editing={Boolean(editingTask)}
+          form={taskForm}
+          projects={projects}
+          onClose={closeTaskForm}
+          onDelete={deleteTask}
+          onSave={saveTask}
+          updateForm={updateTaskForm}
+        />
+      )}
     </section>
   );
 }
@@ -1194,7 +1349,7 @@ function CalendarEventButton({
   return (
     <button
       type="button"
-      className={`calendar-event ${event.tone || event.eventType || 'event'} priority-${priorityClass(event.priority)} ${compact ? 'compact' : ''}`}
+      className={`calendar-event ${event.tone || event.eventType || 'event'} priority-${priorityClass(event.priority)} ${event.source === 'task' ? 'calendar-task-event' : ''} ${event.status === '完了' ? 'is-complete' : ''} ${compact ? 'compact' : ''}`}
       draggable={editable}
       onClick={onClick}
       onContextMenu={onContextMenu}
@@ -1242,7 +1397,7 @@ function CalendarEventPopover({
   const customer = customerName(customers, event.customerId);
   const project = projectName(projects, event.dealId);
   const baseEvent = event.seriesEvent || event;
-  const canEdit = baseEvent.source === 'event';
+  const canEdit = baseEvent.source === 'event' || baseEvent.source === 'task';
 
   function openCustomer() {
     if (!event.customerId) return;
@@ -1487,6 +1642,83 @@ function EventEditor({
           {editing && <button className="ghost-button danger" type="button" onClick={onDelete}>削除</button>}
           {editing && <button className="ghost-button" type="button" onClick={onPostpone}>延期として新日時を保存</button>}
           {editing && <button className="ghost-button" type="button" onClick={onComplete}>完了して商談履歴へ登録</button>}
+          <button className="primary-button" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function TaskEditor({
+  customers,
+  projects = [],
+  editing,
+  form,
+  onClose,
+  onDelete,
+  onSave,
+  updateForm,
+}) {
+  const relatedProjects = projects.filter((project) => !form.customerId || project.customerId === form.customerId);
+
+  return (
+    <div className="calendar-editor-backdrop">
+      <form className="calendar-editor task-editor" onSubmit={onSave}>
+        <div className="section-heading">
+          <h2>{editing ? 'タスク編集' : 'タスク追加'}</h2>
+          <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+        </div>
+        <label className="field-label">
+          記入日
+          <input type="date" value={form.recordedDate || ''} onChange={(event) => updateForm('recordedDate', event.target.value)} />
+        </label>
+        <label className="field-label">
+          締め切り
+          <input type="date" value={form.dueDate || ''} onChange={(event) => updateForm('dueDate', event.target.value)} />
+        </label>
+        <label className="field-label">
+          対応者
+          <input value={form.assigneeName || ''} onChange={(event) => updateForm('assigneeName', event.target.value)} placeholder="担当者名またはメール" />
+        </label>
+        <label className="field-label">
+          件名
+          <input value={form.title || ''} onChange={(event) => updateForm('title', event.target.value)} required />
+        </label>
+        <label className="field-label">
+          ステータス
+          <select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
+            {TASK_STATUSES.map((status) => <option key={status}>{status}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          優先度
+          <select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>
+            {TASK_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          顧客
+          <select value={form.customerId || ''} onChange={(event) => {
+            updateForm('customerId', event.target.value);
+            updateForm('projectId', '');
+          }}>
+            <option value="">未選択</option>
+            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          案件
+          <select value={form.projectId || ''} onChange={(event) => updateForm('projectId', event.target.value)}>
+            <option value="">未選択</option>
+            {relatedProjects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+          </select>
+        </label>
+        <label className="field-label calendar-editor-wide">
+          内容
+          <textarea value={form.content || ''} onChange={(event) => updateForm('content', event.target.value)} />
+        </label>
+        <div className="calendar-editor-actions">
+          {editing && <button className="ghost-button danger" type="button" onClick={onDelete}>削除</button>}
           <button className="primary-button" type="submit">保存</button>
         </div>
       </form>

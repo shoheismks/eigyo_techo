@@ -7,6 +7,7 @@ import { useContacts } from '../modules/contacts/hooks/useContacts.js';
 import { useCustomers } from '../modules/customers/hooks/useCustomers.js';
 import { useProjects } from '../modules/deals/hooks/useProjects.js';
 import { useEvents } from '../modules/calendar/hooks/useEvents.js';
+import { useTasks } from '../modules/calendar/hooks/useTasks.js';
 import { useInventory } from '../modules/inventory/hooks/useInventory.js';
 import { useInvoices } from '../modules/invoices/hooks/useInvoices.js';
 import { useBrands } from '../modules/products/hooks/useBrands.js';
@@ -48,6 +49,7 @@ export function AppDataProvider({ userId, children }) {
   const businessCardsState = useBusinessCards(userId);
   const complaintsState = useComplaints(userId);
   const eventsState = useEvents(userId);
+  const tasksState = useTasks(userId);
   const attachmentsState = useAttachments(userId);
 
   const value = {
@@ -171,6 +173,11 @@ export function AppDataProvider({ userId, children }) {
     addEvent: eventsState.addRecord,
     updateEvent: eventsState.updateRecord,
     removeEvent: eventsState.removeRecord,
+
+    tasks: toArray(tasksState.records),
+    addTask: tasksState.addRecord,
+    updateTask: tasksState.updateRecord,
+    removeTask: tasksState.removeRecord,
 
     attachments: toArray(attachmentsState.records),
     addAttachment: attachmentsState.addRecord,
