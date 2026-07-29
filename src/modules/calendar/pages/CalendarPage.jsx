@@ -203,6 +203,7 @@ function addRecurringInterval(date, frequency) {
   const next = new Date(date);
   if (frequency === 'daily') next.setDate(next.getDate() + 1);
   else if (frequency === 'weekly') next.setDate(next.getDate() + 7);
+  else if (frequency === 'biweekly') next.setDate(next.getDate() + 14);
   else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
   return next;
 }

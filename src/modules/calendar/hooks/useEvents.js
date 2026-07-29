@@ -20,6 +20,7 @@ export const EVENT_RECURRENCE_FREQUENCIES = [
   { value: 'none', label: '繰り返しなし' },
   { value: 'daily', label: '毎日' },
   { value: 'weekly', label: '毎週' },
+  { value: 'biweekly', label: '隔週' },
   { value: 'monthly', label: '毎月' },
 ];
 export const EVENT_RECURRENCE_END_TYPES = [
