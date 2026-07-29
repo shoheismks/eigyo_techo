@@ -1,0 +1,103 @@
+.calendar-list-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.calendar-list-popover {
+  width: min(980px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: #0b1220;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.44);
+}
+
+.calendar-list-popover-body {
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.calendar-list-popup-row {
+  display: grid;
+  grid-template-columns: 108px 96px minmax(180px, 1.5fr) minmax(140px, 1fr) minmax(120px, 1fr) minmax(120px, 0.8fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  color: #dbeafe;
+  background: rgba(15, 23, 42, 0.88);
+  text-align: left;
+}
+
+.calendar-list-popup-row:hover,
+.calendar-list-popup-row:focus-visible {
+  border-color: rgba(96, 165, 250, 0.48);
+  background: rgba(30, 41, 59, 0.94);
+  outline: none;
+}
+
+.calendar-list-popup-row strong {
+  color: #f8fafc;
+}
+
+.calendar-recurrence-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  grid-column: 1 / -1;
+}
+
+.calendar-event-meta em {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 999px;
+  color: #93c5fd;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1;
+}
+
+@media (max-width: 767px) {
+  .calendar-list-popup-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .calendar-list-popover {
+    max-height: calc(100vh - 20px);
+    padding: 14px;
+    border-radius: 14px 14px 10px 10px;
+  }
+
+  .calendar-list-popup-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    min-height: auto;
+  }
+
+  .calendar-list-popup-row span,
+  .calendar-list-popup-row strong {
+    overflow-wrap: anywhere;
+  }
+
+  .calendar-recurrence-fields {
+    grid-template-columns: 1fr;
+  }
+}

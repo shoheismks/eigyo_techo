@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   EVENT_PRIORITIES,
+  EVENT_RECURRENCE_END_TYPES,
+  EVENT_RECURRENCE_FREQUENCIES,
   EVENT_STATUSES,
   EVENT_TYPES,
   emptyEvent,
   normalizeEvent,
 } from '../hooks/useEvents.js';
 import { getCalendarDateMeta } from '../services/japaneseHolidayService.js';
+import './CalendarPage.css';
 
 const VIEW_LABELS = {
   month: '月',
@@ -168,6 +171,125 @@ function eventDate(event) {
   return toDateKey(event.startAt || event.nextFollowDate || event.createdAt);
 }
 
+function dateKeyToLocalDate(dateKey) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function eventSortValue(event) {
+  return String(event.startAt || event.date || eventDate(event));
+}
+
+function isRecurringEvent(event = {}) {
+  return Boolean(event.recurrenceFrequency && event.recurrenceFrequency !== 'none');
+}
+
+function recurrenceLabel(event = {}) {
+  const frequency = EVENT_RECURRENCE_FREQUENCIES.find((item) => item.value === event.recurrenceFrequency)?.label || '繰り返しなし';
+  if (!isRecurringEvent(event)) return frequency;
+  const endLabel = event.recurrenceEndType === 'date' && event.recurrenceEndDate
+    ? `${event.recurrenceEndDate}まで`
+    : '終了なし';
+  return `${frequency} / ${endLabel}`;
+}
+
+function visibleDateRange(days, fallbackDateKey) {
+  const keys = days.map((day) => day.dateKey).filter(Boolean).sort();
+  if (keys.length === 0) return { start: fallbackDateKey, end: fallbackDateKey };
+  return { start: keys[0], end: keys[keys.length - 1] };
+}
+
+function addRecurringInterval(date, frequency) {
+  const next = new Date(date);
+  if (frequency === 'daily') next.setDate(next.getDate() + 1);
+  else if (frequency === 'weekly') next.setDate(next.getDate() + 7);
+  else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
+  return next;
+}
+
+function shiftDateTimeToDate(value, dateKey) {
+  if (!value) return '';
+  const source = new Date(value);
+  if (Number.isNaN(source.getTime())) return '';
+  const shifted = new Date(`${dateKey}T00:00:00`);
+  shifted.setHours(source.getHours(), source.getMinutes(), source.getSeconds(), source.getMilliseconds());
+  return shifted.toISOString();
+}
+
+function shiftEndAt(event, dateKey) {
+  if (!event.endAt) return '';
+  const start = new Date(event.startAt);
+  const end = new Date(event.endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return shiftDateTimeToDate(event.endAt, dateKey);
+  const shiftedStart = new Date(shiftDateTimeToDate(event.startAt, dateKey));
+  return new Date(shiftedStart.getTime() + (end.getTime() - start.getTime())).toISOString();
+}
+
+function occurrenceId(event, dateKey, index) {
+  return `${event.id}__${dateKey}__${index}`;
+}
+
+function expandRecurringEvent(event, rangeStartKey, rangeEndKey) {
+  const base = { ...event, source: 'event', date: eventDate(event) };
+  if (!isRecurringEvent(event)) return [base];
+
+  const startDateKey = eventDate(event);
+  const start = dateKeyToLocalDate(startDateKey);
+  const rangeStart = dateKeyToLocalDate(rangeStartKey);
+  const rangeEnd = dateKeyToLocalDate(rangeEndKey);
+  if (!start || !rangeStart || !rangeEnd) return [base];
+
+  const recurrenceEnd = event.recurrenceEndType === 'date' && event.recurrenceEndDate
+    ? dateKeyToLocalDate(event.recurrenceEndDate)
+    : null;
+  const hardEnd = recurrenceEnd && recurrenceEnd < rangeEnd ? recurrenceEnd : rangeEnd;
+  const results = [];
+  let current = new Date(start);
+  let index = 0;
+  let guard = 0;
+
+  while (current < rangeStart && guard < 10000) {
+    current = addRecurringInterval(current, event.recurrenceFrequency);
+    index += 1;
+    guard += 1;
+  }
+
+  while (current <= hardEnd && guard < 10500) {
+    const dateKey = toDateKey(current);
+    if (dateKey >= rangeStartKey && dateKey <= rangeEndKey) {
+      results.push({
+        ...base,
+        id: occurrenceId(event, dateKey, index),
+        source: 'event',
+        occurrenceDate: dateKey,
+        date: dateKey,
+        startAt: shiftDateTimeToDate(event.startAt, dateKey),
+        endAt: shiftEndAt(event, dateKey),
+        seriesEvent: base,
+      });
+    }
+    current = addRecurringInterval(current, event.recurrenceFrequency);
+    index += 1;
+    guard += 1;
+  }
+
+  return results;
+}
+
+function expandCalendarEvents(events, rangeStartKey, rangeEndKey) {
+  return events
+    .flatMap((event) => expandRecurringEvent(event, rangeStartKey, rangeEndKey))
+    .sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b)));
+}
+
+function eventTimeLabel(event) {
+  if (event.allDay) return '終日';
+  if (!event.startAt) return '-';
+  const start = toDateTimeLocal(event.startAt).slice(11, 16);
+  const end = event.endAt ? toDateTimeLocal(event.endAt).slice(11, 16) : '';
+  return end ? `${start} - ${end}` : start;
+}
+
 function projectName(projects, projectId) {
   return projects.find((project) => project.id === projectId)?.title || '';
 }
@@ -217,21 +339,27 @@ export default function CalendarPage({
   const [detailEvent, setDetailEvent] = useState(null);
   const [form, setForm] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [eventListOpen, setEventListOpen] = useState(false);
 
   const systemEvents = useMemo(
     () => buildSystemEvents({ customers, samples, quotes, complaints }),
     [complaints, customers, quotes, samples],
   );
-  const mergedEvents = useMemo(
-    () => [
-      ...events.map((event) => ({ ...event, source: 'event', date: eventDate(event) })),
-      ...systemEvents,
-    ].sort((a, b) => String(a.startAt || a.date).localeCompare(String(b.startAt || b.date))),
-    [events, systemEvents],
-  );
   const monthDays = useMemo(() => buildMonthDays(baseDate), [baseDate]);
   const weekDays = useMemo(() => buildWeekDays(baseDate), [baseDate]);
   const visibleDays = viewMode === 'week' ? weekDays : viewMode === 'day' ? [{ dateKey: baseDate, label: baseDate, inCurrentMonth: true }] : monthDays;
+  const visibleRange = useMemo(() => visibleDateRange(visibleDays, baseDate), [baseDate, visibleDays]);
+  const expandedUserEvents = useMemo(
+    () => expandCalendarEvents(events, visibleRange.start, visibleRange.end),
+    [events, visibleRange.end, visibleRange.start],
+  );
+  const mergedEvents = useMemo(
+    () => [
+      ...expandedUserEvents,
+      ...systemEvents,
+    ].sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b))),
+    [expandedUserEvents, systemEvents],
+  );
   const listEvents = useMemo(() => mergedEvents.filter((event) => event.status !== '中止'), [mergedEvents]);
   const calendarTitle = viewMode === 'week' ? formatWeekTitle(baseDate) : viewMode === 'day' ? formatDateLabel(baseDate) : formatMonthTitle(baseDate);
 
@@ -262,12 +390,13 @@ export default function CalendarPage({
 
   function openEdit(event) {
     setDetailEvent(null);
-    if (event.source !== 'event') {
-      if (event.customerId) onOpenKarte?.(event.customerId);
+    const baseEvent = event.seriesEvent || event;
+    if (baseEvent.source !== 'event') {
+      if (baseEvent.customerId) onOpenKarte?.(baseEvent.customerId);
       return;
     }
-    setEditingEvent(event);
-    setForm(normalizeEvent(event, user?.id ?? ''));
+    setEditingEvent(baseEvent);
+    setForm(normalizeEvent(baseEvent, user?.id ?? ''));
     setEditorOpen(true);
   }
 
@@ -296,6 +425,9 @@ export default function CalendarPage({
     const normalized = normalizeEvent({
       ...form,
       title: form.title.trim(),
+      recurrenceFrequency: form.recurrenceFrequency || 'none',
+      recurrenceEndType: form.recurrenceFrequency === 'none' ? 'none' : (form.recurrenceEndType || 'none'),
+      recurrenceEndDate: form.recurrenceFrequency !== 'none' && form.recurrenceEndType === 'date' ? form.recurrenceEndDate : '',
       createdBy: form.createdBy || user?.id || '',
       createdByName: form.createdByName || user?.email || '',
     }, user?.id ?? '');
@@ -423,6 +555,9 @@ export default function CalendarPage({
             <button className="primary-button compact-button" type="button" onClick={() => openAdd(baseDate)}>
               予定追加
             </button>
+            <button className="ghost-button compact-button" type="button" onClick={() => setEventListOpen(true)}>
+              予定一覧
+            </button>
           </div>
         </div>
       </div>
@@ -524,6 +659,19 @@ export default function CalendarPage({
         </section>
       )}
 
+      {eventListOpen && (
+        <CalendarEventListPopover
+          contacts={contacts}
+          customers={customers}
+          events={listEvents}
+          onClose={() => setEventListOpen(false)}
+          onOpen={(event) => {
+            setEventListOpen(false);
+            openDetail(event);
+          }}
+        />
+      )}
+
       {detailEvent && (
         <CalendarEventPopover
           contacts={contacts}
@@ -556,8 +704,54 @@ export default function CalendarPage({
   );
 }
 
+function CalendarEventListPopover({ events, customers, contacts, onClose, onOpen }) {
+  const sortedEvents = [...events].sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b)));
+
+  return (
+    <div className="calendar-list-popup-backdrop" role="presentation" onClick={onClose}>
+      <article
+        aria-modal="true"
+        className="calendar-list-popover"
+        role="dialog"
+        onClick={(clickEvent) => clickEvent.stopPropagation()}
+      >
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Calendar</p>
+            <h2>予定一覧</h2>
+          </div>
+          <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+        </div>
+        <div className="calendar-list-popover-body">
+          {sortedEvents.map((event) => {
+            const baseEvent = event.seriesEvent || event;
+            const contactNames = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
+            return (
+              <button
+                className="calendar-list-popup-row"
+                key={event.id}
+                type="button"
+                onClick={() => onOpen(event)}
+              >
+                <span>{formatDateLabel(event.date || eventDate(event))}</span>
+                <span>{eventTimeLabel(event)}</span>
+                <strong>{event.title || event.type || event.eventType}</strong>
+                <span>{customerName(customers, event.customerId)}</span>
+                <span>{contactNames || '-'}</span>
+                <span>{isRecurringEvent(baseEvent) ? recurrenceLabel(baseEvent) : 'なし'}</span>
+              </button>
+            );
+          })}
+          {sortedEvents.length === 0 && <CalendarEmpty />}
+        </div>
+      </article>
+    </div>
+  );
+}
+
 function CalendarEventButton({ event, customers, contacts, compact = false, onClick }) {
   const names = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
+  const baseEvent = event.seriesEvent || event;
   return (
     <button
       type="button"
@@ -568,6 +762,7 @@ function CalendarEventButton({ event, customers, contacts, compact = false, onCl
     >
       <span className="calendar-event-meta">
         <b>{eventTypeIcon(event)}</b>
+        {isRecurringEvent(baseEvent) && <em>Repeat</em>}
         {!compact && <span>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date}</span>}
       </span>
       <strong>{event.title || event.type || event.eventType}</strong>
@@ -589,7 +784,8 @@ function CalendarEventPopover({
   const names = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
   const customer = customerName(customers, event.customerId);
   const project = projectName(projects, event.dealId);
-  const canEdit = event.source === 'event';
+  const baseEvent = event.seriesEvent || event;
+  const canEdit = baseEvent.source === 'event';
 
   function openCustomer() {
     if (!event.customerId) return;
@@ -622,8 +818,10 @@ function CalendarEventPopover({
           <span className="info-badge" style={{ borderColor: event.color || undefined }}>{eventTypeIcon(event)}</span>
           <span className={`info-badge priority-${priorityClass(event.priority)}`}>{event.priority || '通常'}</span>
           <span className="info-badge">{event.status || '-'}</span>
+          {isRecurringEvent(baseEvent) && <span className="info-badge">{recurrenceLabel(baseEvent)}</span>}
         </div>
         <dl className="company-details calendar-detail-list">
+          <div><dt>繰り返し</dt><dd>{recurrenceLabel(baseEvent)}</dd></div>
           <div><dt>日時</dt><dd>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date || '-'}{event.endAt ? ` ～ ${toDateTimeLocal(event.endAt).replace('T', ' ')}` : ''}</dd></div>
           <div><dt>顧客</dt><dd>{customer}</dd></div>
           <div><dt>担当者</dt><dd>{names || '-'}</dd></div>
@@ -726,6 +924,30 @@ function EventEditor({
             {EVENT_STATUSES.map((status) => <option key={status}>{status}</option>)}
           </select>
         </label>
+        <div className="calendar-recurrence-fields">
+          <label className="field-label">
+            繰り返し
+            <select value={form.recurrenceFrequency || 'none'} onChange={(event) => updateForm('recurrenceFrequency', event.target.value)}>
+              {EVENT_RECURRENCE_FREQUENCIES.map((frequency) => (
+                <option key={frequency.value} value={frequency.value}>{frequency.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field-label">
+            終了条件
+            <select value={form.recurrenceEndType || 'none'} onChange={(event) => updateForm('recurrenceEndType', event.target.value)}>
+              {EVENT_RECURRENCE_END_TYPES.map((endType) => (
+                <option key={endType.value} value={endType.value}>{endType.label}</option>
+              ))}
+            </select>
+          </label>
+          {(form.recurrenceEndType || 'none') === 'date' && (
+            <label className="field-label">
+              終了日
+              <input type="date" value={form.recurrenceEndDate || ''} onChange={(event) => updateForm('recurrenceEndDate', event.target.value)} />
+            </label>
+          )}
+        </div>
         <label className="field-label">
           次回フォロー日
           <input type="date" value={form.nextFollowDate || ''} onChange={(event) => updateForm('nextFollowDate', event.target.value)} />

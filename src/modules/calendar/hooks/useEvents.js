@@ -16,6 +16,17 @@ export const EVENT_TYPES = [
 export const EVENT_STATUSES = ['予定', '完了', '中止', '延期'];
 export const EVENT_PRIORITIES = ['低', '通常', '高', '最重要'];
 
+export const EVENT_RECURRENCE_FREQUENCIES = [
+  { value: 'none', label: '繰り返しなし' },
+  { value: 'daily', label: '毎日' },
+  { value: 'weekly', label: '毎週' },
+  { value: 'monthly', label: '毎月' },
+];
+export const EVENT_RECURRENCE_END_TYPES = [
+  { value: 'none', label: '終了なし' },
+  { value: 'date', label: '終了日指定' },
+];
+
 export const emptyEvent = {
   userId: '',
   title: '',
@@ -33,6 +44,9 @@ export const emptyEvent = {
   nextFollowDate: '',
   reminder: '',
   status: '予定',
+  recurrenceFrequency: 'none',
+  recurrenceEndType: 'none',
+  recurrenceEndDate: '',
   postponedFromEventId: '',
   postponedOriginalStartAt: '',
   postponedOriginalEndAt: '',
@@ -58,6 +72,9 @@ export function normalizeEvent(event = {}, userId = '') {
     priority: event.priority || '通常',
     color: event.color || '#2878ff',
     status: event.status || '予定',
+    recurrenceFrequency: event.recurrenceFrequency || event.recurrence || 'none',
+    recurrenceEndType: event.recurrenceEndType || (event.recurrenceEndDate ? 'date' : 'none'),
+    recurrenceEndDate: event.recurrenceEndDate ?? '',
     createdBy: event.createdBy ?? userId,
     createdByName: event.createdByName ?? '',
     createdAt: event.createdAt ?? new Date().toISOString(),
@@ -84,6 +101,9 @@ function toRow(event) {
     next_follow_date: event.nextFollowDate || null,
     reminder: event.reminder,
     status: event.status,
+    recurrence_frequency: event.recurrenceFrequency || 'none',
+    recurrence_end_type: event.recurrenceEndType || 'none',
+    recurrence_end_date: event.recurrenceEndDate || null,
     postponed_from_event_id: event.postponedFromEventId,
     postponed_original_start_at: event.postponedOriginalStartAt || null,
     postponed_original_end_at: event.postponedOriginalEndAt || null,
@@ -114,6 +134,9 @@ function fromRow(row) {
     nextFollowDate: row.next_follow_date,
     reminder: row.reminder,
     status: row.status,
+    recurrenceFrequency: row.recurrence_frequency,
+    recurrenceEndType: row.recurrence_end_type,
+    recurrenceEndDate: row.recurrence_end_date,
     postponedFromEventId: row.postponed_from_event_id,
     postponedOriginalStartAt: row.postponed_original_start_at,
     postponedOriginalEndAt: row.postponed_original_end_at,
