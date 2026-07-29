@@ -8,6 +8,7 @@ import {
 } from '../services/backupService.js';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import { DEFAULT_ISSUER_TAX_RATE, PDF_TEMPLATE_OPTIONS, emptyIssuer } from '../hooks/useIssuers.js';
+import { DEFAULT_THEME_COLOR, isValidThemeColor, sanitizeThemeColor } from '../../../shared/utils/themeColor.js';
 import { TERMS_FIELDS } from '../../quotes/services/termsTemplateService.js';
 import './SettingsPage.css';
 
@@ -107,6 +108,7 @@ export default function SettingsPage({
         ...issuerForm,
         id,
         userId,
+        themeColor: issuerForm.themeColor ? sanitizeThemeColor(issuerForm.themeColor) : '',
         ...logoMeta,
         ...sealMeta,
       };
@@ -281,6 +283,9 @@ export default function SettingsPage({
                     <button className={['issuer-picker-item', issuerForm.id === issuer.id ? 'active' : ''].join(' ')} type="button" onClick={() => { editIssuer(issuer); setActiveCategory('documents'); }} key={issuer.id}>
                       <strong>{issuer.name || issuer.legalName || '名称未設定'}</strong>
                       <span>{[issuer.phone, issuer.email].filter(Boolean).join(' / ') || issuer.address || '-'}</span>
+                      <span className="issuer-theme-preview" style={{ '--issuer-preview-color': sanitizeThemeColor(issuer.themeColor || DEFAULT_THEME_COLOR) }}>
+                        {issuer.themeColor || '標準色'}
+                      </span>
                       <small>{issuer.isDefault ? '既定 / ' : ''}{issuer.isActive === false ? '無効' : '有効'} / 税率 {issuer.defaultTaxRate || DEFAULT_ISSUER_TAX_RATE}%</small>
                     </button>
                   )) : <p className="muted-text">発行元が未登録です。帳票設定から追加してください。</p>}
@@ -366,6 +371,9 @@ export default function SettingsPage({
                     <button className={['issuer-picker-item', issuerForm.id === issuer.id ? 'active' : ''].join(' ')} type="button" onClick={() => editIssuer(issuer)} key={issuer.id}>
                       <strong>{issuer.name || issuer.legalName || '名称未設定'}</strong>
                       <span>{[issuer.phone, issuer.email].filter(Boolean).join(' / ') || issuer.address || '-'}</span>
+                      <span className="issuer-theme-preview" style={{ '--issuer-preview-color': sanitizeThemeColor(issuer.themeColor || DEFAULT_THEME_COLOR) }}>
+                        {issuer.themeColor || '標準色'}
+                      </span>
                       <small>{issuer.isDefault ? '既定 / ' : ''}{issuer.isActive === false ? '無効' : '有効'} / 税率 {issuer.defaultTaxRate || DEFAULT_ISSUER_TAX_RATE}%</small>
                     </button>
                   )) : <p className="muted-text">発行元が未登録です。右側のフォームから追加してください。</p>}
@@ -389,6 +397,25 @@ export default function SettingsPage({
                     <label className="field-label">登録番号<input value={issuerForm.registrationNumber || ''} onChange={(event) => updateIssuerForm('registrationNumber', event.target.value)} /></label>
                     <label className="field-label">担当者<input value={issuerForm.contactPerson || ''} onChange={(event) => updateIssuerForm('contactPerson', event.target.value)} /></label>
                     <label className="field-label">既定税率<input inputMode="decimal" value={issuerForm.defaultTaxRate || ''} onChange={(event) => updateIssuerForm('defaultTaxRate', event.target.value)} /></label>
+                    <label className="field-label">テーマカラー
+                      <span className="issuer-theme-field">
+                        <input
+                          type="color"
+                          value={isValidThemeColor(issuerForm.themeColor) && issuerForm.themeColor ? sanitizeThemeColor(issuerForm.themeColor) : DEFAULT_THEME_COLOR}
+                          onChange={(event) => updateIssuerForm('themeColor', event.target.value)}
+                        />
+                        <input
+                          value={issuerForm.themeColor || ''}
+                          placeholder={DEFAULT_THEME_COLOR}
+                          onChange={(event) => updateIssuerForm('themeColor', event.target.value.trim())}
+                          onBlur={(event) => {
+                            if (!isValidThemeColor(event.target.value)) {
+                              updateIssuerForm('themeColor', '');
+                            }
+                          }}
+                        />
+                      </span>
+                    </label>
                     <label className="field-label">PDFテンプレート<select value={issuerForm.defaultPdfTemplate || 'standard'} onChange={(event) => updateIssuerForm('defaultPdfTemplate', event.target.value)}>{PDF_TEMPLATE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
                   </div>
                 </section>
@@ -475,6 +502,7 @@ export default function SettingsPage({
                         {issuer.isDefault && <span className="info-badge ready">既定</span>}
                         <span className="info-badge">{issuer.isActive === false ? '無効' : '有効'}</span>
                         <span className="info-badge">税率 {issuer.defaultTaxRate || DEFAULT_ISSUER_TAX_RATE}%</span>
+                        <span className="issuer-theme-preview" style={{ '--issuer-preview-color': sanitizeThemeColor(issuer.themeColor || DEFAULT_THEME_COLOR) }}>{issuer.themeColor || '標準色'}</span>
                       </div>
                       <div className="card-actions">
                         <button className="ghost-button" type="button" onClick={() => editIssuer(issuer)}>編集</button>

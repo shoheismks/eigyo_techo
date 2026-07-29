@@ -1,0 +1,229 @@
+.app-shell {
+  --theme-accent: var(--blue);
+  --theme-accent-strong: var(--blue-strong);
+  --theme-accent-soft: rgba(40, 120, 255, 0.16);
+  --theme-accent-muted: rgba(40, 120, 255, 0.1);
+  --theme-accent-border: rgba(102, 163, 255, 0.48);
+  --theme-accent-border-strong: rgba(102, 163, 255, 0.72);
+  --theme-accent-shadow: rgba(40, 120, 255, 0.32);
+  --theme-accent-glow: rgba(40, 120, 255, 0.22);
+}
+
+.app-topbar,
+.sidebar-nav {
+  border-color: var(--theme-accent-border);
+}
+
+.app-topbar {
+  background:
+    linear-gradient(90deg, var(--theme-accent-muted), transparent 34%),
+    rgba(7, 11, 19, 0.94);
+}
+
+.app-main {
+  background:
+    radial-gradient(circle at top right, var(--theme-accent-soft), transparent 30rem),
+    var(--bg);
+}
+
+.issuer-context-control {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.issuer-context-badge {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  border: 1px solid var(--theme-accent-border);
+  border-radius: 999px;
+  background: var(--theme-accent-soft);
+  color: var(--white);
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.issuer-theme-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 999px;
+  background: var(--theme-accent);
+  box-shadow: 0 0 0 3px var(--theme-accent-glow);
+}
+
+.issuer-context-badge strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issuer-context-select {
+  width: auto;
+  min-width: 140px;
+  max-width: 220px;
+  min-height: 30px;
+  border-color: var(--theme-accent-border);
+  background: rgba(7, 11, 19, 0.82);
+  color: var(--text);
+  padding: 0 28px 0 10px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.primary-button,
+.hero-action,
+.floating-help-button,
+.bottom-nav .active,
+.bottom-nav .add-tab span,
+.add-action-button.primary-action,
+.info-badge.ready {
+  background-color: var(--theme-accent);
+  box-shadow: 0 14px 34px var(--theme-accent-shadow);
+}
+
+.primary-button:focus-visible,
+.ghost-button:focus-visible,
+.text-button:focus-visible,
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--theme-accent-border-strong);
+  outline-color: var(--theme-accent-border);
+  box-shadow: 0 0 0 3px var(--theme-accent-glow);
+}
+
+.text-button,
+.ghost-button,
+.eyebrow,
+a {
+  color: var(--theme-accent-strong);
+}
+
+.sidebar-nav-list button.active,
+.sidebar-group-button.active,
+.sidebar-subnav button.active,
+.auth-tabs .selected,
+.row-button.selected,
+.pipeline-count.selected,
+.settings-category-menu button:hover,
+.settings-category-menu button.active {
+  border-color: var(--theme-accent-border);
+  background: var(--theme-accent-soft);
+}
+
+.sidebar-group-button.active .sidebar-group-icon,
+.sidebar-group-icon,
+.mobile-field-panel,
+.file-field,
+.extension-toast,
+.calendar-toast {
+  border-color: var(--theme-accent-border);
+}
+
+.sidebar-group-button.active .sidebar-group-icon,
+.bottom-nav .add-tab {
+  background: var(--theme-accent-soft);
+}
+
+.sidebar-subnav {
+  border-left-color: var(--theme-accent-border);
+}
+
+.page-header,
+.hero-panel {
+  box-shadow: inset 3px 0 0 var(--theme-accent), var(--shadow);
+}
+
+.page-header .eyebrow,
+.settings-content-header span {
+  color: var(--theme-accent-strong);
+}
+
+.desktop-table-head,
+.customers-page .customers-desktop-table th,
+.desktop-data-table thead th,
+.desktop-table-shell .desktop-data-table thead th {
+  background: var(--theme-accent-soft);
+}
+
+.desktop-table-row:hover,
+.customers-page .customers-desktop-table tbody tr:hover,
+.desktop-data-table tbody tr:hover {
+  background: var(--theme-accent-muted);
+}
+
+.desktop-table-row.selected,
+.customers-page .customers-desktop-table tbody tr.selected,
+.desktop-data-table tbody tr.selected {
+  background: var(--theme-accent-soft);
+  box-shadow: inset 3px 0 0 var(--theme-accent);
+}
+
+.tab-button.active,
+.segmented-control button.active,
+.karte-action-icon.primary,
+.karte-add-card,
+.clickable-card:hover {
+  border-color: var(--theme-accent-border);
+  background: var(--theme-accent-soft);
+}
+
+.loading-accent,
+.page-loading,
+.empty-state .primary-button {
+  color: var(--theme-accent-strong);
+}
+
+.issuer-theme-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.issuer-theme-field input[type='color'] {
+  width: 48px;
+  min-width: 48px;
+  height: 44px;
+  min-height: 44px;
+  padding: 4px;
+}
+
+.issuer-theme-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.issuer-theme-preview::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--issuer-preview-color, var(--theme-accent));
+  box-shadow: 0 0 0 3px var(--theme-accent-glow);
+}
+
+@media (max-width: 767px) {
+  .issuer-context-control {
+    gap: 6px;
+  }
+
+  .issuer-context-select {
+    width: 100%;
+    max-width: 100%;
+  }
+}

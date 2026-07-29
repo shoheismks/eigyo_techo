@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, useState } from 'react';
+import { Component, Suspense, useEffect, useMemo, useState } from 'react';
 import AppLayout from './layouts/AppLayout.jsx';
 import AppRouter from './router/AppRouter.jsx';
 import { AppDataProvider, useAppData } from './context/AppDataContext.jsx';
@@ -9,7 +9,10 @@ import { buildSalesOrderDraft } from './modules/salesOrders/hooks/useSalesOrders
 import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
 import { buildInvoiceDraftFromQuote } from './modules/invoices/services/invoicePdfService.js';
 import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
+import { createThemeStyle, DEFAULT_THEME_COLOR } from './shared/utils/themeColor.js';
 import Login from './pages/Login.jsx';
+
+const ISSUER_THEME_STORAGE_KEY = 'eigyo-techo-selected-issuer-id';
 
 function isImportPath() {
   return window.location.pathname === '/import';
@@ -107,6 +110,10 @@ function AuthenticatedShell() {
   const [invoiceDraft, setInvoiceDraft] = useState(null);
   const [salesOrderDraft, setSalesOrderDraft] = useState(null);
   const [inventoryAction, setInventoryAction] = useState(null);
+  const [selectedIssuerId, setSelectedIssuerId] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return window.localStorage.getItem(ISSUER_THEME_STORAGE_KEY) || '';
+  });
 
   const {
     customers,
@@ -213,6 +220,52 @@ function AuthenticatedShell() {
     addAttachment,
     updateAttachment,
   } = appData;
+
+  const activeIssuers = useMemo(
+    () => issuers.filter((issuer) => issuer.isActive !== false),
+    [issuers],
+  );
+  const currentThemeIssuer = useMemo(() => {
+    if (activeIssuers.length === 0) return null;
+    return (
+      activeIssuers.find((issuer) => issuer.id === selectedIssuerId) ||
+      activeIssuers.find((issuer) => issuer.isDefault) ||
+      activeIssuers[0]
+    );
+  }, [activeIssuers, selectedIssuerId]);
+  const themeStyle = useMemo(
+    () => createThemeStyle(currentThemeIssuer?.themeColor || DEFAULT_THEME_COLOR),
+    [currentThemeIssuer?.themeColor],
+  );
+
+  useEffect(() => {
+    if (activeIssuers.length === 0) {
+      if (selectedIssuerId) {
+        setSelectedIssuerId('');
+      }
+      return;
+    }
+
+    if (activeIssuers.some((issuer) => issuer.id === selectedIssuerId)) {
+      return;
+    }
+
+    const fallbackIssuer = activeIssuers.find((issuer) => issuer.isDefault) || activeIssuers[0];
+    setSelectedIssuerId(fallbackIssuer.id);
+  }, [activeIssuers, selectedIssuerId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedIssuerId) {
+      window.localStorage.setItem(ISSUER_THEME_STORAGE_KEY, selectedIssuerId);
+    } else {
+      window.localStorage.removeItem(ISSUER_THEME_STORAGE_KEY);
+    }
+  }, [selectedIssuerId]);
+
+  function handleIssuerThemeChange(issuerId) {
+    setSelectedIssuerId(issuerId);
+  }
 
   useEffect(() => {
     if (!userId) return;
@@ -579,6 +632,11 @@ function AuthenticatedShell() {
         addMenuOpen={addMenuOpen}
         setAddMenuOpen={setAddMenuOpen}
         notice={extensionNotice}
+        issuers={activeIssuers}
+        selectedIssuerId={currentThemeIssuer?.id || ''}
+        currentIssuer={currentThemeIssuer}
+        onIssuerChange={handleIssuerThemeChange}
+        themeStyle={themeStyle}
       >
         <PageErrorBoundary resetKey={activePage} onReset={() => setActivePage('Home')}>
           <Suspense fallback={<PageLoading />}>

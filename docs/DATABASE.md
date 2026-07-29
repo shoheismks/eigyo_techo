@@ -644,7 +644,7 @@ Version1.0の見積作成では、`quotes` を見積ヘッダー、見積明細�
 
 - 目的: 複数の所属会社・事業体を見積発行元として管理し、見積ごとに切り替える。
 - 主キー: `id`
-- 主要カラム: `user_id`, `name`, `legal_name`, `logo_url`, `logo_storage_path`, `address`, `phone`, `email`, `registration_number`, `bank_account`, `contact_person`, `seal_url`, `seal_storage_path`, `default_tax_rate`, `default_payment_terms`, `default_delivery_terms`, `default_remarks`, `default_pdf_template`, `is_default`, `is_active`, `created_at`, `updated_at`
+- 主要カラム: `user_id`, `name`, `legal_name`, `logo_url`, `logo_storage_path`, `theme_color`, `address`, `phone`, `email`, `registration_number`, `bank_account`, `contact_person`, `seal_url`, `seal_storage_path`, `default_tax_rate`, `default_payment_terms`, `default_delivery_terms`, `default_remarks`, `default_pdf_template`, `is_default`, `is_active`, `created_at`, `updated_at`
 - 関連テーブル: `quotes`, `customers`, `projects`
 - Storage利用有無: あり。ロゴは `app-attachments/{user_id}/issuers/{issuer_id}/logos/`、印影は `app-attachments/{user_id}/issuers/{issuer_id}/seals/` に保存し、DBにはURLとpathのみ保存する。
 - RLS有無: あり。`auth.uid() = user_id` のデータのみselect/insert/update/delete可能。
@@ -652,7 +652,7 @@ Version1.0の見積作成では、`quotes` を見積ヘッダー、見積明細�
 - `quotes` 追加項目: `project_id`, `issuer_id`, `issuer_snapshot`, `pdf_template`
 - 見積税率: 新規見積のDB既定値は `tax_rate = 8`, `default_tax_rate = 8`。既存見積の保存済み税率は変更しない。
 - `customers` / `projects` 追加項目: `default_issuer_id`
-- 追加migration: `20260716000100_add_quote_issuers.sql`, `20260716090000_set_quote_default_tax_rate_to_8.sql`
+- 追加migration: `20260716000100_add_quote_issuers.sql`, `20260716090000_set_quote_default_tax_rate_to_8.sql`, `20260729000500_add_issuer_theme_color.sql`
 
 ## 追加: 成約確認書 約款・免責事項
 

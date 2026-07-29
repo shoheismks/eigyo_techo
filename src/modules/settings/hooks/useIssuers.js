@@ -1,4 +1,5 @@
 import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import { isValidThemeColor, sanitizeThemeColor } from '../../../shared/utils/themeColor.js';
 import { DEFAULT_ISSUER_TERMS, DEFAULT_QUOTE_TERMS_SUMMARY } from '../../quotes/services/termsTemplateService.js';
 
 export const PDF_TEMPLATE_OPTIONS = [
@@ -16,6 +17,7 @@ export const emptyIssuer = {
   logoUrl: '',
   logoFileName: '',
   logoStoragePath: '',
+  themeColor: '',
   address: '',
   phone: '',
   email: '',
@@ -62,6 +64,7 @@ export function normalizeIssuer(issuer = {}, userId = '') {
     logoUrl: issuer.logoUrl ?? issuer.logo_url ?? '',
     logoFileName: issuer.logoFileName ?? issuer.logo_file_name ?? '',
     logoStoragePath: issuer.logoStoragePath ?? issuer.logo_storage_path ?? '',
+    themeColor: isValidThemeColor(issuer.themeColor ?? issuer.theme_color ?? '') ? (issuer.themeColor ?? issuer.theme_color ?? '') : '',
     registrationNumber: issuer.registrationNumber ?? issuer.registration_number ?? '',
     bankAccount: issuer.bankAccount ?? issuer.bank_account ?? '',
     contactPerson: issuer.contactPerson ?? issuer.contact_person ?? '',
@@ -163,6 +166,7 @@ function toRow(issuer) {
     logo_url: issuer.logoUrl,
     logo_file_name: issuer.logoFileName,
     logo_storage_path: issuer.logoStoragePath,
+    theme_color: issuer.themeColor ? sanitizeThemeColor(issuer.themeColor) : '',
     address: issuer.address,
     phone: issuer.phone,
     email: issuer.email,
@@ -218,6 +222,7 @@ function fromRow(row) {
     logoUrl: row.logo_url,
     logoFileName: row.logo_file_name,
     logoStoragePath: row.logo_storage_path,
+    themeColor: row.theme_color,
     address: row.address,
     phone: row.phone,
     email: row.email,
