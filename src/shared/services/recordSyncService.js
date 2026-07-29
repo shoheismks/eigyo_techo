@@ -1,4 +1,5 @@
 import { hasSupabaseConfig, supabase } from '../../lib/supabase.js';
+import { getTableOrderColumn } from '../config/TABLE_CONFIG.js';
 
 export function canUseCloud() {
   return hasSupabaseConfig && Boolean(supabase) && isOnline();
@@ -8,15 +9,16 @@ export function hasCloudConfig() {
   return hasSupabaseConfig && Boolean(supabase);
 }
 
-export async function fetchRecords(tableName, userId = '', fromRow = (row) => row, orderColumn = 'updated_at') {
+export async function fetchRecords(tableName, userId = '', fromRow = (row) => row, orderColumn = '') {
   if (!canUseCloud()) {
     return [];
   }
 
+  const resolvedOrderColumn = getTableOrderColumn(tableName, orderColumn);
   let query = supabase
     .from(tableName)
     .select('*')
-    .order(orderColumn, { ascending: false });
+    .order(resolvedOrderColumn, { ascending: false });
 
   if (userId) {
     query = query.eq('user_id', userId);

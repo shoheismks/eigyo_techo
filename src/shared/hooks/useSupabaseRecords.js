@@ -7,8 +7,21 @@ import {
   mergeByUpdatedAt,
   upsertRecords,
 } from '../services/recordSyncService.js';
+import { getTableConfig } from '../config/TABLE_CONFIG.js';
 
-export function createRecordHook({ tableName, storageKey, normalize, toRow, fromRow, orderColumn = 'updated_at' }) {
+function snakeToCamel(value) {
+  return String(value || '').replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+}
+
+function recordSortTime(record, orderColumn) {
+  const camelKey = snakeToCamel(orderColumn);
+  return new Date(record[camelKey] ?? record[orderColumn] ?? record.updatedAt ?? record.updated_at ?? record.createdAt ?? record.created_at ?? 0).getTime();
+}
+
+export function createRecordHook({ tableName, storageKey, normalize, toRow, fromRow, orderColumn = '' }) {
+  const tableConfig = getTableConfig(tableName);
+  const resolvedOrderColumn = orderColumn || tableConfig.orderColumn || 'updated_at';
+
   function readLocal(userId = '') {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -42,7 +55,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
 
       try {
         setSyncState('syncing');
-        const remoteRecords = await fetchRecords(tableName, userId, fromRow, orderColumn);
+        const remoteRecords = await fetchRecords(tableName, userId, fromRow, resolvedOrderColumn);
 
         if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
           return;
@@ -78,7 +91,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
           setSyncState('syncing');
           setSyncError('');
           const localRecords = readLocal(userId);
-          const remoteRecords = await fetchRecords(tableName, userId, fromRow, orderColumn);
+          const remoteRecords = await fetchRecords(tableName, userId, fromRow, resolvedOrderColumn);
           const mergedRecords = mergeByUpdatedAt(localRecords, remoteRecords)
             .map((record) => normalize(record, userId));
 
@@ -86,7 +99,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
             await upsertRecords(tableName, mergedRecords, toRow);
           }
 
-          const refreshedRecords = await fetchRecords(tableName, userId, fromRow, orderColumn);
+          const refreshedRecords = await fetchRecords(tableName, userId, fromRow, resolvedOrderColumn);
           const nextRecords = refreshedRecords.length > 0 ? refreshedRecords : mergedRecords;
 
           if (ignore) {
@@ -113,9 +126,9 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
     const sortedRecords = useMemo(
       () =>
         [...records].sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+          (a, b) => recordSortTime(b, resolvedOrderColumn) - recordSortTime(a, resolvedOrderColumn),
         ),
-      [records],
+      [records, resolvedOrderColumn],
     );
 
     function syncRecords(nextRecords, changedRecord = null) {

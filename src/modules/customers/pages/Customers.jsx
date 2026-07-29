@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import CompanyCard from '../../../shared/components/CompanyCard.jsx';
-import DesktopTable from '../../../shared/components/DesktopTable.jsx';
+import DataTable from '../../../shared/components/DataTable.jsx';
 import {
   businessCodeDuplicateMessage,
   businessCodeFormatMessage,
@@ -793,7 +793,7 @@ export default function Customers({
 
         {visibleCustomers.length > 0 ? (
           <>
-            <DesktopTable
+            <DataTable
               actions={(customer) => (
                 <div
                   className={`customer-action-menu ${openActionMenuId === customer.id ? 'is-open' : ''}`}
@@ -1103,4 +1103,3 @@ export default function Customers({
     </main>
   );
 }
-

@@ -46,8 +46,9 @@ const navGroups = [
     label: '営業',
     helper: '案件・帳票',
     icon: '営',
-    pages: ['Pipeline', 'SalesOrders', 'Invoices'],
+    pages: ['Pipeline', 'Quotes', 'SalesOrders', 'Invoices'],
     items: [
+      { key: 'Quotes', label: '見積', helper: '見積一覧・PDF' },
       { key: 'Pipeline', label: '案件', helper: '商談・フォロー・見積' },
       { key: 'SalesOrders', label: '受注', helper: '受注・契約残' },
       { key: 'Invoices', label: '請求書', helper: '請求・入金' },

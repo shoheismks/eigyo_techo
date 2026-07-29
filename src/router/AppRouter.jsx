@@ -19,6 +19,7 @@ const DeliveryNotes = lazy(() => import('../modules/deliveryNotes/pages/Delivery
 const LeadSearch = lazy(() => import('../modules/customers/pages/LeadSearch.jsx'));
 const MailAI = lazy(() => import('../pages/MailAI.jsx'));
 const Pipeline = lazy(() => import('../pages/Pipeline.jsx'));
+const Quotes = lazy(() => import('../modules/quotes/pages/Quotes.jsx'));
 const ProductDetail = lazy(() => import('../modules/products/pages/ProductDetail.jsx'));
 const Products = lazy(() => import('../modules/products/pages/Products.jsx'));
 const CustomerProductPrices = lazy(() => import('../modules/prices/pages/CustomerProductPrices.jsx'));
@@ -432,6 +433,18 @@ export default function AppRouter({
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
         onOpenInventory={openInventoryPage}
+      />
+    );
+  }
+
+  if (activePage === 'Quotes') {
+    return (
+      <Quotes
+        quotes={quotes}
+        customers={customers}
+        contacts={contacts}
+        projects={projects}
+        onCreateQuote={onCreateQuote}
       />
     );
   }

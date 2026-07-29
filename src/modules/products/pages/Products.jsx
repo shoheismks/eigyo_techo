@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import DesktopTable from '../../../shared/components/DesktopTable.jsx';
+import DataTable from '../../../shared/components/DataTable.jsx';
 import {
   PRODUCT_CATEGORIES,
   TEMPERATURE_ZONES,
@@ -283,7 +283,7 @@ export default function Products({
 
         {visibleProducts.length > 0 ? (
           <>
-            <DesktopTable
+            <DataTable
               actionWidth="260px"
               actions={(product) => (
                 <>
