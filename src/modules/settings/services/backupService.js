@@ -28,6 +28,8 @@ const DATASET_KEYS = [
   'issuers',
   'adoptions',
   'attachments',
+  'events',
+  'tasks',
 ];
 
 export function createBackupPayload({ user, userId, datasets }) {
