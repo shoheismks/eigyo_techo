@@ -151,6 +151,9 @@ export function AppDataProvider({ userId, children }) {
     removeDeliveryNote: deliveryNotesState.removeRecord,
     createDeliveryNoteFromShipment: deliveryNotesState.createDeliveryNoteFromShipment,
     reloadDeliveryNotes: deliveryNotesState.reload,
+    deliveryNoteSyncState: deliveryNotesState.syncState,
+    deliveryNoteSyncError: deliveryNotesState.syncError,
+    deliveryNoteLegacyLocalDataWarning: deliveryNotesState.legacyLocalDataWarning,
 
     issuers: toArray(issuersState.records),
     addIssuer: issuersState.addRecord,

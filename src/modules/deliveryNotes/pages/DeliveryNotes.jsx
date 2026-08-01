@@ -45,6 +45,8 @@ export default function DeliveryNotes({
   createDeliveryNoteFromShipment,
   updateDeliveryNote,
   removeDeliveryNote,
+  syncError = '',
+  legacyLocalDataWarning = '',
   user,
 }) {
   const [keyword, setKeyword] = useState('');
@@ -132,11 +134,20 @@ export default function DeliveryNotes({
     return buildDeliveryNotePdfContext({ deliveryNote: note, shipment, salesOrder: order, customer, issuer });
   }
 
-  function updateSelected(updates) {
+  async function updateSelected(updates) {
     if (!selectedNote) return;
     const normalized = normalizeDeliveryNote({ ...selectedNote, ...updates, updatedBy: user?.id || '', updatedByName: user?.email || '' }, user?.id || selectedNote.userId);
-    updateDeliveryNote?.(selectedNote.id, normalized);
-    setPreviewHtml('');
+    setSaving(true);
+    setMessage('');
+    try {
+      await updateDeliveryNote?.(selectedNote.id, normalized);
+      setPreviewHtml('');
+      setMessage('納品書を更新しました。');
+    } catch (error) {
+      setMessage(error.message || '納品書の更新に失敗しました。');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handlePreview() {
@@ -164,7 +175,7 @@ export default function DeliveryNotes({
         field: 'deliveryNotePdf',
       });
       const generatedAt = new Date().toISOString();
-      updateDeliveryNote?.(selectedNote.id, normalizeDeliveryNote({
+      await updateDeliveryNote?.(selectedNote.id, normalizeDeliveryNote({
         ...selectedNote,
         status: selectedNote.deliveryNotePdfUrl ? 'Reissued' : 'Issued',
         deliveryNotePdfUrl: uploadedPdf?.publicUrl || uploadedPdf?.url || '',
@@ -193,6 +204,22 @@ export default function DeliveryNotes({
     }
   }
 
+  async function removeNote(id) {
+    if (!id || saving) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await removeDeliveryNote?.(id);
+      if (selectedId === id) setSelectedId('');
+      setPreviewHtml('');
+      setMessage('納品書を取消しました。');
+    } catch (error) {
+      setMessage(error.message || '納品書の取消に失敗しました。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="page delivery-notes-page">
       <div className="page-header">
@@ -200,6 +227,9 @@ export default function DeliveryNotes({
         <h1>納品書</h1>
         <p>出荷済データから、価格表示を切り替えられる納品書を作成・再発行します。</p>
       </div>
+
+      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
+      {syncError && <p className="form-error-message">{syncError}</p>}
 
       <section className="sync-status-card">
         <div>
@@ -234,7 +264,7 @@ export default function DeliveryNotes({
             <>
               <button type="button" className="ghost-button" onClick={() => setSelectedId(note.id)}>詳細</button>
               {note.deliveryNotePdfUrl && <a className="ghost-button external-button" href={note.deliveryNotePdfUrl} target="_blank" rel="noreferrer">PDF</a>}
-              <button type="button" className="ghost-button danger" onClick={() => removeDeliveryNote?.(note.id)}>取消</button>
+              <button type="button" className="ghost-button danger" onClick={() => removeNote(note.id)} disabled={saving}>取消</button>
             </>
           )}
           actionWidth="190px"

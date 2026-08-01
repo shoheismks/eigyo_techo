@@ -114,6 +114,9 @@ export default function AppRouter({
   salesOrderLegacyLocalDataWarning,
   shipments,
   deliveryNotes,
+  deliveryNoteSyncState,
+  deliveryNoteSyncError,
+  deliveryNoteLegacyLocalDataWarning,
   issuers,
   addIssuer,
   updateIssuer,
@@ -420,6 +423,9 @@ export default function AppRouter({
         createDeliveryNoteFromShipment={createDeliveryNoteFromShipment}
         updateDeliveryNote={updateDeliveryNote}
         removeDeliveryNote={removeDeliveryNote}
+        syncState={deliveryNoteSyncState}
+        syncError={deliveryNoteSyncError}
+        legacyLocalDataWarning={deliveryNoteLegacyLocalDataWarning}
         user={user}
       />
     );

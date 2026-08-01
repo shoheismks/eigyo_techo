@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase.js';
-import { canUseCloud, getLocalSyncReason } from '../../../shared/services/recordSyncService.js';
+import { canUseCloud } from '../../../shared/services/recordSyncService.js';
 import { parsePrice } from '../../products/hooks/useProducts.js';
 
 const STORAGE_KEY = 'eigyo-techo-delivery-notes';
@@ -169,17 +169,15 @@ function rowToNote(row, lines = [], userId = '') {
   }, userId);
 }
 
-function readLocal(userId = '') {
+function hasLegacyLocalDeliveryNotes() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return saved.map((record) => normalizeDeliveryNote(record, userId)).filter((record) => !userId || record.userId === userId);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
   } catch {
-    return [];
+    return Boolean(localStorage.getItem(STORAGE_KEY));
   }
-}
-
-function saveLocal(records) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records.map((record) => normalizeDeliveryNote(record))));
 }
 
 async function fetchRemote(userId = '') {
@@ -214,16 +212,21 @@ async function persistNote(note) {
 }
 
 export function useDeliveryNotes(userId = '') {
-  const [records, setRecords] = useState(() => (canUseCloud() ? [] : readLocal(userId)));
-  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
+  const [records, setRecords] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
   const [syncError, setSyncError] = useState('');
+  const [legacyLocalDataWarning] = useState(() =>
+    hasLegacyLocalDeliveryNotes()
+      ? '旧ローカル納品書データがあります。安全のため自動移行・自動削除は行いません。'
+      : '',
+  );
   const writeSequenceRef = useRef(0);
 
   async function reload(writeSequence = null) {
     if (!canUseCloud()) {
-      setRecords(readLocal(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason());
+      setRecords([]);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、納品書データは取得・保存できません。ネットワークと設定を確認してください。');
       return;
     }
 
@@ -232,14 +235,13 @@ export function useDeliveryNotes(userId = '') {
       const remote = await fetchRemote(userId);
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
       setRecords(remote);
-      saveLocal(remote);
       setSyncState('supabase');
       setSyncError('');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
-      setRecords(readLocal(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason(error.message));
+      setRecords([]);
+      setSyncState('error');
+      setSyncError(error.message || '納品書データの取得に失敗しました。');
     }
   }
 
@@ -259,39 +261,41 @@ export function useDeliveryNotes(userId = '') {
       p_issue_date: issueDate || null,
     });
     if (error) {
-      setSyncError(getLocalSyncReason(error.message));
+      setSyncState('error');
+      setSyncError(error.message || '納品書作成に失敗しました。');
       throw error;
     }
     await reload(++writeSequenceRef.current);
     return data;
   }
 
-  function upsertLocal(nextRecord) {
+  async function persistDeliveryNote(nextRecord) {
     const normalized = normalizeDeliveryNote(nextRecord, userId);
-    setRecords((current) => {
-      const next = current.some((record) => record.id === normalized.id)
-        ? current.map((record) => (record.id === normalized.id ? normalized : record))
-        : [normalized, ...current];
-      saveLocal(next);
-      return next;
-    });
 
-    if (canUseCloud()) {
-      const writeSequence = ++writeSequenceRef.current;
-      setSyncState('syncing');
-      persistNote(normalized)
-        .then(() => reload(writeSequence))
-        .catch((error) => {
-          setSyncState('local');
-          setSyncError(getLocalSyncReason(error.message));
-        });
+    if (!canUseCloud()) {
+      const message = 'Supabaseに接続できないため、納品書データは保存できません。';
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
     }
-    return normalized.id;
+
+    const writeSequence = ++writeSequenceRef.current;
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      await persistNote(normalized);
+      await reload(writeSequence);
+      return normalized.id;
+    } catch (error) {
+      setSyncState('error');
+      setSyncError(error.message || '納品書データの保存に失敗しました。');
+      throw error;
+    }
   }
 
   function addRecord(note) {
     const now = nowIso();
-    return upsertLocal(normalizeDeliveryNote({
+    return persistDeliveryNote(normalizeDeliveryNote({
       ...note,
       id: note.id ?? crypto.randomUUID(),
       userId,
@@ -302,8 +306,10 @@ export function useDeliveryNotes(userId = '') {
 
   function updateRecord(id, updates) {
     const previous = records.find((record) => record.id === id);
-    if (!previous) return;
-    upsertLocal(normalizeDeliveryNote({
+    if (!previous) {
+      return Promise.reject(new Error('更新対象の納品書が見つかりません。'));
+    }
+    return persistDeliveryNote(normalizeDeliveryNote({
       ...previous,
       ...updates,
       id,
@@ -313,7 +319,7 @@ export function useDeliveryNotes(userId = '') {
   }
 
   function removeRecord(id) {
-    updateRecord(id, { isDeleted: true, status: 'Cancelled', deletedAt: nowIso() });
+    return updateRecord(id, { isDeleted: true, status: 'Cancelled', deletedAt: nowIso() });
   }
 
   const sortedRecords = useMemo(
@@ -330,5 +336,6 @@ export function useDeliveryNotes(userId = '') {
     reload,
     syncState,
     syncError,
+    legacyLocalDataWarning,
   };
 }
