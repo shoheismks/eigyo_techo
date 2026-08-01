@@ -79,29 +79,29 @@ export async function readBackupFile(file) {
   return payload;
 }
 
-export function restoreBackupPayload(payload, handlers) {
+export async function restoreBackupPayload(payload, handlers) {
   const summary = {};
 
-  DATASET_KEYS.forEach((key) => {
+  for (const key of DATASET_KEYS) {
     const records = Array.isArray(payload.datasets?.[key]) ? payload.datasets[key] : [];
     const handler = handlers?.[key];
 
     if (!handler) {
       summary[key] = { imported: 0, skipped: records.length };
-      return;
+      continue;
     }
 
-    records.forEach((record) => {
+    for (const record of records) {
       const existing = handler.records.some((item) => item.id === record.id);
       if (existing) {
-        handler.update(record.id, record);
+        await handler.update(record.id, record);
       } else {
-        handler.add(record);
+        await handler.add(record);
       }
-    });
+    }
 
     summary[key] = { imported: records.length, skipped: 0 };
-  });
+  }
 
   return summary;
 }

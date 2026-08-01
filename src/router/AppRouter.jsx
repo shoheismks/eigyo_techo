@@ -88,6 +88,9 @@ export default function AppRouter({
   removeCustomerProductPrice,
   deactivateCustomerProductPrice,
   addCustomerProductPriceHistory,
+  customerProductPriceSyncState,
+  customerProductPriceSyncError,
+  customerProductPriceLegacyLocalDataWarning,
   adoptions,
   addAdoption,
   updateAdoption,
@@ -471,6 +474,9 @@ export default function AppRouter({
         updatePrice={updateCustomerProductPrice}
         removePrice={removeCustomerProductPrice}
         deactivatePrice={deactivateCustomerProductPrice}
+        syncState={customerProductPriceSyncState}
+        syncError={customerProductPriceSyncError}
+        legacyLocalDataWarning={customerProductPriceLegacyLocalDataWarning}
         userId={userId}
       />
     );

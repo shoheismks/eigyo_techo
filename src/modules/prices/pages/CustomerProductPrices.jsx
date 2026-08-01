@@ -67,6 +67,9 @@ export default function CustomerProductPrices({
   removePrice,
   deactivatePrice,
   userId = '',
+  syncState = '',
+  syncError = '',
+  legacyLocalDataWarning = '',
 }) {
   const [keyword, setKeyword] = useState('');
   const [customerFilter, setCustomerFilter] = useState(ALL);
@@ -77,6 +80,7 @@ export default function CustomerProductPrices({
   const [form, setForm] = useState(() => normalizeCustomerProductPrice({ ...emptyCustomerProductPrice, userId }, userId));
   const [changeReason, setChangeReason] = useState('');
   const [message, setMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
@@ -174,8 +178,9 @@ export default function CustomerProductPrices({
     });
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
+    if (isSaving) return;
     const payload = normalizeCustomerProductPrice(form, userId);
     if (!payload.customerId) {
       setMessage('顧客を選択してください。');
@@ -199,26 +204,47 @@ export default function CustomerProductPrices({
     }
 
     const reason = changeReason.trim() || (editingId ? 'price master updated' : 'price master created');
-    if (editingId) {
-      updatePrice?.(editingId, payload, reason);
-      setMessage('価格を更新しました。');
-    } else {
-      addPrice?.(payload, reason);
-      resetForm();
-      setMessage('価格を登録しました。');
+    setIsSaving(true);
+    try {
+      if (editingId) {
+        await updatePrice?.(editingId, payload, reason);
+        setMessage('保存しました。');
+      } else {
+        await addPrice?.(payload, reason);
+        resetForm();
+        setMessage('登録しました。');
+      }
+    } catch (error) {
+      setMessage(error.message || '保存に失敗しました。Supabaseの接続と権限を確認してください。');
+    } finally {
+      setIsSaving(false);
     }
   }
 
-  function deactivateSelectedPrice() {
+  async function deactivateSelectedPrice() {
     if (!editingId) return;
-    deactivatePrice?.(editingId, changeReason.trim() || 'deactivated from price master');
-    setMessage('価格を無効化しました。');
+    setIsSaving(true);
+    try {
+      await deactivatePrice?.(editingId, changeReason.trim() || 'deactivated from price master');
+      setMessage('無効化しました。');
+    } catch (error) {
+      setMessage(error.message || '無効化に失敗しました。');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function removeSelectedPrice() {
+  async function removeSelectedPrice() {
     if (!editingId) return;
-    removePrice?.(editingId, changeReason.trim() || 'deleted from price master');
-    setMessage('価格を削除しました。');
+    setIsSaving(true);
+    try {
+      await removePrice?.(editingId, changeReason.trim() || 'deleted from price master');
+      setMessage('削除しました。');
+    } catch (error) {
+      setMessage(error.message || '削除に失敗しました。');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const columns = [
@@ -241,6 +267,9 @@ export default function CustomerProductPrices({
         <h1>顧客別価格マスター</h1>
         <p>顧客・商品ごとの税抜販売単価を管理し、見積と受注へ採用根拠付きで反映します。</p>
       </section>
+
+      {legacyLocalDataWarning && <div className="form-error-message">{legacyLocalDataWarning}</div>}
+      {syncError && <div className="form-error-message">{syncError}</div>}
 
       <section className="search-panel desktop-filter-panel">
         <label className="field-label filter-search">検索<input value={keyword} placeholder="顧客・商品・商品コード・ブランドで検索" onChange={(event) => setKeyword(event.target.value)} /></label>
@@ -289,10 +318,10 @@ export default function CustomerProductPrices({
           )}
 
           <div className="mail-action-row">
-            <button type="submit" className="primary-button">{editingId ? '更新' : '登録'}</button>
-            {editingId && <button type="button" className="ghost-button" onClick={() => duplicatePrice(form)}>複製</button>}
-            {editingId && <button type="button" className="ghost-button" onClick={deactivateSelectedPrice}>無効化</button>}
-            {editingId && <button type="button" className="ghost-button danger" onClick={removeSelectedPrice}>削除</button>}
+            <button type="submit" className="primary-button" disabled={isSaving || syncState === 'syncing'}>{isSaving ? '保存中...' : editingId ? '更新' : '登録'}</button>
+            {editingId && <button type="button" className="ghost-button" disabled={isSaving} onClick={() => duplicatePrice(form)}>複製</button>}
+            {editingId && <button type="button" className="ghost-button" disabled={isSaving} onClick={deactivateSelectedPrice}>無効化</button>}
+            {editingId && <button type="button" className="ghost-button danger" disabled={isSaving} onClick={removeSelectedPrice}>削除</button>}
           </div>
           {message && <p className={message.includes('選択') || message.includes('入力') || message.includes('同じ') || message.includes('以前') ? 'form-error-message' : 'notice-text'}>{message}</p>}
         </form>

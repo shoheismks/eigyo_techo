@@ -175,7 +175,7 @@ export default function SettingsPage({
 
     try {
       const payload = await readBackupFile(file);
-      const summary = restoreBackupPayload(payload, restoreHandlers);
+      const summary = await restoreBackupPayload(payload, restoreHandlers);
       const importedCount = Object.values(summary).reduce(
         (total, item) => total + item.imported,
         0,

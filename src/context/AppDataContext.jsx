@@ -85,6 +85,9 @@ export function AppDataProvider({ userId, children }) {
     removeCustomerProductPrice: pricesState.removeRecord,
     deactivateCustomerProductPrice: pricesState.deactivateRecord,
     addCustomerProductPriceHistory: pricesState.addHistoryRecord,
+    customerProductPriceSyncState: pricesState.syncState,
+    customerProductPriceSyncError: pricesState.syncError,
+    customerProductPriceLegacyLocalDataWarning: pricesState.legacyLocalDataWarning,
 
     inventories: toArray(inventoryState.records),
     addInventory: inventoryState.addRecord,

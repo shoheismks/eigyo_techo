@@ -1,4 +1,5 @@
-import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { canUseCloud, fetchRecords, upsertRecords } from '../../../shared/services/recordSyncService.js';
 import { normalizePriceNumber } from '../services/customerProductPriceService.js';
 
 const PRICE_STORAGE_KEY = 'eigyo-techo-customer-product-prices';
@@ -148,28 +149,120 @@ function historyFromRow(row) {
   return normalizeCustomerProductPriceHistory(row, row.user_id);
 }
 
-const usePriceRecords = createRecordHook({
-  tableName: 'customer_product_prices',
-  storageKey: PRICE_STORAGE_KEY,
-  normalize: normalizeCustomerProductPrice,
-  toRow: priceToRow,
-  fromRow: priceFromRow,
-});
+function hasLegacyLocalRecords(storageKey) {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return Boolean(localStorage.getItem(storageKey));
+  }
+}
 
-const usePriceHistoryRecords = createRecordHook({
-  tableName: 'customer_product_price_history',
-  storageKey: HISTORY_STORAGE_KEY,
-  normalize: normalizeCustomerProductPriceHistory,
-  toRow: historyToRow,
-  fromRow: historyFromRow,
-});
+function cloudRequiredMessage() {
+  if (!canUseCloud()) {
+    return 'Supabaseに接続できないため、顧客別価格は保存できません。ネットワークと設定を確認してください。';
+  }
+
+  return '';
+}
 
 export function useCustomerProductPrices(userId = '') {
-  const pricesHook = usePriceRecords(userId);
-  const historyHook = usePriceHistoryRecords(userId);
+  const [records, setRecords] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
+  const [syncError, setSyncError] = useState('');
+  const [legacyLocalDataWarning] = useState(() =>
+    hasLegacyLocalRecords(PRICE_STORAGE_KEY) || hasLegacyLocalRecords(HISTORY_STORAGE_KEY)
+      ? '旧ローカルデータがあります。安全のため自動移行は行いません。必要な場合は管理者が確認してください。'
+      : '',
+  );
 
-  function addHistory(action, beforeData, afterData, reason = '') {
-    historyHook.addRecord(normalizeCustomerProductPriceHistory({
+  const sortByUpdatedAt = useCallback((items) =>
+    [...items].sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))),
+  []);
+
+  const sortHistory = useCallback((items) =>
+    [...items].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))),
+  []);
+
+  const reload = useCallback(async () => {
+    const unavailableMessage = cloudRequiredMessage();
+    if (unavailableMessage) {
+      setRecords([]);
+      setHistory([]);
+      setSyncState('error');
+      setSyncError(unavailableMessage);
+      return;
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      const [remotePrices, remoteHistory] = await Promise.all([
+        fetchRecords('customer_product_prices', userId, priceFromRow, 'updated_at'),
+        fetchRecords('customer_product_price_history', userId, historyFromRow, 'created_at'),
+      ]);
+      setRecords(sortByUpdatedAt(remotePrices.map((price) => normalizeCustomerProductPrice(price, userId))));
+      setHistory(sortHistory(remoteHistory.map((entry) => normalizeCustomerProductPriceHistory(entry, userId))));
+      setSyncState('supabase');
+    } catch (error) {
+      setRecords([]);
+      setHistory([]);
+      setSyncState('error');
+      setSyncError(error.message || '顧客別価格の取得に失敗しました。');
+    }
+  }, [sortByUpdatedAt, sortHistory, userId]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const recordsById = useMemo(() => new Map(records.map((price) => [price.id, price])), [records]);
+
+  async function persistPrice(price) {
+    const unavailableMessage = cloudRequiredMessage();
+    if (unavailableMessage) {
+      setSyncState('error');
+      setSyncError(unavailableMessage);
+      throw new Error(unavailableMessage);
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      await upsertRecords('customer_product_prices', [price], priceToRow);
+      setSyncState('supabase');
+    } catch (error) {
+      setSyncState('error');
+      setSyncError(error.message || '顧客別価格の保存に失敗しました。');
+      throw error;
+    }
+  }
+
+  async function persistHistory(entry) {
+    const unavailableMessage = cloudRequiredMessage();
+    if (unavailableMessage) {
+      setSyncState('error');
+      setSyncError(unavailableMessage);
+      throw new Error(unavailableMessage);
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      await upsertRecords('customer_product_price_history', [entry], historyToRow);
+      setSyncState('supabase');
+    } catch (error) {
+      setSyncState('error');
+      setSyncError(error.message || '価格履歴の保存に失敗しました。');
+      throw error;
+    }
+  }
+
+  async function addHistory(action, beforeData, afterData, reason = '') {
+    const entry = normalizeCustomerProductPriceHistory({
       customerProductPriceId: afterData?.id || beforeData?.id || '',
       action,
       beforeData,
@@ -177,41 +270,68 @@ export function useCustomerProductPrices(userId = '') {
       reason,
       changedBy: userId,
       userId,
-    }, userId));
+    }, userId);
+
+    await persistHistory(entry);
+    setHistory((current) => sortHistory([entry, ...current]));
+    return entry.id;
   }
 
-  function addPrice(price, reason = 'created') {
-    const normalized = normalizeCustomerProductPrice(price, userId);
-    const id = pricesHook.addRecord(normalized);
-    addHistory('created', null, { ...normalized, id }, reason);
-    return id;
+  async function addPrice(price, reason = 'created') {
+    const now = new Date().toISOString();
+    const normalized = normalizeCustomerProductPrice({
+      ...price,
+      id: price.id ?? crypto.randomUUID(),
+      userId,
+      createdAt: price.createdAt || now,
+      updatedAt: now,
+    }, userId);
+
+    await persistPrice(normalized);
+    await addHistory('created', null, normalized, reason);
+    setRecords((current) => sortByUpdatedAt([normalized, ...current.filter((item) => item.id !== normalized.id)]));
+    return normalized.id;
   }
 
-  function updatePrice(id, updates, reason = 'updated') {
-    const before = pricesHook.records.find((item) => item.id === id);
-    const after = normalizeCustomerProductPrice({ ...before, ...updates, id }, userId);
-    pricesHook.updateRecord(id, after);
-    addHistory('updated', before || null, after, reason);
+  async function updatePrice(id, updates, reason = 'updated') {
+    const before = recordsById.get(id);
+    const after = normalizeCustomerProductPrice({
+      ...before,
+      ...updates,
+      id,
+      userId,
+      updatedAt: new Date().toISOString(),
+    }, userId);
+
+    await persistPrice(after);
+    await addHistory('updated', before || null, after, reason);
+    setRecords((current) => sortByUpdatedAt(current.map((item) => (item.id === id ? after : item))));
   }
 
-  function deactivatePrice(id, reason = 'deactivated') {
-    updatePrice(id, { isActive: false }, reason);
+  async function deactivatePrice(id, reason = 'deactivated') {
+    await updatePrice(id, { isActive: false }, reason);
   }
 
-  function removePrice(id, reason = 'deleted') {
-    updatePrice(id, { isActive: false, deletedAt: new Date().toISOString() }, reason);
+  async function removePrice(id, reason = 'deleted') {
+    await updatePrice(id, { isActive: false, deletedAt: new Date().toISOString() }, reason);
   }
 
   return {
-    records: pricesHook.records,
-    history: historyHook.records,
+    records,
+    history,
     addRecord: addPrice,
     updateRecord: updatePrice,
     removeRecord: removePrice,
     deactivateRecord: deactivatePrice,
-    addHistoryRecord: historyHook.addRecord,
-    reload: pricesHook.reload,
-    syncState: pricesHook.syncState,
-    syncError: pricesHook.syncError,
+    addHistoryRecord: async (entry) => {
+      const normalized = normalizeCustomerProductPriceHistory(entry, userId);
+      await persistHistory(normalized);
+      setHistory((current) => sortHistory([normalized, ...current]));
+      return normalized.id;
+    },
+    reload,
+    syncState,
+    syncError,
+    legacyLocalDataWarning,
   };
 }
