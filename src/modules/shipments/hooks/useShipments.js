@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase.js';
-import { canUseCloud, getLocalSyncReason } from '../../../shared/services/recordSyncService.js';
+import { canUseCloud } from '../../../shared/services/recordSyncService.js';
 import { parsePrice } from '../../products/hooks/useProducts.js';
 
 const SHIPMENTS_STORAGE_KEY = 'eigyo-techo-shipments';
@@ -81,17 +81,15 @@ export function normalizeShipment(shipment = {}, userId = '') {
   };
 }
 
-function readLocal(userId = '') {
+function hasLegacyLocalShipments() {
   try {
-    const saved = JSON.parse(localStorage.getItem(SHIPMENTS_STORAGE_KEY) || '[]');
-    return saved.map((record) => normalizeShipment(record, userId)).filter((record) => !userId || record.userId === userId);
+    const saved = localStorage.getItem(SHIPMENTS_STORAGE_KEY);
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
   } catch {
-    return [];
+    return Boolean(localStorage.getItem(SHIPMENTS_STORAGE_KEY));
   }
-}
-
-function saveLocal(records) {
-  localStorage.setItem(SHIPMENTS_STORAGE_KEY, JSON.stringify(records.map((record) => normalizeShipment(record))));
 }
 
 async function fetchRemote(userId = '') {
@@ -117,16 +115,21 @@ async function fetchRemote(userId = '') {
 }
 
 export function useShipments(userId = '') {
-  const [records, setRecords] = useState(() => (canUseCloud() ? [] : readLocal(userId)));
-  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
+  const [records, setRecords] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
   const [syncError, setSyncError] = useState('');
+  const [legacyLocalDataWarning] = useState(() =>
+    hasLegacyLocalShipments()
+      ? '旧ローカル出荷データがあります。安全のため自動移行・自動削除は行いません。'
+      : '',
+  );
   const writeSequenceRef = useRef(0);
 
   async function reload(writeSequence = null) {
     if (!canUseCloud()) {
-      setRecords(readLocal(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason());
+      setRecords([]);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、出荷データは取得・保存できません。ネットワークと設定を確認してください。');
       return;
     }
 
@@ -135,14 +138,13 @@ export function useShipments(userId = '') {
       const remote = await fetchRemote(userId);
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
       setRecords(remote);
-      saveLocal(remote);
       setSyncState('supabase');
       setSyncError('');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
-      setRecords(readLocal(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason(error.message));
+      setRecords([]);
+      setSyncState('error');
+      setSyncError(error.message || '出荷データの取得に失敗しました。');
     }
   }
 
@@ -158,7 +160,8 @@ export function useShipments(userId = '') {
     setSyncState('syncing');
     const { data, error } = await supabase.rpc(functionName, params);
     if (error) {
-      setSyncError(getLocalSyncReason(error.message));
+      setSyncState('error');
+      setSyncError(error.message || '出荷処理に失敗しました。');
       throw error;
     }
     await reload(++writeSequenceRef.current);
@@ -210,5 +213,6 @@ export function useShipments(userId = '') {
     reload,
     syncState,
     syncError,
+    legacyLocalDataWarning,
   };
 }

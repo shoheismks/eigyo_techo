@@ -113,6 +113,9 @@ export default function AppRouter({
   salesOrderSyncError,
   salesOrderLegacyLocalDataWarning,
   shipments,
+  shipmentSyncState,
+  shipmentSyncError,
+  shipmentLegacyLocalDataWarning,
   deliveryNotes,
   deliveryNoteSyncState,
   deliveryNoteSyncError,
@@ -404,6 +407,9 @@ export default function AppRouter({
         inventoryLots={inventoryLots}
         deliveryNotes={deliveryNotes}
         updateShipmentStatus={updateShipmentStatus}
+        syncState={shipmentSyncState}
+        syncError={shipmentSyncError}
+        legacyLocalDataWarning={shipmentLegacyLocalDataWarning}
         onOpenSalesOrder={() => setActivePage('SalesOrders')}
         onOpenDeliveryNotes={() => setActivePage('DeliveryNotes')}
         onCreateDeliveryNote={createDeliveryNoteFromShipment}

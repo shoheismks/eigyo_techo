@@ -144,6 +144,9 @@ export function AppDataProvider({ userId, children }) {
     shipShipment: shipmentsState.shipShipment,
     cancelShipment: shipmentsState.cancelShipment,
     reloadShipments: shipmentsState.reload,
+    shipmentSyncState: shipmentsState.syncState,
+    shipmentSyncError: shipmentsState.syncError,
+    shipmentLegacyLocalDataWarning: shipmentsState.legacyLocalDataWarning,
 
     deliveryNotes: toArray(deliveryNotesState.records),
     addDeliveryNote: deliveryNotesState.addRecord,

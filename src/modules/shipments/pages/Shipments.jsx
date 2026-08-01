@@ -35,10 +35,14 @@ export default function Shipments({
   onOpenSalesOrder,
   onOpenDeliveryNotes,
   onCreateDeliveryNote,
+  syncError = '',
+  legacyLocalDataWarning = '',
 }) {
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedId, setSelectedId] = useState(shipments[0]?.id || '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
   const orderMap = useMemo(() => new Map(salesOrders.map((order) => [order.id, order])), [salesOrders]);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
@@ -80,8 +84,18 @@ export default function Shipments({
     { key: 'trackingNumber', label: '追跡番号', minWidth: '160px', render: (shipment) => shipment.trackingNumber || '-' },
   ];
 
-  function changeStatus(shipment, status) {
-    updateShipmentStatus?.(shipment.id, status, { shipmentDate: shipment.shipmentDate });
+  async function changeStatus(shipment, status) {
+    if (!shipment?.id || saving) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await updateShipmentStatus?.(shipment.id, status, { shipmentDate: shipment.shipmentDate });
+      setMessage('出荷ステータスを更新しました。');
+    } catch (error) {
+      setMessage(error.message || '出荷ステータスの更新に失敗しました。');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function hasDeliveryNote(shipment) {
@@ -95,6 +109,10 @@ export default function Shipments({
         <h1>出荷管理</h1>
         <p>受注から作成した出荷予定、ピッキング、出荷確定、取消を確認します。</p>
       </div>
+
+      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
+      {syncError && <p className="form-error-message">{syncError}</p>}
+      {message && <p className={message.includes('失敗') ? 'form-error-message' : 'notice-text'}>{message}</p>}
 
       <section className="sync-status-card">
         <div>
@@ -188,10 +206,10 @@ export default function Shipments({
                 <div><span>追跡番号</span><strong>{selectedShipment.trackingNumber || '-'}</strong></div>
               </div>
               <div className="mail-action-row">
-                <button type="button" className="ghost-button" disabled={selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Picking')}>Picking</button>
-                <button type="button" className="ghost-button" disabled={selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Ready')}>Ready</button>
-                <button type="button" className="primary-button" disabled={selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Shipped')}>Shipped</button>
-                <button type="button" className="ghost-button danger" disabled={selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Cancelled')}>取消</button>
+                <button type="button" className="ghost-button" disabled={saving || selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Picking')}>Picking</button>
+                <button type="button" className="ghost-button" disabled={saving || selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Ready')}>Ready</button>
+                <button type="button" className="primary-button" disabled={saving || selectedShipment.status === 'Shipped' || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Shipped')}>Shipped</button>
+                <button type="button" className="ghost-button danger" disabled={saving || selectedShipment.status === 'Cancelled'} onClick={() => changeStatus(selectedShipment, 'Cancelled')}>取消</button>
                 {selectedShipment.status === 'Shipped' && (
                   <button type="button" className="primary-button" onClick={() => (hasDeliveryNote(selectedShipment) ? onOpenDeliveryNotes?.(selectedShipment.id) : onCreateDeliveryNote?.(selectedShipment.id))}>
                     {hasDeliveryNote(selectedShipment) ? '納品書を開く' : '納品書作成'}
