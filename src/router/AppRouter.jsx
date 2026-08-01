@@ -175,6 +175,7 @@ export default function AppRouter({
   updateAttachment,
   syncState,
   syncError,
+  legacyLocalDataWarning,
   reloadFromCloud,
   } = appData;
 
@@ -231,6 +232,9 @@ export default function AppRouter({
         onOpenKarte={openCustomerKarte}
         onOpenPipeline={() => setActivePage('Pipeline')}
         onCreateMail={() => setActivePage('MailAI')}
+        syncState={syncState}
+        syncError={syncError}
+        legacyLocalDataWarning={legacyLocalDataWarning}
       />
     );
   }

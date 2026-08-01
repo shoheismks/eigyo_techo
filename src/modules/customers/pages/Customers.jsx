@@ -140,6 +140,9 @@ export default function Customers({
   onOpenKarte,
   onOpenPipeline,
   onCreateMail,
+  syncState = '',
+  syncError = '',
+  legacyLocalDataWarning = '',
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -158,6 +161,7 @@ export default function Customers({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(INITIAL_CUSTOMER_FORM);
   const [formError, setFormError] = useState('');
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState('');
 
   useEffect(() => {
@@ -591,7 +595,7 @@ export default function Customers({
     }
   }
 
-  function handleCreateCustomer() {
+  async function handleCreateCustomer() {
     const customerCode = normalizeBusinessCode(customerForm.customerCode);
     const companyName = customerForm.companyName.trim();
 
@@ -632,7 +636,8 @@ export default function Customers({
     const customerId = crypto.randomUUID();
     const tags = parseTags(customerForm.tagsText);
 
-    addCustomer({
+    setIsSavingCustomer(true);
+    const savedCustomer = await addCustomer({
       id: customerId,
       customerCode,
       corporateNumber: customerForm.corporateNumber.trim(),
@@ -674,6 +679,13 @@ export default function Customers({
       updatedAt: now,
     });
 
+    setIsSavingCustomer(false);
+
+    if (!savedCustomer) {
+      setFormError(syncError || '顧客データの保存に失敗しました。');
+      return;
+    }
+
     setSelectedPreviewId(customerId);
     setSearchQuery('');
     setStatusFilter(ALL);
@@ -698,6 +710,9 @@ export default function Customers({
           <p>PCでは比較・絞り込みしやすいテーブルで、スマホではカードで確認できます。</p>
         </div>
       </section>
+
+      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
+      {syncError && syncState === 'error' && <p className="form-error-message">{syncError}</p>}
 
       <section className="search-panel compact-panel desktop-filter-panel">
         <label className="field-label filter-search">
@@ -1094,7 +1109,14 @@ export default function Customers({
 
               <div className="customer-editor-actions">
                 <button type="button" className="ghost-button" onClick={closeCreateModal}>キャンセル</button>
-                <button type="button" className="primary-button" onClick={handleCreateCustomer}>保存</button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleCreateCustomer}
+                  disabled={isSavingCustomer}
+                >
+                  {isSavingCustomer ? '保存中...' : '保存'}
+                </button>
               </div>
             </form>
           </div>

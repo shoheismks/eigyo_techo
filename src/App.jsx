@@ -546,8 +546,8 @@ function AuthenticatedShell() {
     closeTutorial();
   }
 
-  function handleExtensionImport(companyName) {
-    const result = importCompanyName(companyName);
+  async function handleExtensionImport(companyName) {
+    const result = await importCompanyName(companyName);
     setExtensionNotice(result.reason);
 
     if (result.ok) {
@@ -561,7 +561,7 @@ function AuthenticatedShell() {
   useEffect(() => {
     window.eigyoTechoImportCompanyName = handleExtensionImport;
 
-    function handleMessage(event) {
+    async function handleMessage(event) {
       if (event.origin !== window.location.origin) {
         return;
       }
@@ -570,7 +570,7 @@ function AuthenticatedShell() {
         return;
       }
 
-      const result = handleExtensionImport(event.data.companyName || '');
+      const result = await handleExtensionImport(event.data.companyName || '');
       window.postMessage(
         {
           type: 'EIGYO_TECHO_IMPORT_RESULT',

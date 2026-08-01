@@ -62,6 +62,7 @@ export function AppDataProvider({ userId, children }) {
     reloadFromCloud: customersState.reloadFromCloud,
     syncError: customersState.syncError,
     syncState: customersState.syncState,
+    legacyLocalDataWarning: customersState.legacyLocalDataWarning,
 
     products: toArray(productsState.products),
     addProduct: productsState.addProduct,

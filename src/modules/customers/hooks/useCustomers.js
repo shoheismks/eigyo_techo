@@ -5,9 +5,7 @@ import {
   deleteRemoteCustomer,
   fetchRemoteCustomers,
   hasCloudConfig,
-  mergeCustomers,
   upsertRemoteCustomer,
-  upsertRemoteCustomers,
 } from '../services/customerSyncService.js';
 import { normalizeOfficeFields } from '../services/customerOfficeService.js';
 import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
@@ -180,21 +178,22 @@ function normalizeCustomer(customer = {}, userId = '') {
   };
 }
 
-function readLocalCustomers(userId = '') {
+function hasLegacyLocalCustomers() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved
-      ? JSON.parse(saved)
-          .map((customer) => normalizeCustomer(customer, userId))
-          .filter((customer) => !userId || customer.userId === userId)
-      : [];
+    if (!saved) {
+      return false;
+    }
+
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
   } catch {
-    return [];
+    return true;
   }
 }
 
-function saveLocalCustomers(customers) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+function legacyLocalDataMessage() {
+  return '\u65e7\u30ed\u30fc\u30ab\u30eb\u9867\u5ba2\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u3059\u3002\u5b89\u5168\u306e\u305f\u3081\u81ea\u52d5\u79fb\u884c\u30fb\u81ea\u52d5\u524a\u9664\u306f\u884c\u3044\u307e\u305b\u3093\u3002';
 }
 
 function toSyncError(error) {
@@ -203,16 +202,16 @@ function toSyncError(error) {
     return 'Supabase customers table was not found. Please run the SQL setup.';
   }
 
-  return 'Supabase sync failed. LocalStorage fallback is active.';
+  return message || 'Supabase customers sync failed.';
 }
 
-function getLocalReason(fallback = '') {
+function getUnavailableReason(fallback = '') {
   if (!hasCloudConfig()) {
-    return 'Supabase env vars are not set. LocalStorage fallback is active.';
+    return 'Supabase env vars are not set. Customer data cannot be saved.';
   }
 
   if (!isOnline()) {
-    return 'Offline. LocalStorage fallback is active.';
+    return 'Offline. Customer data cannot be saved.';
   }
 
   return fallback;
@@ -223,55 +222,48 @@ function isOnline() {
 }
 
 export function useCustomers(userId = '') {
-  const [customers, setCustomers] = useState(() =>
-    canUseSupabase() ? [] : readLocalCustomers(userId),
-  );
-  const [syncState, setSyncState] = useState(canUseSupabase() ? 'syncing' : 'local');
-  const [syncError, setSyncError] = useState(getLocalReason);
+  const [customers, setCustomers] = useState([]);
+  const [syncState, setSyncState] = useState(canUseSupabase() ? 'syncing' : 'error');
+  const [syncError, setSyncError] = useState(() => getUnavailableReason());
+  const [legacyLocalDataWarning, setLegacyLocalDataWarning] = useState('');
   const writeSequenceRef = useRef(0);
+
+  useEffect(() => {
+    setLegacyLocalDataWarning(hasLegacyLocalCustomers() ? legacyLocalDataMessage() : '');
+  }, []);
 
   useEffect(() => {
     let ignore = false;
 
     async function syncFromSupabase() {
       if (!canUseSupabase()) {
-        setCustomers(readLocalCustomers(userId));
-        setSyncState('local');
-        setSyncError(getLocalReason());
+        setCustomers([]);
+        setSyncState('error');
+        setSyncError(getUnavailableReason());
         return;
       }
 
       try {
         setSyncState('syncing');
         setSyncError('');
-        const localCustomers = readLocalCustomers(userId);
         const remoteCustomers = (await fetchRemoteCustomers(userId)).map((customer) =>
           normalizeCustomer(customer, userId),
         );
-        const mergedCustomers = mergeCustomers(localCustomers, remoteCustomers).map((customer) =>
-          normalizeCustomer(customer, userId),
-        );
-
-        if (localCustomers.length > 0) {
-          await upsertRemoteCustomers(mergedCustomers);
-        }
-
-        const refreshedCustomers = (await fetchRemoteCustomers(userId)).map((customer) =>
-          normalizeCustomer(customer, userId),
-        );
-        const nextCustomers = refreshedCustomers.length > 0 ? refreshedCustomers : mergedCustomers;
 
         if (ignore) {
           return;
         }
 
-        setCustomers(nextCustomers);
-        saveLocalCustomers(nextCustomers);
+        setCustomers(remoteCustomers);
         setSyncState('supabase');
       } catch (error) {
-        setCustomers(readLocalCustomers(userId));
+        if (ignore) {
+          return;
+        }
+
+        setCustomers([]);
         setSyncError(toSyncError(error));
-        setSyncState('local');
+        setSyncState('error');
       }
     }
 
@@ -283,10 +275,6 @@ export function useCustomers(userId = '') {
   }, [userId]);
 
   useEffect(() => {
-    saveLocalCustomers(customers);
-  }, [customers]);
-
-  useEffect(() => {
     function handleOnline() {
       if (canUseSupabase()) {
         reloadFromCloud();
@@ -294,7 +282,8 @@ export function useCustomers(userId = '') {
     }
 
     function handleOffline() {
-      setSyncState('local');
+      setSyncState('error');
+      setSyncError(getUnavailableReason());
     }
 
     window.addEventListener('online', handleOnline);
@@ -316,9 +305,9 @@ export function useCustomers(userId = '') {
 
   async function reloadFromCloud(writeSequence = null) {
     if (!canUseSupabase()) {
-      setCustomers(readLocalCustomers(userId));
-      setSyncState('local');
-      setSyncError(getLocalReason());
+      setCustomers([]);
+      setSyncState('error');
+      setSyncError(getUnavailableReason());
       return;
     }
 
@@ -334,77 +323,74 @@ export function useCustomers(userId = '') {
       }
 
       setCustomers(remoteCustomers);
-      saveLocalCustomers(remoteCustomers);
       setSyncState('supabase');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
         return;
       }
 
-      setCustomers(readLocalCustomers(userId));
       setSyncError(toSyncError(error));
-      setSyncState('local');
+      setSyncState('error');
+      throw error;
     }
   }
 
-  function syncCustomers(nextCustomers, changedCustomer = null) {
-    saveLocalCustomers(nextCustomers);
-
+  async function persistCustomer(changedCustomer) {
     if (!canUseSupabase()) {
-      setSyncState('local');
-      setSyncError(
-        hasCloudConfig()
-          ? getLocalReason('Supabase unavailable. Saved to LocalStorage.')
-          : getLocalReason(),
-      );
-      return;
+      const message = getUnavailableReason();
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
     }
 
     const writeSequence = ++writeSequenceRef.current;
-    const writePromise = changedCustomer
-      ? upsertRemoteCustomer(changedCustomer)
-      : upsertRemoteCustomers(nextCustomers);
-
     setSyncState('syncing');
     setSyncError('');
-    writePromise
-      .then(() => reloadFromCloud(writeSequence))
-      .catch((error) => {
-        if (writeSequence !== writeSequenceRef.current) {
-          return;
-        }
 
+    try {
+      await upsertRemoteCustomer(changedCustomer);
+      await reloadFromCloud(writeSequence);
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
         setSyncError(toSyncError(error));
-        setSyncState('local');
-      });
+        setSyncState('error');
+      }
+
+      throw error;
+    }
   }
 
-  function addCustomer(customer) {
+  async function addCustomer(customer) {
     const normalized = normalizeCustomer({
       ...customer,
       userId,
       updatedAt: new Date().toISOString(),
     }, userId);
 
-    setCustomers((current) => {
-      const exists = current.some((item) => {
-        if (normalized.placeId && item.placeId === normalized.placeId) {
-          return true;
-        }
+    const exists = customers.some((item) => {
+      if (normalized.placeId && item.placeId === normalized.placeId) {
+        return true;
+      }
 
-        return (
-          item.companyName === normalized.companyName &&
-          item.address === normalized.address
-        );
-      });
-
-      const nextCustomers = exists ? current : [normalized, ...current];
-      syncCustomers(nextCustomers, exists ? null : normalized);
-      return nextCustomers;
+      return (
+        item.companyName === normalized.companyName &&
+        item.address === normalized.address
+      );
     });
+
+    if (exists) {
+      return normalized;
+    }
+
+    try {
+      await persistCustomer(normalized);
+      return normalized;
+    } catch {
+      return null;
+    }
   }
 
-  function importCompanyName(companyName) {
+  async function importCompanyName(companyName) {
     const normalizedCompanyName = companyName.trim().replace(/\s+/g, ' ');
 
     if (!normalizedCompanyName) {
@@ -436,11 +422,14 @@ export function useCustomers(userId = '') {
       updatedAt: new Date().toISOString(),
     }, userId);
 
-    setCustomers((current) => {
-      const nextCustomers = [importedCustomer, ...current];
-      syncCustomers(nextCustomers, importedCustomer);
-      return nextCustomers;
-    });
+    try {
+      await persistCustomer(importedCustomer);
+    } catch (error) {
+      return {
+        ok: false,
+        reason: toSyncError(error),
+      };
+    }
 
     return {
       ok: true,
@@ -449,42 +438,63 @@ export function useCustomers(userId = '') {
     };
   }
 
-  function updateCustomer(id, updates) {
-    setCustomers((current) => {
-      const nextCustomers = current.map((customer) =>
-        customer.id === id
-          ? normalizeCustomer({ ...customer, ...updates, userId, updatedAt: new Date().toISOString() }, userId)
-          : customer,
-      );
-      const updatedCustomer = nextCustomers.find((customer) => customer.id === id);
-      syncCustomers(nextCustomers, updatedCustomer);
-      return nextCustomers;
-    });
+  async function updateCustomer(id, updates) {
+    const currentCustomer = customers.find((customer) => customer.id === id);
+
+    if (!currentCustomer) {
+      const message = 'Customer data was not found.';
+      setSyncError(message);
+      return null;
+    }
+
+    const updatedCustomer = normalizeCustomer({
+      ...currentCustomer,
+      ...updates,
+      userId,
+      updatedAt: new Date().toISOString(),
+    }, userId);
+
+    try {
+      await persistCustomer(updatedCustomer);
+      return updatedCustomer;
+    } catch {
+      return null;
+    }
   }
 
-  function removeCustomer(id) {
-    setCustomers((current) => {
-      const hasChildren = current.some((customer) => customer.parentCustomerId === id);
+  async function removeCustomer(id) {
+    const hasChildren = customers.some((customer) => customer.parentCustomerId === id);
 
-      if (hasChildren) {
-        setSyncError('配下拠点がある本社は削除できません。先に支社・支店の本社設定を解除してください。');
-        return current;
+    if (hasChildren) {
+      const message = 'Cannot delete a head office while branch offices are linked. Remove branch links first.';
+      setSyncError(message);
+      return false;
+    }
+
+    if (!canUseSupabase()) {
+      const message = getUnavailableReason();
+      setSyncState('error');
+      setSyncError(message);
+      return false;
+    }
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+
+    try {
+      await deleteRemoteCustomer(id);
+      await reloadFromCloud(writeSequence);
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncError(toSyncError(error));
+        setSyncState('error');
       }
 
-      const nextCustomers = current.filter((customer) => customer.id !== id);
-      saveLocalCustomers(nextCustomers);
+      return false;
+    }
 
-      if (canUseSupabase()) {
-        deleteRemoteCustomer(id)
-          .then(reloadFromCloud)
-          .catch((error) => {
-            setSyncError(toSyncError(error));
-            setSyncState('local');
-          });
-      }
-
-      return nextCustomers;
-    });
+    return true;
   }
 
   function isSaved(companyName, address, placeId = '') {
@@ -507,5 +517,6 @@ export function useCustomers(userId = '') {
     reloadFromCloud,
     syncError,
     syncState,
+    legacyLocalDataWarning,
   };
 }
