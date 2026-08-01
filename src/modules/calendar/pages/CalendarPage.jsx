@@ -401,6 +401,7 @@ function expandCalendarEvents(events, rangeStartKey, rangeEndKey) {
 }
 
 function eventTimeLabel(event) {
+  if (isTaskCalendarItem(event)) return '締切';
   if (event.allDay) return '終日';
   if (!event.startAt) return '-';
   const start = toDateTimeLocal(event.startAt).slice(11, 16);
@@ -459,6 +460,57 @@ function priorityClass(priority = '') {
   return 'normal';
 }
 
+const TASK_ASSIGNEE_UNASSIGNED = '__unassigned__';
+
+function isTaskComplete(task = {}) {
+  return task.status === TASK_STATUSES[2];
+}
+
+function taskAssigneeLabel(task = {}) {
+  return task.assigneeName?.trim() || '未割当';
+}
+
+function taskPriorityRank(priority) {
+  const index = TASK_PRIORITIES.indexOf(priority);
+  return index === -1 ? TASK_PRIORITIES.length : index;
+}
+
+function isOverdueTask(task = {}, todayKey = toDateKey(new Date())) {
+  return Boolean(task.dueDate && task.dueDate < todayKey && !isTaskComplete(task));
+}
+
+function compareTasks(a = {}, b = {}) {
+  const completionDiff = Number(isTaskComplete(a)) - Number(isTaskComplete(b));
+  if (completionDiff !== 0) return completionDiff;
+
+  const priorityDiff = taskPriorityRank(a.priority) - taskPriorityRank(b.priority);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  const dueDiff = String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31'));
+  if (dueDiff !== 0) return dueDiff;
+
+  return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+}
+
+function isTaskCalendarItem(event = {}) {
+  return event.source === 'task';
+}
+
+function compareCalendarItems(a = {}, b = {}) {
+  const dateDiff = String(a.date || eventDate(a)).localeCompare(String(b.date || eventDate(b)));
+  if (dateDiff !== 0) return dateDiff;
+
+  if (isTaskCalendarItem(a) && isTaskCalendarItem(b)) {
+    return compareTasks(a.originalTask || a, b.originalTask || b);
+  }
+
+  if (isTaskCalendarItem(a) !== isTaskCalendarItem(b)) {
+    return isTaskCalendarItem(a) ? 1 : -1;
+  }
+
+  return eventSortValue(a).localeCompare(eventSortValue(b));
+}
+
 function taskToCalendarItem(task) {
   return {
     id: `task-${task.id}`,
@@ -475,7 +527,7 @@ function taskToCalendarItem(task) {
     memo: task.content,
     source: 'task',
     tone: 'task',
-    color: task.priority === '高' ? '#ef4444' : task.priority === '低' ? '#38bdf8' : '#f59e0b',
+    color: priorityClass(task.priority) === 'high' ? '#ef4444' : priorityClass(task.priority) === 'low' ? '#38bdf8' : '#f59e0b',
     assigneeName: task.assigneeName,
     originalTask: task,
   };
@@ -511,7 +563,7 @@ export default function CalendarPage({
   const [taskForm, setTaskForm] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [taskEditorOpen, setTaskEditorOpen] = useState(false);
-  const [taskFilters, setTaskFilters] = useState({ assignee: '', status: '', priority: '' });
+  const [taskFilters, setTaskFilters] = useState({ assignee: '', completion: '', priority: '', overdue: '' });
   const [eventListOpen, setEventListOpen] = useState(false);
   const [dragState, setDragState] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
@@ -540,18 +592,28 @@ export default function CalendarPage({
     () => tasks
       .filter((task) => !task.deletedAt && task.dueDate)
       .filter((task) => task.dueDate >= visibleRange.start && task.dueDate <= visibleRange.end)
-      .filter((task) => !taskFilters.assignee || task.assigneeName === taskFilters.assignee)
-      .filter((task) => !taskFilters.status || task.status === taskFilters.status)
+      .filter((task) => {
+        if (!taskFilters.assignee) return true;
+        if (taskFilters.assignee === TASK_ASSIGNEE_UNASSIGNED) return !task.assigneeName?.trim();
+        return task.assigneeName === taskFilters.assignee;
+      })
+      .filter((task) => {
+        if (taskFilters.completion === 'incomplete') return !isTaskComplete(task);
+        if (taskFilters.completion === 'complete') return isTaskComplete(task);
+        return true;
+      })
       .filter((task) => !taskFilters.priority || task.priority === taskFilters.priority)
+      .filter((task) => !taskFilters.overdue || isOverdueTask(task, today))
+      .sort(compareTasks)
       .map(taskToCalendarItem),
-    [taskFilters.assignee, taskFilters.priority, taskFilters.status, tasks, visibleRange.end, visibleRange.start],
+    [taskFilters.assignee, taskFilters.completion, taskFilters.overdue, taskFilters.priority, tasks, today, visibleRange.end, visibleRange.start],
   );
   const mergedEvents = useMemo(
     () => [
       ...expandedUserEvents,
       ...systemEvents,
       ...filteredTaskItems,
-    ].sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b))),
+    ].sort(compareCalendarItems),
     [expandedUserEvents, filteredTaskItems, systemEvents],
   );
   const listEvents = useMemo(() => mergedEvents.filter((event) => event.status !== '中止'), [mergedEvents]);
@@ -607,6 +669,16 @@ export default function CalendarPage({
 
   function eventsForDay(dateKey) {
     return mergedEvents.filter((event) => (event.date || eventDate(event)) === dateKey);
+  }
+
+  function taskItemsForDay(dateKey) {
+    return eventsForDay(dateKey).filter(isTaskCalendarItem);
+  }
+
+  function timedEventsForHour(dateKey, hour) {
+    return eventsForDay(dateKey)
+      .filter((event) => !isTaskCalendarItem(event))
+      .filter((event) => new Date(event.startAt || `${dateKey}T00:00:00`).getHours() === hour);
   }
 
   function openAdd(dateKey, hour = 9) {
@@ -982,17 +1054,19 @@ export default function CalendarPage({
 
       <section className="calendar-task-filters" aria-label="タスク絞り込み">
         <label className="field-label">
-          対応者
-          <select value={taskFilters.assignee} onChange={(event) => setTaskFilters((current) => ({ ...current, assignee: event.target.value }))}>
+          完了状態
+          <select value={taskFilters.completion} onChange={(event) => setTaskFilters((current) => ({ ...current, completion: event.target.value }))}>
             <option value="">すべて</option>
-            {taskAssignees.map((assignee) => <option key={assignee} value={assignee}>{assignee}</option>)}
+            <option value="incomplete">未完了</option>
+            <option value="complete">完了</option>
           </select>
         </label>
         <label className="field-label">
-          ステータス
-          <select value={taskFilters.status} onChange={(event) => setTaskFilters((current) => ({ ...current, status: event.target.value }))}>
+          対応者
+          <select value={taskFilters.assignee} onChange={(event) => setTaskFilters((current) => ({ ...current, assignee: event.target.value }))}>
             <option value="">すべて</option>
-            {TASK_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            <option value={TASK_ASSIGNEE_UNASSIGNED}>未割当</option>
+            {taskAssignees.map((assignee) => <option key={assignee} value={assignee}>{assignee}</option>)}
           </select>
         </label>
         <label className="field-label">
@@ -1000,6 +1074,13 @@ export default function CalendarPage({
           <select value={taskFilters.priority} onChange={(event) => setTaskFilters((current) => ({ ...current, priority: event.target.value }))}>
             <option value="">すべて</option>
             {TASK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          期限
+          <select value={taskFilters.overdue} onChange={(event) => setTaskFilters((current) => ({ ...current, overdue: event.target.value }))}>
+            <option value="">すべて</option>
+            <option value="overdue">期限切れ</option>
           </select>
         </label>
       </section>
@@ -1032,6 +1113,39 @@ export default function CalendarPage({
         </section>
       ) : viewMode === 'day' ? (
         <section className="calendar-day-schedule">
+          {taskItemsForDay(baseDate).length > 0 && (
+            <div className="calendar-day-task-strip">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Tasks</p>
+                  <h2>締切日のタスク</h2>
+                </div>
+                <span className="info-badge">{taskItemsForDay(baseDate).length}件</span>
+              </div>
+              <div className="calendar-day-task-list">
+                {taskItemsForDay(baseDate).map((event) => (
+                  <CalendarEventButton
+                    compact
+                    contacts={contacts}
+                    customers={customers}
+                    event={event}
+                    key={event.id}
+                    onClick={(clickEvent) => {
+                      clickEvent.stopPropagation();
+                      openDetail(event);
+                    }}
+                    onContextMenu={(clickEvent) => openActionMenu(clickEvent, event)}
+                    onDragEnd={() => {
+                      setDragState(null);
+                      setDropTarget(null);
+                    }}
+                    onDragStart={(dragEvent) => startDrag(event, dragEvent)}
+                    onResizeStart={(pointerEvent) => startResize(event, pointerEvent)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {Array.from({ length: 12 }, (_, index) => index + 8).map((hour) => (
             <div
               className={`calendar-time-slot ${dropTarget?.dateKey === baseDate && dropTarget?.hour === hour ? 'calendar-drop-target' : ''}`}
@@ -1050,9 +1164,7 @@ export default function CalendarPage({
             >
               <span>{String(hour).padStart(2, '0')}:00</span>
               <div>
-                {eventsForDay(baseDate)
-                  .filter((event) => event.source === 'task' ? hour === 8 : new Date(event.startAt || `${baseDate}T00:00:00`).getHours() === hour)
-                  .map((event) => (
+                {timedEventsForHour(baseDate, hour).map((event) => (
                     <CalendarEventButton
                       compact
                       contacts={contacts}
@@ -1268,7 +1380,7 @@ function CalendarEventActionMenu({
 }
 
 function CalendarEventListPopover({ events, customers, contacts, onClose, onOpen }) {
-  const sortedEvents = [...events].sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b)));
+  const sortedEvents = [...events].sort(compareCalendarItems);
 
   return (
     <div className="calendar-list-popup-backdrop" role="presentation" onClick={onClose}>
@@ -1289,6 +1401,7 @@ function CalendarEventListPopover({ events, customers, contacts, onClose, onOpen
           {sortedEvents.map((event) => {
             const baseEvent = event.seriesEvent || event;
             const contactNames = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
+            const isTask = isTaskCalendarItem(event);
             return (
               <button
                 className="calendar-list-popup-row"
@@ -1300,7 +1413,7 @@ function CalendarEventListPopover({ events, customers, contacts, onClose, onOpen
                 <span>{eventTimeLabel(event)}</span>
                 <strong>{event.title || event.type || event.eventType}</strong>
                 <span>{customerName(customers, event.customerId)}</span>
-                <span>{contactNames || '-'}</span>
+                <span>{isTask ? taskAssigneeLabel(event) : contactNames || '-'}</span>
                 <span>{isRecurringEvent(baseEvent) ? recurrenceLabel(baseEvent) : 'なし'}</span>
               </button>
             );
@@ -1326,6 +1439,9 @@ function CalendarEventButton({
   const names = event.contactIds?.map((id) => contactName(contacts, id)).filter(Boolean).join(', ');
   const baseEvent = event.seriesEvent || event;
   const editable = baseEvent.source === 'event';
+  const isTask = isTaskCalendarItem(event);
+  const customer = customerName(customers, event.customerId);
+  const assignee = taskAssigneeLabel(event);
   let longPressTimer = null;
 
   function startLongPress(touchEvent) {
@@ -1368,10 +1484,12 @@ function CalendarEventButton({
       <span className="calendar-event-meta">
         <b>{eventTypeIcon(event)}</b>
         {isRecurringEvent(baseEvent) && <em>Repeat</em>}
-        {!compact && <span>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date}</span>}
+        {!compact && !isTask && <span>{event.startAt ? toDateTimeLocal(event.startAt).replace('T', ' ') : event.date}</span>}
+        {!compact && isTask && <span>締切 {event.date || '-'}</span>}
       </span>
       <strong>{event.title || event.type || event.eventType}</strong>
-      {!compact && <small>{customerName(customers, event.customerId)}{names ? ` / ${names}` : ''}</small>}
+      {!compact && !isTask && <small>{customer}{names ? ` / ${names}` : ''}</small>}
+      {isTask && <small>{assignee}{customer ? ` / ${customer}` : ''}</small>}
       {editable && (
         <span
           aria-hidden="true"

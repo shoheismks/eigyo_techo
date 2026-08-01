@@ -63,7 +63,7 @@
 
 .calendar-task-filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 14px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -74,6 +74,11 @@
 .calendar-task-event {
   border-left-color: #f59e0b;
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(15, 23, 42, 0.92));
+}
+
+.calendar-task-event .calendar-event-meta b {
+  border-color: rgba(245, 158, 11, 0.42);
+  color: #fde68a;
 }
 
 .calendar-task-event.priority-high {
@@ -92,6 +97,28 @@
 
 .calendar-task-event.is-complete strong {
   text-decoration: line-through;
+}
+
+.calendar-task-event small {
+  overflow-wrap: anywhere;
+}
+
+.calendar-day-task-strip {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.26);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.86));
+}
+
+.calendar-day-task-strip .section-heading {
+  align-items: center;
+}
+
+.calendar-day-task-list {
+  display: grid;
+  gap: 8px;
 }
 
 .task-editor {
@@ -386,6 +413,10 @@
 
   .calendar-task-filters {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-day-task-strip {
+    padding: 12px;
   }
 
   .task-editor {
