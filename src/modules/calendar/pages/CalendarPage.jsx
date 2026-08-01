@@ -1398,6 +1398,7 @@ function CalendarEventPopover({
   const project = projectName(projects, event.dealId);
   const baseEvent = event.seriesEvent || event;
   const canEdit = baseEvent.source === 'event' || baseEvent.source === 'task';
+  const isTask = baseEvent.source === 'task';
 
   function openCustomer() {
     if (!event.customerId) return;
@@ -1412,10 +1413,10 @@ function CalendarEventPopover({
   }
 
   return (
-    <div className="calendar-detail-backdrop" role="presentation" onClick={onClose}>
+    <div className={`calendar-detail-backdrop${isTask ? ' task-detail-backdrop' : ''}`} role="presentation" onClick={onClose}>
       <article
         aria-modal="true"
-        className={`calendar-detail-popover priority-${priorityClass(event.priority)}`}
+        className={`calendar-detail-popover${isTask ? ' task-detail-popover' : ''} priority-${priorityClass(event.priority)}`}
         role="dialog"
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
