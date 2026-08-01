@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase.js';
-import { canUseCloud, getLocalSyncReason } from '../../../shared/services/recordSyncService.js';
+import { canUseCloud } from '../../../shared/services/recordSyncService.js';
 import { DEFAULT_QUOTE_TAX_RATE, calculateQuoteTotals } from '../../quotes/hooks/useQuotes.js';
 import { parsePrice } from '../../products/hooks/useProducts.js';
 
@@ -379,17 +379,15 @@ function rowToOrder(row, lines = [], history = [], userId = '') {
   }, userId);
 }
 
-function readLocal(userId = '') {
+function hasLegacyLocalSalesOrders() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return saved.map((order) => normalizeSalesOrder(order, userId)).filter((order) => !userId || order.userId === userId);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
   } catch {
-    return [];
+    return Boolean(localStorage.getItem(STORAGE_KEY));
   }
-}
-
-function saveLocal(records) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records.map((record) => normalizeSalesOrder(record))));
 }
 
 export function generateSalesOrderNumber(orders = [], issuerId = '') {
@@ -585,16 +583,21 @@ async function persistOrder(order, historyEntry = null) {
 }
 
 export function useSalesOrders(userId = '') {
-  const [records, setRecords] = useState(() => (canUseCloud() ? [] : readLocal(userId)));
-  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
+  const [records, setRecords] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
   const [syncError, setSyncError] = useState('');
+  const [legacyLocalDataWarning] = useState(() =>
+    hasLegacyLocalSalesOrders()
+      ? '旧ローカル受注データがあります。安全のため自動移行・自動削除は行いません。'
+      : '',
+  );
   const writeSequenceRef = useRef(0);
 
   async function reload(writeSequence = null) {
     if (!canUseCloud()) {
-      setRecords(readLocal(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason());
+      setRecords([]);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、受注データは取得・保存できません。ネットワークと設定を確認してください。');
       return;
     }
     try {
@@ -602,13 +605,12 @@ export function useSalesOrders(userId = '') {
       const remote = await fetchRemote(userId);
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
       setRecords(remote);
-      saveLocal(remote);
       setSyncState('supabase');
       setSyncError('');
     } catch (error) {
-      setRecords(readLocal(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason(error.message));
+      setRecords([]);
+      setSyncState('error');
+      setSyncError(error.message || '受注データの取得に失敗しました。');
     }
   }
 
@@ -618,7 +620,7 @@ export function useSalesOrders(userId = '') {
 
   const sortedRecords = useMemo(() => [...records].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()), [records]);
 
-  function upsertLocal(nextRecord, previousRecord = null) {
+  async function persistSalesOrder(nextRecord, previousRecord = null) {
     const eventType = !previousRecord ? 'created' : previousRecord.status !== nextRecord.status ? 'status_changed' : 'updated';
     const historyEntry = {
       id: crypto.randomUUID(),
@@ -632,36 +634,38 @@ export function useSalesOrders(userId = '') {
     };
     const withHistory = normalizeSalesOrder({ ...nextRecord, history: [historyEntry, ...(nextRecord.history ?? [])] }, userId);
 
-    setRecords((current) => {
-      const exists = current.some((record) => record.id === withHistory.id);
-      const next = exists ? current.map((record) => (record.id === withHistory.id ? withHistory : record)) : [withHistory, ...current];
-      saveLocal(next);
-      return next;
-    });
-
-    if (canUseCloud()) {
-      const writeSequence = ++writeSequenceRef.current;
-      setSyncState('syncing');
-      persistOrder(withHistory, historyEntry)
-        .then(() => reload(writeSequence))
-        .catch((error) => {
-          setSyncState('local');
-          setSyncError(getLocalSyncReason(error.message));
-        });
+    if (!canUseCloud()) {
+      const message = 'Supabaseに接続できないため、受注データは保存できません。';
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
     }
 
-    return withHistory.id;
+    const writeSequence = ++writeSequenceRef.current;
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      await persistOrder(withHistory, historyEntry);
+      await reload(writeSequence);
+      return withHistory.id;
+    } catch (error) {
+      setSyncState('error');
+      setSyncError(error.message || '受注データの保存に失敗しました。');
+      throw error;
+    }
   }
 
   function addRecord(order) {
     const now = new Date().toISOString();
     const normalized = normalizeSalesOrder({ ...order, userId, createdAt: now, updatedAt: now }, userId);
-    return upsertLocal(normalized);
+    return persistSalesOrder(normalized);
   }
 
   function updateRecord(id, updates) {
     const previous = records.find((record) => record.id === id);
-    if (!previous) return;
+    if (!previous) {
+      return Promise.reject(new Error('更新対象の受注が見つかりません。'));
+    }
     const now = new Date().toISOString();
     const normalized = normalizeSalesOrder({
       ...previous,
@@ -671,11 +675,11 @@ export function useSalesOrders(userId = '') {
       updatedAt: now,
       confirmedAt: updates.status === '受注確定' ? previous.confirmedAt || now : previous.confirmedAt,
     }, userId);
-    upsertLocal(normalized, previous);
+    return persistSalesOrder(normalized, previous);
   }
 
   function removeRecord(id) {
-    updateRecord(id, { isDeleted: true, status: '取消', deletedAt: new Date().toISOString() });
+    return updateRecord(id, { isDeleted: true, status: '取消', deletedAt: new Date().toISOString() });
   }
 
   async function runReservationRpc(functionName, params) {
@@ -685,7 +689,8 @@ export function useSalesOrders(userId = '') {
     setSyncState('syncing');
     const { data, error } = await supabase.rpc(functionName, params);
     if (error) {
-      setSyncError(getLocalSyncReason(error.message));
+      setSyncState('error');
+      setSyncError(error.message || '在庫引当に失敗しました。');
       throw error;
     }
     await reload(++writeSequenceRef.current);
@@ -742,5 +747,6 @@ export function useSalesOrders(userId = '') {
     reload,
     syncState,
     syncError,
+    legacyLocalDataWarning,
   };
 }

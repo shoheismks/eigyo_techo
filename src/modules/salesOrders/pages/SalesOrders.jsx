@@ -167,6 +167,8 @@ export default function SalesOrders({
   onDraftHandled,
   onOpenKarte,
   onOpenProject,
+  syncError = '',
+  legacyLocalDataWarning = '',
   user,
 }) {
   const [keyword, setKeyword] = useState('');
@@ -589,7 +591,8 @@ export default function SalesOrders({
     return '';
   }
 
-  function saveOrder(event) {
+
+  async function saveOrder(event) {
     event.preventDefault();
     const validation = validate();
     if (validation) {
@@ -615,15 +618,35 @@ export default function SalesOrders({
     }, user?.id || '');
     try {
       if (salesOrders.some((order) => order.id === payload.id)) {
-        updateSalesOrder?.(payload.id, payload);
+        await updateSalesOrder?.(payload.id, payload);
       } else {
-        addSalesOrder?.(payload);
+        await addSalesOrder?.(payload);
       }
       setEditingId(payload.id);
       setForm(payload);
       setMessage('受注を保存しました。');
     } catch (error) {
       setMessage(error.message || '受注の保存に失敗しました。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeOrder(id) {
+    if (!id || saving) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await removeSalesOrder?.(id);
+      if (editingId === id) {
+        const nextDraft = makeManualDraft({ orders: salesOrders, issuers, user });
+        setEditingId('');
+        setForm(nextDraft);
+        setFormOpen(false);
+      }
+      setMessage('受注を取消しました。');
+    } catch (error) {
+      setMessage(error.message || '受注の取消に失敗しました。');
     } finally {
       setSaving(false);
     }
@@ -733,6 +756,9 @@ export default function SalesOrders({
         <h1>受注管理</h1>
         <p>見積書または成約確認書の内容を固定スナップショットとして受注へ引き継ぎます。</p>
       </div>
+
+      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
+      {syncError && <p className="form-error-message">{syncError}</p>}
 
       <section className="sync-status-card">
         <div>
@@ -1004,7 +1030,7 @@ export default function SalesOrders({
               </div>
               <div className="mail-action-row">
                 <button type="submit" className="primary-button" disabled={saving}>{saving ? '保存中...' : '受注を保存'}</button>
-                {editingId && <button type="button" className="ghost-button danger" onClick={() => removeSalesOrder?.(editingId)}>取消/削除</button>}
+                {editingId && <button type="button" className="ghost-button danger" onClick={() => removeOrder(editingId)} disabled={saving}>取消/削除</button>}
               </div>
               {message && <p className={message.includes('失敗') || message.includes('入力') || message.includes('選択') ? 'form-error-message' : 'notice-text'}>{message}</p>}
             </aside>
@@ -1018,7 +1044,7 @@ export default function SalesOrders({
             <button type="button" className="ghost-button" onClick={() => startEdit(order)}>詳細/編集</button>
             {order.customerId && <button type="button" className="ghost-button" onClick={() => onOpenKarte?.(order.customerId)}>カルテ</button>}
             {order.projectId && <button type="button" className="ghost-button" onClick={() => onOpenProject?.(order.projectId)}>案件</button>}
-            <button type="button" className="ghost-button danger" onClick={() => removeSalesOrder?.(order.id)}>取消</button>
+            <button type="button" className="ghost-button danger" onClick={() => removeOrder(order.id)} disabled={saving}>取消</button>
           </>
         )}
         actionWidth="320px"

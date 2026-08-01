@@ -109,6 +109,9 @@ export default function AppRouter({
   quoteLegacyLocalDataWarning,
   invoices,
   salesOrders,
+  salesOrderSyncState,
+  salesOrderSyncError,
+  salesOrderLegacyLocalDataWarning,
   shipments,
   deliveryNotes,
   issuers,
@@ -357,6 +360,9 @@ export default function AppRouter({
         addSalesOrder={addSalesOrder}
         updateSalesOrder={updateSalesOrder}
         removeSalesOrder={removeSalesOrder}
+        syncState={salesOrderSyncState}
+        syncError={salesOrderSyncError}
+        legacyLocalDataWarning={salesOrderLegacyLocalDataWarning}
         customers={customers}
         contacts={contacts}
         projects={projects}
