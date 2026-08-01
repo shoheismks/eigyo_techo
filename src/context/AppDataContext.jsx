@@ -117,6 +117,9 @@ export function AppDataProvider({ userId, children }) {
     addQuote: quotesState.addRecord,
     updateQuote: quotesState.updateRecord,
     removeQuote: quotesState.removeRecord,
+    quoteSyncState: quotesState.syncState,
+    quoteSyncError: quotesState.syncError,
+    quoteLegacyLocalDataWarning: quotesState.legacyLocalDataWarning,
 
     invoices: toArray(invoicesState.records),
     addInvoice: invoicesState.addRecord,

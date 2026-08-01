@@ -1,4 +1,5 @@
-import { createRecordHook } from '../../../shared/hooks/useSupabaseRecords.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { canUseCloud, deleteRecord, fetchRecords, upsertRecords } from '../../../shared/services/recordSyncService.js';
 import { normalizeBusinessCode } from '../../../shared/utils/businessCode.js';
 import { parsePrice } from '../../products/hooks/useProducts.js';
 import { DEFAULT_QUOTE_TERMS_SUMMARY, normalizeVisibleTerms } from '../services/termsTemplateService.js';
@@ -331,6 +332,8 @@ export function quoteValidUntilDisplay(quote = {}) {
   return quote.validUntil ?? quote.valid_until ?? '';
 }
 
+const QUOTES_STORAGE_KEY = 'eigyo-techo-quotes';
+
 export function normalizeQuote(quote = {}, userId = '') {
   const defaultTaxRate = quote.defaultTaxRate ?? quote.default_tax_rate ?? quote.taxRate ?? quote.tax_rate ?? DEFAULT_QUOTE_TAX_RATE;
   const roundingMode = quote.roundingMode ?? quote.rounding_mode ?? 'round';
@@ -637,10 +640,147 @@ function fromRow(row) {
   });
 }
 
-export const useQuotes = createRecordHook({
-  tableName: 'quotes',
-  storageKey: 'eigyo-techo-quotes',
-  normalize: normalizeQuote,
-  toRow,
-  fromRow,
-});
+function hasLegacyLocalQuotes() {
+  try {
+    const saved = localStorage.getItem(QUOTES_STORAGE_KEY);
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return Boolean(localStorage.getItem(QUOTES_STORAGE_KEY));
+  }
+}
+
+function cloudRequiredMessage() {
+  if (!canUseCloud()) {
+    return 'Supabaseに接続できないため、見積データは保存できません。ネットワークと設定を確認してください。';
+  }
+
+  return '';
+}
+
+function sortQuotes(quotes = []) {
+  return [...quotes].sort((a, b) =>
+    String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')),
+  );
+}
+
+export function useQuotes(userId = '') {
+  const [records, setRecords] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
+  const [syncError, setSyncError] = useState('');
+  const [legacyLocalDataWarning] = useState(() =>
+    hasLegacyLocalQuotes()
+      ? '旧ローカル見積データがあります。安全のため自動移行・自動削除は行いません。'
+      : '',
+  );
+
+  const recordsById = useMemo(() => new Map(records.map((quote) => [quote.id, quote])), [records]);
+
+  const reload = useCallback(async () => {
+    const unavailableMessage = cloudRequiredMessage();
+    if (unavailableMessage) {
+      setRecords([]);
+      setSyncState('error');
+      setSyncError(unavailableMessage);
+      return;
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      const remoteQuotes = await fetchRecords('quotes', userId, fromRow, 'updated_at');
+      setRecords(sortQuotes(remoteQuotes.map((quote) => normalizeQuote(quote, userId))));
+      setSyncState('supabase');
+    } catch (error) {
+      setRecords([]);
+      setSyncState('error');
+      setSyncError(error.message || '見積データの取得に失敗しました。');
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  async function persistQuote(quote) {
+    const unavailableMessage = cloudRequiredMessage();
+    if (unavailableMessage) {
+      setSyncState('error');
+      setSyncError(unavailableMessage);
+      throw new Error(unavailableMessage);
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      await upsertRecords('quotes', [quote], toRow);
+      setSyncState('supabase');
+    } catch (error) {
+      setSyncState('error');
+      setSyncError(error.message || '見積データの保存に失敗しました。');
+      throw error;
+    }
+  }
+
+  async function addRecord(record) {
+    const now = new Date().toISOString();
+    const normalized = normalizeQuote({
+      ...record,
+      id: record.id ?? crypto.randomUUID(),
+      userId,
+      createdAt: record.createdAt || now,
+      updatedAt: now,
+    }, userId);
+
+    await persistQuote(normalized);
+    setRecords((current) => sortQuotes([normalized, ...current.filter((quote) => quote.id !== normalized.id)]));
+    return normalized.id;
+  }
+
+  async function updateRecord(id, updates) {
+    const before = recordsById.get(id);
+    const normalized = normalizeQuote({
+      ...before,
+      ...updates,
+      id,
+      userId,
+      updatedAt: new Date().toISOString(),
+    }, userId);
+
+    await persistQuote(normalized);
+    setRecords((current) => sortQuotes(current.map((quote) => (quote.id === id ? normalized : quote))));
+  }
+
+  async function removeRecord(id) {
+    const unavailableMessage = cloudRequiredMessage();
+    if (unavailableMessage) {
+      setSyncState('error');
+      setSyncError(unavailableMessage);
+      throw new Error(unavailableMessage);
+    }
+
+    try {
+      setSyncState('syncing');
+      setSyncError('');
+      await deleteRecord('quotes', id, userId);
+      setRecords((current) => current.filter((quote) => quote.id !== id));
+      setSyncState('supabase');
+    } catch (error) {
+      setSyncState('error');
+      setSyncError(error.message || '見積データの削除に失敗しました。');
+      throw error;
+    }
+  }
+
+  return {
+    records,
+    addRecord,
+    updateRecord,
+    removeRecord,
+    reload,
+    syncState,
+    syncError,
+    legacyLocalDataWarning,
+  };
+}

@@ -104,6 +104,9 @@ export default function AppRouter({
   updateSample,
   removeSample,
   quotes,
+  quoteSyncState,
+  quoteSyncError,
+  quoteLegacyLocalDataWarning,
   invoices,
   salesOrders,
   shipments,
@@ -457,6 +460,9 @@ export default function AppRouter({
         customers={customers}
         contacts={contacts}
         projects={projects}
+        syncState={quoteSyncState}
+        syncError={quoteSyncError}
+        legacyLocalDataWarning={quoteLegacyLocalDataWarning}
         onCreateQuote={onCreateQuote}
       />
     );

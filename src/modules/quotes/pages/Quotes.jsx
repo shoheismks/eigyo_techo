@@ -33,7 +33,15 @@ function projectName(quote, projects) {
   return quote.projectName || projects.find((project) => project.id === quote.projectId)?.title || '-';
 }
 
-export default function Quotes({ quotes = [], customers = [], contacts = [], projects = [], onCreateQuote }) {
+export default function Quotes({
+  quotes = [],
+  customers = [],
+  contacts = [],
+  projects = [],
+  syncError = '',
+  legacyLocalDataWarning = '',
+  onCreateQuote,
+}) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -94,6 +102,8 @@ export default function Quotes({ quotes = [], customers = [], contacts = [], pro
         </label>
       </ActionBar>}
     >
+      {legacyLocalDataWarning && <div className="form-error-message">{legacyLocalDataWarning}</div>}
+      {syncError && <div className="form-error-message">{syncError}</div>}
       <section className="result-stack" id="quotes-table">
         <div className="section-heading">
           <h2>見積一覧</h2>
