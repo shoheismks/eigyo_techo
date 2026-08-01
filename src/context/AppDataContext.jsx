@@ -99,6 +99,9 @@ export function AppDataProvider({ userId, children }) {
     inventoryReservations: toArray(inventoryState.inventoryReservations),
     stocktakes: toArray(inventoryState.stocktakes),
     stocktakeLines: toArray(inventoryState.stocktakeLines),
+    inventorySyncState: inventoryState.syncState,
+    inventorySyncError: inventoryState.syncError,
+    inventoryLegacyLocalDataWarning: inventoryState.legacyLocalDataWarning,
 
     adoptions: toArray(adoptionsState.records),
     addAdoption: adoptionsState.addRecord,

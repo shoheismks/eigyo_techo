@@ -162,8 +162,15 @@ function readLocal(key, userId = '', normalize = (record) => record) {
   }
 }
 
-function saveLocal(key, records) {
-  localStorage.setItem(key, JSON.stringify(records));
+function hasLegacyLocalRecords(key) {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return Boolean(localStorage.getItem(key));
+  }
 }
 
 function movementLabel(movementType) {
@@ -567,14 +574,26 @@ export function inventoryLabel(inventory, product, supplier) {
 }
 
 export function useInventory(userId = '') {
-  const [inventoryLots, setInventoryLots] = useState(() => readLocal(LOTS_STORAGE_KEY, userId, normalizeLot));
-  const [inventoryMovements, setInventoryMovements] = useState(() => readLocal(MOVEMENTS_STORAGE_KEY, userId, normalizeMovement));
-  const [inventoryReservations, setInventoryReservations] = useState(() => readLocal(RESERVATIONS_STORAGE_KEY, userId, normalizeReservation));
-  const [stocktakes, setStocktakes] = useState(() => readLocal(STOCKTAKES_STORAGE_KEY, userId, normalizeStocktake));
-  const [stocktakeLines, setStocktakeLines] = useState(() => readLocal(STOCKTAKE_LINES_STORAGE_KEY, userId, normalizeStocktakeLine));
-  const [legacyRecords, setLegacyRecords] = useState(() => readLocal(LOCAL_STORAGE_KEY, userId, normalizeInventory));
-  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
+  const [inventoryLots, setInventoryLots] = useState([]);
+  const [inventoryMovements, setInventoryMovements] = useState([]);
+  const [inventoryReservations, setInventoryReservations] = useState([]);
+  const [stocktakes, setStocktakes] = useState([]);
+  const [stocktakeLines, setStocktakeLines] = useState([]);
+  const [legacyRecords, setLegacyRecords] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
   const [syncError, setSyncError] = useState('');
+  const [legacyLocalDataWarning] = useState(() =>
+    [
+      LOCAL_STORAGE_KEY,
+      LOTS_STORAGE_KEY,
+      MOVEMENTS_STORAGE_KEY,
+      RESERVATIONS_STORAGE_KEY,
+      STOCKTAKES_STORAGE_KEY,
+      STOCKTAKE_LINES_STORAGE_KEY,
+    ].some(hasLegacyLocalRecords)
+      ? '旧ローカル在庫データがあります。安全のため自動移行・自動削除は行いません。'
+      : '',
+  );
   const writeSequenceRef = useRef(0);
 
   const records = useMemo(() => {
@@ -583,20 +602,16 @@ export function useInventory(userId = '') {
     return sortInventories(normalized.length > 0 ? normalized : legacyRecords);
   }, [inventoryLots, inventoryMovements, legacyRecords]);
 
-  function persistLocal(nextRecords, lots = inventoryLots, movements = inventoryMovements) {
-    saveLocal(LOCAL_STORAGE_KEY, nextRecords);
-    saveLocal(LOTS_STORAGE_KEY, lots);
-    saveLocal(MOVEMENTS_STORAGE_KEY, movements);
-    saveLocal(RESERVATIONS_STORAGE_KEY, inventoryReservations);
-    saveLocal(STOCKTAKES_STORAGE_KEY, stocktakes);
-    saveLocal(STOCKTAKE_LINES_STORAGE_KEY, stocktakeLines);
-  }
-
   async function reload(writeSequence = null) {
     if (!canUseCloud()) {
-      setLegacyRecords(readLocal(LOCAL_STORAGE_KEY, userId, normalizeInventory));
-      setSyncState('local');
-      setSyncError(syncReason());
+      setInventoryLots([]);
+      setInventoryMovements([]);
+      setInventoryReservations([]);
+      setStocktakes([]);
+      setStocktakeLines([]);
+      setLegacyRecords([]);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、在庫データは取得・保存できません。ネットワークと設定を確認してください。');
       return;
     }
 
@@ -625,14 +640,12 @@ export function useInventory(userId = '') {
       setStocktakes(nextStocktakes);
       setStocktakeLines(nextStocktakeLines);
       setLegacyRecords(nextRecords);
-      persistLocal(nextRecords, nextLots, nextMovements);
       setSyncState('supabase');
       setSyncError('');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
-      setLegacyRecords(readLocal(LOCAL_STORAGE_KEY, userId, normalizeInventory));
-      setSyncState('local');
-      setSyncError(syncReason(error.message));
+      setSyncState('error');
+      setSyncError(error.message || '在庫データの取得に失敗しました。');
     }
   }
 
@@ -640,51 +653,14 @@ export function useInventory(userId = '') {
     reload();
   }, [userId]);
 
-  function addLocalRecord(record) {
-    const now = nowIso();
-    const normalized = normalizeInventory({
-      ...record,
-      id: record.id ?? crypto.randomUUID(),
-      userId,
-      createdAt: now,
-      updatedAt: now,
-    }, userId);
-    setLegacyRecords((current) => {
-      const next = [normalized, ...current];
-      persistLocal(next);
-      return next;
-    });
-    return normalized.id;
-  }
-
-  function updateLocalRecord(id, updates) {
-    setLegacyRecords((current) => {
-      const next = current.map((record) =>
-        record.id === id
-          ? normalizeInventory({ ...record, ...updates, userId, updatedAt: nowIso() }, userId)
-          : record,
-      );
-      persistLocal(next);
-      return next;
-    });
-  }
-
-  function removeLocalRecord(id) {
-    setLegacyRecords((current) => {
-      const next = current.filter((record) => record.id !== id);
-      persistLocal(next);
-      return next;
-    });
-  }
-
   function addRecord(record) {
     const id = record.id || crypto.randomUUID();
     const normalized = normalizeInventory({ ...record, id, userId }, userId);
 
-    setLegacyRecords((current) => sortInventories([normalized, ...current.filter((item) => item.id !== id)]));
-
     if (!canUseCloud()) {
-      return addLocalRecord(normalized);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、在庫は登録できません。');
+      return id;
     }
 
     const writeSequence = ++writeSequenceRef.current;
@@ -696,8 +672,8 @@ export function useInventory(userId = '') {
         return reload(writeSequence);
       })
       .catch((error) => {
-        setSyncState('local');
-        setSyncError(syncReason(error.message));
+        setSyncState('error');
+        setSyncError(error.message || '在庫登録に失敗しました。');
       });
 
     return id;
@@ -706,16 +682,9 @@ export function useInventory(userId = '') {
   function updateRecord(id, updates) {
     const currentRecord = records.find((record) => record.id === id);
     const movement = findNewMovement(currentRecord, updates);
-    const optimistic = currentRecord
-      ? normalizeInventory({ ...currentRecord, ...updates, updatedAt: nowIso() }, userId)
-      : null;
-
-    if (optimistic) {
-      setLegacyRecords((current) => sortInventories(current.map((record) => (record.id === id ? optimistic : record))));
-    }
-
     if (!canUseCloud()) {
-      updateLocalRecord(id, updates);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、在庫は更新できません。');
       return;
     }
 
@@ -746,7 +715,7 @@ export function useInventory(userId = '') {
         p_notes: movement.memo || null,
       });
     } else if (movement?.type === '入庫') {
-      writePromise = supabase.rpc('receive_inventory', inventoryToReceiveParams(optimistic));
+      writePromise = supabase.rpc('receive_inventory', inventoryToReceiveParams(normalizeInventory({ ...currentRecord, ...updates }, userId)));
     } else {
       writePromise = supabase.rpc('update_inventory_lot', {
         p_inventory_lot_id: id,
@@ -760,16 +729,15 @@ export function useInventory(userId = '') {
         return reload(writeSequence);
       })
       .catch((error) => {
-        setSyncState('local');
-        setSyncError(syncReason(error.message));
+        setSyncState('error');
+        setSyncError(error.message || '在庫更新に失敗しました。');
       });
   }
 
   function removeRecord(id) {
-    setLegacyRecords((current) => current.filter((record) => record.id !== id));
-
     if (!canUseCloud()) {
-      removeLocalRecord(id);
+      setSyncState('error');
+      setSyncError('Supabaseに接続できないため、在庫は削除できません。');
       return;
     }
 
@@ -785,8 +753,8 @@ export function useInventory(userId = '') {
         return reload(writeSequence);
       })
       .catch((error) => {
-        setSyncState('local');
-        setSyncError(syncReason(error.message));
+        setSyncState('error');
+        setSyncError(error.message || '在庫削除に失敗しました。');
       });
   }
 
@@ -803,5 +771,6 @@ export function useInventory(userId = '') {
     inventoryReservations,
     stocktakes,
     stocktakeLines,
+    legacyLocalDataWarning,
   };
 }
