@@ -111,16 +111,6 @@ function canUseCloud() {
   return hasSupabaseConfig && Boolean(supabase) && (typeof navigator === 'undefined' || navigator.onLine);
 }
 
-function syncReason(fallback = '') {
-  if (!hasSupabaseConfig || !supabase) {
-    return 'Supabase設定がないため、LocalStorageバックアップで動作しています。';
-  }
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return 'オフラインのため、LocalStorageバックアップで動作しています。';
-  }
-  return fallback || 'Supabase接続に失敗したため、LocalStorageバックアップで動作しています。';
-}
-
 function normalizeNumber(value) {
   const parsed = parsePrice(value);
   return parsed === '' ? '' : parsed;
@@ -147,19 +137,6 @@ function nowIso() {
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function readLocal(key, userId = '', normalize = (record) => record) {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved
-      ? JSON.parse(saved)
-          .map((record) => normalize(record, userId))
-          .filter((record) => !userId || record.userId === userId || record.user_id === userId)
-      : [];
-  } catch {
-    return [];
-  }
 }
 
 function hasLegacyLocalRecords(key) {

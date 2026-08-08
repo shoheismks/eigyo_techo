@@ -3,11 +3,14 @@ import {
   canUseCloud,
   deleteRecord,
   fetchRecords,
-  getLocalSyncReason,
-  mergeByUpdatedAt,
   upsertRecords,
 } from '../services/recordSyncService.js';
 import { getTableConfig } from '../config/TABLE_CONFIG.js';
+
+const CLOUD_REQUIRED_MESSAGE = 'Supabase is required for business data. Check the network and Supabase settings.';
+const LOCAL_CACHE_MESSAGE = 'Showing an explicitly allowed local cache because Supabase is unavailable.';
+const LOCAL_CACHE_SAVE_MESSAGE = 'Saved to an explicitly allowed local cache because Supabase is unavailable.';
+const LEGACY_LOCAL_WARNING = 'Old LocalStorage business data was detected. It will not be migrated or deleted automatically.';
 
 function snakeToCamel(value) {
   return String(value || '').replace(/_([a-z])/g, (_, char) => char.toUpperCase());
@@ -18,18 +21,23 @@ function recordSortTime(record, orderColumn) {
   return new Date(record[camelKey] ?? record[orderColumn] ?? record.updatedAt ?? record.updated_at ?? record.createdAt ?? record.created_at ?? 0).getTime();
 }
 
+function localStorageAvailable() {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
 export function createRecordHook({ tableName, storageKey, normalize, toRow, fromRow, orderColumn = '' }) {
   const tableConfig = getTableConfig(tableName);
   const resolvedOrderColumn = orderColumn || tableConfig.orderColumn || 'updated_at';
-  const disableLocalPersistence = tableConfig.disableLocalPersistence === true;
+  const allowLocalPersistence = tableConfig.localPersistence === true;
+  const returnWritePromise = tableConfig.returnWritePromise === true;
 
-  function readLocal(userId = '') {
-    if (disableLocalPersistence) {
+  function readLocalSnapshot(userId = '') {
+    if (!localStorageAvailable() || !storageKey) {
       return [];
     }
 
     try {
-      const saved = localStorage.getItem(storageKey);
+      const saved = window.localStorage.getItem(storageKey);
       return saved
         ? JSON.parse(saved)
             .map((record) => normalize(record, userId))
@@ -40,21 +48,21 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
     }
   }
 
-  function saveLocal(records) {
-    if (disableLocalPersistence) {
+  function writeLocalCache(records) {
+    if (!allowLocalPersistence || !localStorageAvailable() || !storageKey) {
       return;
     }
 
-    localStorage.setItem(storageKey, JSON.stringify(records.map((record) => normalize(record))));
+    window.localStorage.setItem(storageKey, JSON.stringify(records.map((record) => normalize(record))));
   }
 
   function hasLegacyLocalRecords() {
-    if (!disableLocalPersistence) {
+    if (allowLocalPersistence || !localStorageAvailable() || !storageKey) {
       return false;
     }
 
     try {
-      const saved = localStorage.getItem(storageKey);
+      const saved = window.localStorage.getItem(storageKey);
       if (!saved) {
         return false;
       }
@@ -62,135 +70,71 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
       const parsed = JSON.parse(saved);
       return Array.isArray(parsed) && parsed.length > 0;
     } catch {
-      return true;
+      return Boolean(window.localStorage.getItem(storageKey));
     }
   }
 
-  function unavailableMessage() {
-    return 'Supabase is unavailable. Data cannot be saved.';
-  }
-
   return function useRecords(userId = '') {
-    const [records, setRecords] = useState(() =>
-      canUseCloud() || disableLocalPersistence ? [] : readLocal(userId),
-    );
-    const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : disableLocalPersistence ? 'error' : 'local');
-    const [syncError, setSyncError] = useState('');
+    const [records, setRecords] = useState(() => (allowLocalPersistence ? readLocalSnapshot(userId) : []));
+    const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : allowLocalPersistence ? 'local' : 'error');
+    const [syncError, setSyncError] = useState(() => (canUseCloud() || allowLocalPersistence ? '' : CLOUD_REQUIRED_MESSAGE));
     const [legacyLocalDataWarning, setLegacyLocalDataWarning] = useState('');
     const writeSequenceRef = useRef(0);
 
     async function reload(writeSequence = null) {
       if (!canUseCloud()) {
-        if (disableLocalPersistence) {
-          setRecords([]);
-          setSyncState('error');
-          setSyncError(unavailableMessage());
-          return;
+        if (allowLocalPersistence) {
+          const localRecords = readLocalSnapshot(userId);
+          setRecords(localRecords);
+          setSyncState('local');
+          setSyncError(LOCAL_CACHE_MESSAGE);
+          return localRecords;
         }
 
-        setRecords(readLocal(userId));
-        setSyncState('local');
-        setSyncError(getLocalSyncReason());
-        return;
+        setRecords([]);
+        setSyncState('error');
+        setSyncError(CLOUD_REQUIRED_MESSAGE);
+        return [];
       }
 
       try {
         setSyncState('syncing');
+        setSyncError('');
         const remoteRecords = await fetchRecords(tableName, userId, fromRow, resolvedOrderColumn);
 
         if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
-          return;
+          return remoteRecords;
         }
 
-        setRecords(remoteRecords.map((record) => normalize(record, userId)));
-        saveLocal(remoteRecords);
+        const nextRecords = remoteRecords.map((record) => normalize(record, userId));
+        setRecords(nextRecords);
+        writeLocalCache(nextRecords);
         setSyncState('supabase');
         setSyncError('');
+        return nextRecords;
       } catch (error) {
         if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
-          return;
+          return [];
         }
 
-        if (disableLocalPersistence) {
-          setSyncState('error');
-          setSyncError(error.message || unavailableMessage());
-          throw error;
+        if (allowLocalPersistence) {
+          const localRecords = readLocalSnapshot(userId);
+          setRecords(localRecords);
+          setSyncState('local');
+          setSyncError(error.message || LOCAL_CACHE_MESSAGE);
+          return localRecords;
         }
 
-        setRecords(readLocal(userId));
-        setSyncState('local');
-        setSyncError(getLocalSyncReason(error.message));
+        setRecords([]);
+        setSyncState('error');
+        setSyncError(error.message || CLOUD_REQUIRED_MESSAGE);
+        return [];
       }
     }
 
     useEffect(() => {
-      let ignore = false;
-      setLegacyLocalDataWarning(
-        hasLegacyLocalRecords()
-          ? '\u65e7\u30ed\u30fc\u30ab\u30eb\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u3059\u3002\u5b89\u5168\u306e\u305f\u3081\u81ea\u52d5\u79fb\u884c\u30fb\u81ea\u52d5\u524a\u9664\u306f\u884c\u3044\u307e\u305b\u3093\u3002'
-          : '',
-      );
-
-      async function sync() {
-        if (!canUseCloud()) {
-          if (disableLocalPersistence) {
-            setRecords([]);
-            setSyncState('error');
-            setSyncError(unavailableMessage());
-            return;
-          }
-
-          setRecords(readLocal(userId));
-          setSyncState('local');
-          setSyncError(getLocalSyncReason());
-          return;
-        }
-
-        try {
-          setSyncState('syncing');
-          setSyncError('');
-          const remoteRecords = await fetchRecords(tableName, userId, fromRow, resolvedOrderColumn);
-          const localRecords = disableLocalPersistence ? [] : readLocal(userId);
-          let nextRecords = remoteRecords.map((record) => normalize(record, userId));
-
-          if (!disableLocalPersistence && localRecords.length > 0) {
-            const mergedRecords = mergeByUpdatedAt(localRecords, remoteRecords)
-              .map((record) => normalize(record, userId));
-            await upsertRecords(tableName, mergedRecords, toRow);
-            const refreshedRecords = await fetchRecords(tableName, userId, fromRow, resolvedOrderColumn);
-            nextRecords = refreshedRecords.length > 0 ? refreshedRecords : mergedRecords;
-          }
-
-          if (ignore) {
-            return;
-          }
-
-          setRecords(nextRecords);
-          saveLocal(nextRecords);
-          setSyncState('supabase');
-        } catch (error) {
-          if (ignore) {
-            return;
-          }
-
-          if (disableLocalPersistence) {
-            setRecords([]);
-            setSyncState('error');
-            setSyncError(error.message || unavailableMessage());
-            return;
-          }
-
-          setRecords(readLocal(userId));
-          setSyncState('local');
-          setSyncError(getLocalSyncReason(error.message));
-        }
-      }
-
-      sync();
-
-      return () => {
-        ignore = true;
-      };
+      setLegacyLocalDataWarning(hasLegacyLocalRecords() ? LEGACY_LOCAL_WARNING : '');
+      reload();
     }, [userId]);
 
     const sortedRecords = useMemo(
@@ -201,37 +145,39 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
       [records, resolvedOrderColumn],
     );
 
-    async function syncRecords(nextRecords, changedRecord = null) {
-      saveLocal(nextRecords);
+    async function persistRecords(changedRecords) {
+      if (allowLocalPersistence && !canUseCloud()) {
+        const nextRecords = changedRecords.map((record) => normalize(record, userId));
+        setRecords((current) => {
+          const byId = new Map(current.map((record) => [record.id, record]));
+          nextRecords.forEach((record) => byId.set(record.id, record));
+          const mergedRecords = [...byId.values()];
+          writeLocalCache(mergedRecords);
+          return mergedRecords;
+        });
+        setSyncState('local');
+        setSyncError(LOCAL_CACHE_SAVE_MESSAGE);
+        return;
+      }
 
       if (!canUseCloud()) {
-        if (disableLocalPersistence) {
-          setSyncState('error');
-          setSyncError(unavailableMessage());
-          throw new Error(unavailableMessage());
-        }
-
-        setSyncState('local');
-        setSyncError(getLocalSyncReason());
-        return;
+        setSyncState('error');
+        setSyncError(CLOUD_REQUIRED_MESSAGE);
+        throw new Error(CLOUD_REQUIRED_MESSAGE);
       }
 
       const writeSequence = ++writeSequenceRef.current;
       setSyncState('syncing');
-      const writePromise = changedRecord
-        ? upsertRecords(tableName, [changedRecord], toRow)
-        : upsertRecords(tableName, nextRecords, toRow);
+      setSyncError('');
 
       try {
-        await writePromise;
+        await upsertRecords(tableName, changedRecords, toRow);
         await reload(writeSequence);
       } catch (error) {
-        if (writeSequence !== writeSequenceRef.current) {
-          return;
+        if (writeSequence === writeSequenceRef.current) {
+          setSyncState('error');
+          setSyncError(error.message || CLOUD_REQUIRED_MESSAGE);
         }
-
-        setSyncState(disableLocalPersistence ? 'error' : 'local');
-        setSyncError(disableLocalPersistence ? error.message || unavailableMessage() : getLocalSyncReason(error.message));
         throw error;
       }
     }
@@ -246,89 +192,66 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
         updatedAt: now,
       }, userId);
 
-      if (disableLocalPersistence) {
-        return syncRecords([normalizedRecord, ...records], normalizedRecord)
-          .then(() => normalizedRecord.id);
+      const writePromise = persistRecords([normalizedRecord]).then(() => normalizedRecord.id);
+      if (returnWritePromise) {
+        return writePromise;
       }
 
-      setRecords((current) => {
-        const nextRecords = [normalizedRecord, ...current];
-        syncRecords(nextRecords, normalizedRecord);
-        return nextRecords;
-      });
-
+      writePromise.catch(() => {});
       return normalizedRecord.id;
     }
 
     function updateRecord(id, updates) {
-      if (disableLocalPersistence) {
-        const currentRecord = records.find((record) => record.id === id);
-        if (!currentRecord) {
-          const error = new Error('Record was not found.');
-          setSyncError(error.message);
-          return Promise.reject(error);
-        }
-
-        const changedRecord = normalize({
-          ...currentRecord,
-          ...updates,
-          userId,
-          updatedAt: new Date().toISOString(),
-        }, userId);
-        const nextRecords = records.map((record) => (record.id === id ? changedRecord : record));
-        return syncRecords(nextRecords, changedRecord);
+      const currentRecord = records.find((record) => record.id === id);
+      if (!currentRecord) {
+        const error = new Error('Record was not found.');
+        setSyncError(error.message);
+        return Promise.reject(error);
       }
 
-      setRecords((current) => {
-        const nextRecords = current.map((record) =>
-          record.id === id
-            ? normalize({ ...record, ...updates, userId, updatedAt: new Date().toISOString() }, userId)
-            : record,
-        );
-        const changedRecord = nextRecords.find((record) => record.id === id);
-        syncRecords(nextRecords, changedRecord);
-        return nextRecords;
-      });
+      const changedRecord = normalize({
+        ...currentRecord,
+        ...updates,
+        userId,
+        updatedAt: new Date().toISOString(),
+      }, userId);
+
+      return persistRecords([changedRecord]);
     }
 
-    function removeRecord(id) {
-      if (disableLocalPersistence) {
-        if (!canUseCloud()) {
-          setSyncState('error');
-          setSyncError(unavailableMessage());
-          return Promise.resolve(false);
-        }
-
-        const writeSequence = ++writeSequenceRef.current;
-        setSyncState('syncing');
-        setSyncError('');
-        return deleteRecord(tableName, id, userId)
-          .then(() => reload(writeSequence))
-          .then(() => true)
-          .catch((error) => {
-            if (writeSequence === writeSequenceRef.current) {
-              setSyncState('error');
-              setSyncError(error.message || unavailableMessage());
-            }
-            return false;
-          });
+    async function removeRecord(id) {
+      if (allowLocalPersistence && !canUseCloud()) {
+        setRecords((current) => {
+          const nextRecords = current.filter((record) => record.id !== id);
+          writeLocalCache(nextRecords);
+          return nextRecords;
+        });
+        setSyncState('local');
+        setSyncError(LOCAL_CACHE_SAVE_MESSAGE);
+        return true;
       }
 
-      setRecords((current) => {
-        const nextRecords = current.filter((record) => record.id !== id);
-        saveLocal(nextRecords);
+      if (!canUseCloud()) {
+        setSyncState('error');
+        setSyncError(CLOUD_REQUIRED_MESSAGE);
+        return false;
+      }
 
-        if (canUseCloud()) {
-          deleteRecord(tableName, id, userId)
-            .then(reload)
-            .catch((error) => {
-              setSyncState('local');
-              setSyncError(getLocalSyncReason(error.message));
-            });
+      const writeSequence = ++writeSequenceRef.current;
+      setSyncState('syncing');
+      setSyncError('');
+
+      try {
+        await deleteRecord(tableName, id, userId);
+        await reload(writeSequence);
+        return true;
+      } catch (error) {
+        if (writeSequence === writeSequenceRef.current) {
+          setSyncState('error');
+          setSyncError(error.message || CLOUD_REQUIRED_MESSAGE);
         }
-
-        return nextRecords;
-      });
+        return false;
+      }
     }
 
     return {

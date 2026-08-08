@@ -1,6 +1,8 @@
 import { hasSupabaseConfig, supabase } from '../../lib/supabase.js';
 import { getTableOrderColumn } from '../config/TABLE_CONFIG.js';
 
+const SUPABASE_UNAVAILABLE_MESSAGE = 'Supabase is not available.';
+
 export function canUseCloud() {
   return hasSupabaseConfig && Boolean(supabase) && isOnline();
 }
@@ -11,7 +13,7 @@ export function hasCloudConfig() {
 
 export async function fetchRecords(tableName, userId = '', fromRow = (row) => row, orderColumn = '') {
   if (!canUseCloud()) {
-    return [];
+    throw new Error(SUPABASE_UNAVAILABLE_MESSAGE);
   }
 
   const resolvedOrderColumn = getTableOrderColumn(tableName, orderColumn);
@@ -33,8 +35,12 @@ export async function fetchRecords(tableName, userId = '', fromRow = (row) => ro
 }
 
 export async function upsertRecords(tableName, records, toRow = (record) => record) {
-  if (!canUseCloud() || records.length === 0) {
+  if (!Array.isArray(records) || records.length === 0) {
     return;
+  }
+
+  if (!canUseCloud()) {
+    throw new Error(SUPABASE_UNAVAILABLE_MESSAGE);
   }
 
   const { error } = await supabase
@@ -48,7 +54,7 @@ export async function upsertRecords(tableName, records, toRow = (record) => reco
 
 export async function deleteRecord(tableName, id, userId = '') {
   if (!canUseCloud()) {
-    return;
+    throw new Error(SUPABASE_UNAVAILABLE_MESSAGE);
   }
 
   let query = supabase.from(tableName).delete().eq('id', id);
@@ -60,35 +66,6 @@ export async function deleteRecord(tableName, id, userId = '') {
   if (error) {
     throw error;
   }
-}
-
-export function mergeByUpdatedAt(localRecords, remoteRecords) {
-  const merged = new Map();
-
-  [...remoteRecords, ...localRecords].forEach((record) => {
-    const current = merged.get(record.id);
-    if (!current || getTime(record) >= getTime(current)) {
-      merged.set(record.id, record);
-    }
-  });
-
-  return [...merged.values()];
-}
-
-export function getLocalSyncReason(fallback = '') {
-  if (!hasCloudConfig()) {
-    return 'Supabase設定がないため、LocalStorageバックアップで動作しています。';
-  }
-
-  if (!isOnline()) {
-    return 'オフラインのため、LocalStorageバックアップで動作しています。';
-  }
-
-  return fallback || 'Supabase接続に失敗したため、LocalStorageバックアップで動作しています。';
-}
-
-function getTime(record) {
-  return new Date(record.updatedAt ?? record.updated_at ?? record.createdAt ?? record.created_at ?? 0).getTime();
 }
 
 function isOnline() {
