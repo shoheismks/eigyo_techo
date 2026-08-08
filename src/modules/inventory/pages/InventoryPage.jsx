@@ -24,6 +24,7 @@ const TABS = [
 ];
 
 const ALL = 'all';
+const ADJUSTMENT_REASONS = ['棚卸差異', '破損', '廃棄', 'サンプル使用', '入力ミス修正', 'その他'];
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -126,6 +127,16 @@ function emptyMovementForm(initial = {}, user = null) {
   };
 }
 
+function emptyAdjustmentForm(inventory = null, user = null) {
+  return {
+    mode: 'absolute',
+    quantity: inventory?.quantity ?? '',
+    reason: '棚卸差異',
+    memo: '',
+    handlerName: user?.email || '',
+  };
+}
+
 export default function InventoryPage({
   inventories = [],
   products = [],
@@ -147,6 +158,8 @@ export default function InventoryPage({
   const [keyword, setKeyword] = useState(() => localStorage.getItem('eigyo-techo-inventory-keyword') || '');
   const [filter, setFilter] = useState(() => localStorage.getItem('eigyo-techo-inventory-filter') || ALL);
   const [form, setForm] = useState(() => emptyMovementForm(initialAction || {}, user));
+  const [adjustmentInventoryId, setAdjustmentInventoryId] = useState('');
+  const [adjustmentForm, setAdjustmentForm] = useState(() => emptyAdjustmentForm(null, user));
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -171,6 +184,7 @@ export default function InventoryPage({
 
   const selectedProduct = products.find((product) => product.id === form.productId);
   const selectedInventory = inventories.find((inventory) => inventory.id === form.inventoryId);
+  const adjustmentInventory = inventories.find((inventory) => inventory.id === adjustmentInventoryId);
   const historyRows = useMemo(
     () => buildHistory(inventories, products, suppliers),
     [inventories, products, suppliers],
@@ -255,6 +269,68 @@ export default function InventoryPage({
       }
       return next;
     });
+  }
+
+  function openAdjustmentDialog(inventory) {
+    setError('');
+    setToast('');
+    setAdjustmentInventoryId(inventory.id);
+    setAdjustmentForm(emptyAdjustmentForm(inventory, user));
+  }
+
+  function closeAdjustmentDialog() {
+    setAdjustmentInventoryId('');
+    setAdjustmentForm(emptyAdjustmentForm(null, user));
+  }
+
+  function setAdjustmentField(field, value) {
+    setError('');
+    setToast('');
+    setAdjustmentForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleAdjustmentSubmit(event) {
+    event.preventDefault();
+    if (!adjustmentInventory) {
+      setError('調整する在庫を選択してください。');
+      return;
+    }
+
+    const currentQuantity = parseNumber(adjustmentInventory.quantity);
+    const inputQuantity = parseNumber(adjustmentForm.quantity);
+    const nextQuantity = adjustmentForm.mode === 'delta'
+      ? currentQuantity + inputQuantity
+      : inputQuantity;
+    const difference = nextQuantity - currentQuantity;
+    const reservedQuantity = parseNumber(adjustmentInventory.reservedQuantity);
+
+    if (!Number.isFinite(nextQuantity) || adjustmentForm.quantity === '') {
+      setError('調整数量を入力してください。');
+      return;
+    }
+    if (nextQuantity < 0) {
+      setError('調整後数量は0以上で入力してください。');
+      return;
+    }
+    if (nextQuantity < reservedQuantity) {
+      setError('調整後数量は引当済数量を下回れません。');
+      return;
+    }
+
+    updateInventory?.(adjustmentInventory.id, {
+      quantity: nextQuantity,
+      movementHistory: appendInventoryMovement(adjustmentInventory, {
+        type: '棚卸',
+        quantity: difference,
+        unit: adjustmentInventory.unit,
+        reason: adjustmentForm.reason,
+        date: todayString(),
+        handlerName: adjustmentForm.handlerName,
+        memo: adjustmentForm.memo,
+      }),
+    });
+    setToast('在庫調整を保存しました。');
+    closeAdjustmentDialog();
   }
 
   function validateCommon() {
@@ -509,12 +585,13 @@ export default function InventoryPage({
             <span>{filteredInventories.length}件</span>
           </div>
           <DesktopTable
-            actionWidth="220px"
+            actionWidth="300px"
             actions={(inventory) => (
               <>
                 <button type="button" className="ghost-button" onClick={() => { setActiveTab('inbound'); setForm(emptyMovementForm({ productId: inventory.productId }, user)); }}>入庫</button>
                 <button type="button" className="ghost-button" onClick={() => { setActiveTab('outbound'); setForm(emptyMovementForm({ inventoryId: inventory.id, productId: inventory.productId, reason: '販売' }, user)); }}>出庫</button>
                 <button type="button" className="ghost-button" onClick={() => { setActiveTab('stocktake'); setForm(emptyMovementForm({ inventoryId: inventory.id, productId: inventory.productId, reason: '棚卸差異' }, user)); }}>棚卸</button>
+                <button type="button" className="ghost-button" onClick={() => openAdjustmentDialog(inventory)}>在庫調整</button>
               </>
             )}
             className="inventory-common-table"
@@ -547,6 +624,7 @@ export default function InventoryPage({
                     <button type="button" className="ghost-button" onClick={() => { setActiveTab('inbound'); setForm(emptyMovementForm({ productId: inventory.productId }, user)); }}>入庫</button>
                     <button type="button" className="ghost-button" onClick={() => { setActiveTab('outbound'); setForm(emptyMovementForm({ inventoryId: inventory.id, productId: inventory.productId, reason: '販売' }, user)); }}>出庫</button>
                     <button type="button" className="ghost-button" onClick={() => { setActiveTab('stocktake'); setForm(emptyMovementForm({ inventoryId: inventory.id, productId: inventory.productId, reason: '棚卸差異' }, user)); }}>棚卸</button>
+                    <button type="button" className="ghost-button" onClick={() => openAdjustmentDialog(inventory)}>在庫調整</button>
                   </div>
                 </article>
               );
@@ -614,6 +692,16 @@ export default function InventoryPage({
           </div>
         </section>
       )}
+
+      {adjustmentInventory && (
+        <InventoryAdjustmentDialog
+          form={adjustmentForm}
+          inventory={adjustmentInventory}
+          onChange={setAdjustmentField}
+          onClose={closeAdjustmentDialog}
+          onSubmit={handleAdjustmentSubmit}
+        />
+      )}
     </main>
   );
 }
@@ -631,6 +719,92 @@ function InventoryProductSelect({ value, products, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function InventoryAdjustmentDialog({ inventory, form, onChange, onClose, onSubmit }) {
+  const currentQuantity = parseNumber(inventory.quantity);
+  const inputQuantity = parseNumber(form.quantity);
+  const nextQuantity = form.mode === 'delta' ? currentQuantity + inputQuantity : inputQuantity;
+  const difference = form.quantity === '' ? 0 : nextQuantity - currentQuantity;
+  const reservedQuantity = parseNumber(inventory.reservedQuantity);
+
+  return (
+    <div className="modal-backdrop inventory-adjustment-backdrop" role="presentation" onMouseDown={onClose}>
+      <form
+        className="modal-panel inventory-adjustment-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inventory-adjustment-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={onSubmit}
+      >
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Inventory adjustment</p>
+            <h2 id="inventory-adjustment-title">在庫調整</h2>
+          </div>
+          <button type="button" className="ghost-button" onClick={onClose}>閉じる</button>
+        </div>
+
+        <div className="dashboard-metrics inventory-adjustment-summary">
+          <div className="summary-card">
+            <span>現在庫</span>
+            <strong>{currentQuantity.toLocaleString('ja-JP')} {inventory.unit}</strong>
+          </div>
+          <div className="summary-card">
+            <span>引当済</span>
+            <strong>{reservedQuantity.toLocaleString('ja-JP')} {inventory.unit}</strong>
+          </div>
+          <div className="summary-card">
+            <span>調整後数量</span>
+            <strong>{nextQuantity.toLocaleString('ja-JP')} {inventory.unit}</strong>
+          </div>
+          <div className={`summary-card ${difference < 0 ? 'inventory-danger' : difference > 0 ? 'inventory-expiring' : ''}`}>
+            <span>増減</span>
+            <strong>{difference > 0 ? '+' : ''}{difference.toLocaleString('ja-JP')} {inventory.unit}</strong>
+          </div>
+        </div>
+
+        <div className="inventory-form-grid">
+          <label className="field-label">
+            入力方式
+            <select value={form.mode} onChange={(event) => onChange('mode', event.target.value)}>
+              <option value="absolute">調整後数量</option>
+              <option value="delta">増減数量</option>
+            </select>
+          </label>
+          <label className="field-label">
+            {form.mode === 'delta' ? '増減数量' : '調整後数量'}
+            <input
+              inputMode="decimal"
+              value={form.quantity}
+              onChange={(event) => onChange('quantity', event.target.value)}
+              required
+            />
+          </label>
+          <label className="field-label">
+            調整理由
+            <select value={form.reason} onChange={(event) => onChange('reason', event.target.value)}>
+              {ADJUSTMENT_REASONS.map((reason) => <option key={reason}>{reason}</option>)}
+            </select>
+          </label>
+          <label className="field-label">
+            担当者
+            <input value={form.handlerName} onChange={(event) => onChange('handlerName', event.target.value)} />
+          </label>
+          <label className="field-label full-width">
+            メモ
+            <textarea value={form.memo} onChange={(event) => onChange('memo', event.target.value)} />
+          </label>
+        </div>
+
+        <div className="customer-editor-actions">
+          <button type="button" className="ghost-button" onClick={onClose}>キャンセル</button>
+          <button type="submit" className="primary-button">在庫調整を保存</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
