@@ -173,10 +173,16 @@ export default function AppRouter({
   addEvent,
   updateEvent,
   removeEvent,
+  eventSyncState,
+  eventSyncError,
+  eventLegacyLocalDataWarning,
   tasks,
   addTask,
   updateTask,
   removeTask,
+  taskSyncState,
+  taskSyncError,
+  taskLegacyLocalDataWarning,
   attachments,
   addAttachment,
   updateAttachment,
@@ -696,6 +702,12 @@ export default function AppRouter({
         addTask={addTask}
         updateTask={updateTask}
         removeTask={removeTask}
+        syncState={eventSyncState === 'error' || taskSyncState === 'error' ? 'error' : eventSyncState}
+        syncError={[eventSyncError, taskSyncError].filter(Boolean).join(' / ')}
+        legacyLocalDataWarning={[
+          eventLegacyLocalDataWarning,
+          taskLegacyLocalDataWarning,
+        ].filter(Boolean).join(' / ')}
         updateCustomer={updateCustomer}
         user={user}
         onOpenKarte={openCustomerKarte}

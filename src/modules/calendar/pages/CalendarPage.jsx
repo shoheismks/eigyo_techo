@@ -548,6 +548,9 @@ export default function CalendarPage({
   addTask,
   updateTask,
   removeTask,
+  syncState,
+  syncError,
+  legacyLocalDataWarning,
   updateCustomer,
   onOpenKarte,
   onOpenProject,
@@ -571,6 +574,7 @@ export default function CalendarPage({
   const [actionMenu, setActionMenu] = useState(null);
   const [savingEventId, setSavingEventId] = useState('');
   const [calendarToast, setCalendarToast] = useState('');
+  const [calendarError, setCalendarError] = useState('');
 
   const systemEvents = useMemo(
     () => buildSystemEvents({ customers, samples, quotes, complaints }),
@@ -662,6 +666,12 @@ export default function CalendarPage({
     window.setTimeout(() => setCalendarToast(''), 2400);
   }
 
+  function showError(error) {
+    const message = error?.message || String(error || '');
+    setCalendarError(message);
+    showToast(`保存に失敗しました: ${message}`);
+  }
+
   function editableEvent(event) {
     const baseEvent = event.seriesEvent || event;
     return baseEvent.source === 'event' ? baseEvent : null;
@@ -729,9 +739,10 @@ export default function CalendarPage({
     setTaskForm((current) => (current ? { ...current, [field]: value } : current));
   }
 
-  function saveTask(event) {
+  async function saveTask(event) {
     event.preventDefault();
     if (!taskForm?.title?.trim()) return;
+    setCalendarError('');
 
     const normalized = normalizeTask({
       ...taskForm,
@@ -740,19 +751,29 @@ export default function CalendarPage({
       createdByName: taskForm.createdByName || user?.email || '',
     }, user?.id ?? '');
 
-    if (editingTask) {
-      updateTask?.(editingTask.id, normalized);
-    } else {
-      addTask?.(normalized);
+    try {
+      if (editingTask) {
+        await updateTask?.(editingTask.id, normalized);
+      } else {
+        await addTask?.(normalized);
+      }
+      closeTaskForm();
+      showToast('タスクを保存しました');
+    } catch (error) {
+      showError(error);
     }
-
-    closeTaskForm();
   }
 
-  function deleteTask() {
+  async function deleteTask() {
     if (!editingTask) return;
-    removeTask?.(editingTask.id);
-    closeTaskForm();
+    setCalendarError('');
+    try {
+      await removeTask?.(editingTask.id);
+      closeTaskForm();
+      showToast('タスクを削除しました');
+    } catch (error) {
+      showError(error);
+    }
   }
 
   function openDetail(event) {
@@ -773,9 +794,10 @@ export default function CalendarPage({
     setForm((current) => (current ? { ...current, [field]: value } : current));
   }
 
-  function saveEvent(event) {
+  async function saveEvent(event) {
     event.preventDefault();
     if (!form.title.trim()) return;
+    setCalendarError('');
 
     const normalized = normalizeEvent({
       ...form,
@@ -795,26 +817,36 @@ export default function CalendarPage({
       createdByName: form.createdByName || user?.email || '',
     }, user?.id ?? '');
 
-    if (editingEvent) {
-      updateEvent(editingEvent.id, normalized);
-    } else {
-      addEvent(normalized);
-    }
+    try {
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, normalized);
+      } else {
+        await addEvent(normalized);
+      }
 
-    if (normalized.nextFollowDate && normalized.customerId) {
-      updateCustomer?.(normalized.customerId, {
-        nextFollowUpDate: normalized.nextFollowDate,
-        nextFollowDate: normalized.nextFollowDate,
-      });
+      if (normalized.nextFollowDate && normalized.customerId) {
+        void updateCustomer?.(normalized.customerId, {
+          nextFollowUpDate: normalized.nextFollowDate,
+          nextFollowDate: normalized.nextFollowDate,
+        });
+      }
+      closeForm();
+      showToast('予定を保存しました');
+    } catch (error) {
+      showError(error);
     }
-
-    closeForm();
   }
 
-  function deleteEvent() {
+  async function deleteEvent() {
     if (!editingEvent) return;
-    removeEvent(editingEvent.id);
-    closeForm();
+    setCalendarError('');
+    try {
+      await removeEvent(editingEvent.id);
+      closeForm();
+      showToast('予定を削除しました');
+    } catch (error) {
+      showError(error);
+    }
   }
 
   function confirmRecurringChange(event, actionLabel) {
@@ -822,25 +854,24 @@ export default function CalendarPage({
     return window.confirm(`繰り返し予定です。${actionLabel}は系列全体に適用します。よろしいですか？`);
   }
 
-  function applyEventUpdate(event, updates, actionLabel = '予定を更新') {
+  async function applyEventUpdate(event, updates, actionLabel = '\u4e88\u5b9a\u3092\u66f4\u65b0') {
     const baseEvent = editableEvent(event);
     if (!baseEvent) return false;
     if (!confirmRecurringChange(baseEvent, actionLabel)) return false;
 
+    setCalendarError('');
     setSavingEventId(baseEvent.id);
     try {
-      updateEvent(baseEvent.id, {
+      await updateEvent(baseEvent.id, {
         ...updates,
         updatedAt: new Date().toISOString(),
       });
-      window.setTimeout(() => {
-        setSavingEventId('');
-        showToast('予定を保存しました');
-      }, 350);
+      setSavingEventId('');
+      showToast('\u4e88\u5b9a\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f');
       return true;
     } catch (error) {
       setSavingEventId('');
-      showToast(`保存に失敗しました: ${error.message}`);
+      showError(error);
       return false;
     }
   }
@@ -857,7 +888,7 @@ export default function CalendarPage({
     if (!dragState) return;
     const updates = moveEventToDate(dragState.event, dateKey, hour);
     if (window.confirm('予定の日時を変更します。よろしいですか？')) {
-      applyEventUpdate(dragState.event, updates, '日時変更');
+      void applyEventUpdate(dragState.event, updates, '日時変更');
     }
     setDragState(null);
     setDropTarget(null);
@@ -875,7 +906,7 @@ export default function CalendarPage({
     if (!resizeState) return;
     const updates = resizeEventEnd(resizeState.event, clientY - resizeState.startY);
     if (window.confirm('予定の終了時間を変更します。よろしいですか？')) {
-      applyEventUpdate(resizeState.event, updates, '終了時間変更');
+      void applyEventUpdate(resizeState.event, updates, '終了時間変更');
     }
     setResizeState(null);
   }
@@ -902,23 +933,28 @@ export default function CalendarPage({
     setActionMenu(null);
   }
 
-  function duplicateEvent(calendarEvent) {
+  async function duplicateEvent(calendarEvent) {
     const baseEvent = calendarEvent.seriesEvent || calendarEvent;
     const now = new Date().toISOString();
-    addEvent(normalizeEvent({
-      ...baseEvent,
-      id: crypto.randomUUID(),
-      title: `${baseEvent.title || '予定'} copy`,
-      startAt: calendarEvent.startAt || baseEvent.startAt,
-      endAt: calendarEvent.endAt || baseEvent.endAt,
-      recurrenceFrequency: 'none',
-      recurrenceEndType: 'none',
-      recurrenceEndDate: '',
-      createdAt: now,
-      updatedAt: now,
-    }, user?.id ?? ''));
-    showToast('予定を複製しました');
-    setActionMenu(null);
+    setCalendarError('');
+    try {
+      await addEvent(normalizeEvent({
+        ...baseEvent,
+        id: crypto.randomUUID(),
+        title: `${baseEvent.title || '\u4e88\u5b9a'} copy`,
+        startAt: calendarEvent.startAt || baseEvent.startAt,
+        endAt: calendarEvent.endAt || baseEvent.endAt,
+        recurrenceFrequency: 'none',
+        recurrenceEndType: 'none',
+        recurrenceEndDate: '',
+        createdAt: now,
+        updatedAt: now,
+      }, user?.id ?? ''));
+      showToast('\u4e88\u5b9a\u3092\u8907\u88fd\u3057\u307e\u3057\u305f');
+      setActionMenu(null);
+    } catch (error) {
+      showError(error);
+    }
   }
 
   function changeEventColor(calendarEvent, color) {
@@ -931,17 +967,22 @@ export default function CalendarPage({
     setActionMenu(null);
   }
 
-  function removeCalendarEvent(calendarEvent) {
+  async function removeCalendarEvent(calendarEvent) {
     const baseEvent = editableEvent(calendarEvent);
     if (!baseEvent) return;
-    if (!confirmRecurringChange(baseEvent, '削除')) return;
-    if (!window.confirm('予定を削除します。よろしいですか？')) return;
-    removeEvent(baseEvent.id);
-    showToast('予定を削除しました');
-    setActionMenu(null);
+    if (!confirmRecurringChange(baseEvent, '\u524a\u9664')) return;
+    if (!window.confirm('\u4e88\u5b9a\u3092\u524a\u9664\u3057\u307e\u3059\u3002\u3088\u308d\u3057\u3044\u3067\u3059\u304b\uff1f')) return;
+    setCalendarError('');
+    try {
+      await removeEvent(baseEvent.id);
+      showToast('\u4e88\u5b9a\u3092\u524a\u9664\u3057\u307e\u3057\u305f');
+      setActionMenu(null);
+    } catch (error) {
+      showError(error);
+    }
   }
 
-  function completeAsDeal() {
+  async function completeAsDeal() {
     if (!editingEvent || !editingEvent.customerId) return;
     const customer = customers.find((item) => item.id === editingEvent.customerId);
     if (!customer) return;
@@ -949,9 +990,9 @@ export default function CalendarPage({
     const deal = {
       id: crypto.randomUUID(),
       date: toDateKey(editingEvent.startAt || new Date()),
-      type: editingEvent.eventType || '商談',
+      type: editingEvent.eventType || '\u5546\u8ac7',
       summary: editingEvent.memo || editingEvent.title,
-      nextAction: editingEvent.nextFollowDate ? `次回フォロー: ${editingEvent.nextFollowDate}` : '',
+      nextAction: editingEvent.nextFollowDate ? `\u6b21\u56de\u30d5\u30a9\u30ed\u30fc: ${editingEvent.nextFollowDate}` : '',
       contactIds: editingEvent.contactIds,
       contactNames: editingEvent.contactIds.map((id) => contactName(contacts, id)).filter(Boolean),
       createdAt: new Date().toISOString(),
@@ -960,30 +1001,41 @@ export default function CalendarPage({
       replies: [],
     };
 
-    updateCustomer?.(customer.id, {
+    void updateCustomer?.(customer.id, {
       dealHistories: [deal, ...(customer.dealHistories ?? [])],
       lastContactDate: deal.date,
       nextFollowUpDate: editingEvent.nextFollowDate || customer.nextFollowUpDate,
       nextFollowDate: editingEvent.nextFollowDate || customer.nextFollowDate,
     });
-    updateEvent(editingEvent.id, { status: '完了', completedAt: new Date().toISOString() });
-    closeForm();
+
+    setCalendarError('');
+    try {
+      await updateEvent(editingEvent.id, { status: '\u5b8c\u4e86', completedAt: new Date().toISOString() });
+      closeForm();
+    } catch (error) {
+      showError(error);
+    }
   }
 
-  function postponeEvent() {
+  async function postponeEvent() {
     if (!editingEvent || !form.startAt) return;
-    addEvent(normalizeEvent({
-      ...form,
-      id: crypto.randomUUID(),
-      status: '予定',
-      postponedFromEventId: editingEvent.id,
-      postponedOriginalStartAt: editingEvent.startAt,
-      postponedOriginalEndAt: editingEvent.endAt,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, user?.id ?? ''));
-    updateEvent(editingEvent.id, { status: '延期' });
-    closeForm();
+    setCalendarError('');
+    try {
+      await addEvent(normalizeEvent({
+        ...form,
+        id: crypto.randomUUID(),
+        status: '\u4e88\u5b9a',
+        postponedFromEventId: editingEvent.id,
+        postponedOriginalStartAt: editingEvent.startAt,
+        postponedOriginalEndAt: editingEvent.endAt,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, user?.id ?? ''));
+      await updateEvent(editingEvent.id, { status: '\u5ef6\u671f' });
+      closeForm();
+    } catch (error) {
+      showError(error);
+    }
   }
 
   function movePrevious() {
@@ -1051,6 +1103,14 @@ export default function CalendarPage({
           </div>
         </div>
       </div>
+
+      {(legacyLocalDataWarning || syncError || calendarError || syncState === 'error') && (
+        <div className="form-error-message" role="alert">
+          {legacyLocalDataWarning && <p>{legacyLocalDataWarning}</p>}
+          {syncError && <p>{syncError}</p>}
+          {calendarError && <p>{calendarError}</p>}
+        </div>
+      )}
 
       <section className="calendar-task-filters" aria-label="タスク絞り込み">
         <label className="field-label">

@@ -199,11 +199,17 @@ export function AppDataProvider({ userId, children }) {
     addEvent: eventsState.addRecord,
     updateEvent: eventsState.updateRecord,
     removeEvent: eventsState.removeRecord,
+    eventSyncState: eventsState.syncState,
+    eventSyncError: eventsState.syncError,
+    eventLegacyLocalDataWarning: eventsState.legacyLocalDataWarning,
 
     tasks: toArray(tasksState.records),
     addTask: tasksState.addRecord,
     updateTask: tasksState.updateRecord,
     removeTask: tasksState.removeRecord,
+    taskSyncState: tasksState.syncState,
+    taskSyncError: tasksState.syncError,
+    taskLegacyLocalDataWarning: tasksState.legacyLocalDataWarning,
 
     attachments: toArray(attachmentsState.records),
     addAttachment: attachmentsState.addRecord,
