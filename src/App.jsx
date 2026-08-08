@@ -193,6 +193,7 @@ function AuthenticatedShell() {
     addIssuer,
     updateIssuer,
     removeIssuer,
+    issuerSyncState,
     projects,
     addProject,
     updateProject,
@@ -240,6 +241,9 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     if (activeIssuers.length === 0) {
+      if (issuerSyncState === 'syncing') {
+        return;
+      }
       if (selectedIssuerId) {
         setSelectedIssuerId('');
       }
@@ -252,7 +256,7 @@ function AuthenticatedShell() {
 
     const fallbackIssuer = activeIssuers.find((issuer) => issuer.isDefault) || activeIssuers[0];
     setSelectedIssuerId(fallbackIssuer.id);
-  }, [activeIssuers, selectedIssuerId]);
+  }, [activeIssuers, issuerSyncState, selectedIssuerId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

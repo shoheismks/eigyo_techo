@@ -37,6 +37,9 @@ export default function SettingsPage({
   issuers = [],
   addIssuer,
   updateIssuer,
+  issuerSyncState,
+  issuerSyncError,
+  issuerLegacyLocalDataWarning,
 }) {
   const fileInputRef = useRef(null);
   const [backupMessage, setBackupMessage] = useState('');
@@ -116,15 +119,15 @@ export default function SettingsPage({
       delete payload.sealFile;
 
       if (payload.isDefault) {
-        issuers
+        await Promise.all(issuers
           .filter((issuer) => issuer.id !== id && issuer.isDefault)
-          .forEach((issuer) => updateIssuer?.(issuer.id, { isDefault: false }));
+          .map((issuer) => updateIssuer?.(issuer.id, { isDefault: false })));
       }
 
       if (issuers.some((issuer) => issuer.id === id)) {
-        updateIssuer?.(id, payload);
+        await updateIssuer?.(id, payload);
       } else {
-        addIssuer?.(payload);
+        await addIssuer?.(payload);
       }
 
       setIssuerMessage('発行元を保存しました。');
@@ -136,23 +139,37 @@ export default function SettingsPage({
     }
   }
 
-  function duplicateIssuer(issuer) {
-    addIssuer?.({
-      ...issuer,
-      id: crypto.randomUUID(),
-      name: `${issuer.name || '発行元'} copy`,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    setIssuerMessage('発行元を複製しました。');
+  async function duplicateIssuer(issuer) {
+    setIssuerSaving(true);
+    setIssuerMessage('');
+    try {
+      await addIssuer?.({
+        ...issuer,
+        id: crypto.randomUUID(),
+        name: `${issuer.name || '\u767a\u884c\u5143'} copy`,
+        isDefault: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      setIssuerMessage('\u767a\u884c\u5143\u3092\u8907\u88fd\u3057\u307e\u3057\u305f\u3002');
+    } catch (error) {
+      setIssuerMessage(error.message || '\u767a\u884c\u5143\u306e\u8907\u88fd\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002');
+    } finally {
+      setIssuerSaving(false);
+    }
   }
-
-  function disableIssuer(issuer) {
-    updateIssuer?.(issuer.id, { isActive: false, isDefault: false });
-    setIssuerMessage('発行元を無効化しました。');
+  async function disableIssuer(issuer) {
+    setIssuerSaving(true);
+    setIssuerMessage('');
+    try {
+      await updateIssuer?.(issuer.id, { isActive: false, isDefault: false });
+      setIssuerMessage('\u767a\u884c\u5143\u3092\u7121\u52b9\u5316\u3057\u307e\u3057\u305f\u3002');
+    } catch (error) {
+      setIssuerMessage(error.message || '\u767a\u884c\u5143\u306e\u7121\u52b9\u5316\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002');
+    } finally {
+      setIssuerSaving(false);
+    }
   }
-
   function handleExport() {
     const payload = createBackupPayload({
       user,
@@ -239,6 +256,13 @@ export default function SettingsPage({
               <button className="primary-button" type="button" onClick={resetIssuerForm}>＋ 発行元追加</button>
             )}
           </div>
+
+          {['company', 'documents'].includes(activeCategory) && (issuerLegacyLocalDataWarning || issuerSyncError || issuerSyncState === 'error') && (
+            <div className="form-error-message" role="alert">
+              {issuerLegacyLocalDataWarning && <p>{issuerLegacyLocalDataWarning}</p>}
+              {issuerSyncError && <p>{issuerSyncError}</p>}
+            </div>
+          )}
 
           {activeCategory === 'basic' && (
             <div className="settings-card-grid">

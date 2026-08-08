@@ -93,6 +93,16 @@ export const TABLE_CONFIG = {
     defaultSort: { key: 'updatedAt', direction: 'desc' },
     displayName: '納品書',
   },
+  issuers: {
+    orderColumn: 'updated_at',
+    realtime: true,
+    audit: true,
+    softDelete: false,
+    disableLocalPersistence: true,
+    searchable: ['name', 'legal_name', 'registration_number', 'contact_person', 'bank_account'],
+    defaultSort: { key: 'updatedAt', direction: 'desc' },
+    displayName: 'Issuer',
+  },
   inventory: {
     orderColumn: 'updated_at',
     realtime: true,

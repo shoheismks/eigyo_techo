@@ -170,6 +170,9 @@ export function AppDataProvider({ userId, children }) {
     addIssuer: issuersState.addRecord,
     updateIssuer: issuersState.updateRecord,
     removeIssuer: issuersState.removeRecord,
+    issuerSyncState: issuersState.syncState,
+    issuerSyncError: issuersState.syncError,
+    issuerLegacyLocalDataWarning: issuersState.legacyLocalDataWarning,
 
     projects: toArray(projectsState.records),
     addProject: projectsState.addRecord,

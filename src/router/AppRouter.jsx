@@ -131,6 +131,9 @@ export default function AppRouter({
   addIssuer,
   updateIssuer,
   removeIssuer,
+  issuerSyncState,
+  issuerSyncError,
+  issuerLegacyLocalDataWarning,
   addQuote,
   updateQuote,
   removeQuote,
@@ -729,6 +732,9 @@ export default function AppRouter({
         addIssuer={addIssuer}
         updateIssuer={updateIssuer}
         removeIssuer={removeIssuer}
+        issuerSyncState={issuerSyncState}
+        issuerSyncError={issuerSyncError}
+        issuerLegacyLocalDataWarning={issuerLegacyLocalDataWarning}
         backupDatasets={{
           customers,
           products,
