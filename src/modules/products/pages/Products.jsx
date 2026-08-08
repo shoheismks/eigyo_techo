@@ -45,6 +45,9 @@ export default function Products({
   removeProduct,
   onOpenProductDetail,
   onOpenInventory,
+  syncState = '',
+  syncError = '',
+  legacyLocalDataWarning = '',
 }) {
   const [keyword, setKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(ALL);
@@ -202,6 +205,9 @@ export default function Products({
           <p>商品情報と在庫導線をまとめて確認できます。在庫登録は各商品行の「＋入庫」から直接開始できます。</p>
         </div>
       </section>
+
+      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
+      {syncError && syncState === 'error' && <p className="form-error-message">{syncError}</p>}
 
       <section className="search-panel desktop-filter-panel">
         <div className="section-heading">

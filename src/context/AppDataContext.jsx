@@ -68,16 +68,23 @@ export function AppDataProvider({ userId, children }) {
     addProduct: productsState.addProduct,
     updateProduct: productsState.updateProduct,
     removeProduct: productsState.removeProduct,
+    productSyncState: productsState.productSyncState,
+    productSyncError: productsState.productSyncError,
+    productLegacyLocalDataWarning: productsState.productLegacyLocalDataWarning,
 
     productAssets: toArray(productAssetsState.records),
     addProductAsset: productAssetsState.addRecord,
     updateProductAsset: productAssetsState.updateRecord,
     removeProductAsset: productAssetsState.removeRecord,
+    productAssetSyncError: productAssetsState.syncError,
+    productAssetLegacyLocalDataWarning: productAssetsState.legacyLocalDataWarning,
 
     brands: toArray(brandsState.records),
     addBrand: brandsState.addRecord,
     updateBrand: brandsState.updateRecord,
     removeBrand: brandsState.removeRecord,
+    brandSyncError: brandsState.syncError,
+    brandLegacyLocalDataWarning: brandsState.legacyLocalDataWarning,
 
     customerProductPrices: toArray(pricesState.records),
     customerProductPriceHistory: toArray(pricesState.history),

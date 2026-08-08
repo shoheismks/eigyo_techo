@@ -111,6 +111,8 @@ export default function ProductDetail({
   addProductAsset,
   updateProductAsset,
   removeProductAsset,
+  syncError = '',
+  legacyLocalDataWarning = '',
   addInventory,
   updateInventory,
   removeInventory,
@@ -374,7 +376,7 @@ export default function ProductDetail({
     setForm((current) => ({ ...current, brandId: '', brandName: '' }));
   }
 
-  function createBrandFromInput() {
+  async function createBrandFromInput() {
     const name = normalizeBrandName(form.brandName);
     if (!name || !addBrand) return;
     const duplicate = findDuplicateBrand(activeBrands, name);
@@ -384,14 +386,22 @@ export default function ProductDetail({
       return;
     }
 
-    const brandId = addBrand(normalizeBrand({
-      name,
-      manufacturerId: form.manufacturerName || '',
-      country: form.origin || '',
-      userId,
-    }, userId));
-    setForm((current) => ({ ...current, brandId, brandName: name }));
-    setSaveMessage('ブランドを追加しました。');
+    try {
+      const brandId = await addBrand(normalizeBrand({
+        name,
+        manufacturerId: form.manufacturerName || '',
+        country: form.origin || '',
+        userId,
+      }, userId));
+      if (!brandId) {
+        setSaveError(syncError || 'ブランドの保存に失敗しました。');
+        return;
+      }
+      setForm((current) => ({ ...current, brandId, brandName: name }));
+      setSaveMessage('ブランドを追加しました。');
+    } catch (error) {
+      setSaveError(error.message || 'ブランドの保存に失敗しました。');
+    }
   }
 
   function updateInventoryField(field, value) {
@@ -589,6 +599,8 @@ export default function ProductDetail({
       ...asset,
       ...updates,
       updatedAt: new Date().toISOString(),
+    })?.catch((error) => {
+      setAssetError(error.message || '商品アセットの保存に失敗しました。');
     });
   }
 
@@ -635,7 +647,11 @@ export default function ProductDetail({
     setSaving(true);
     try {
       if (isNew) {
-        addProduct(payload);
+        const productId = await addProduct(payload);
+        if (!productId) {
+          setSaveError(syncError || '商品情報の保存に失敗しました。');
+          return;
+        }
         setActivePage('Products');
       } else {
         await updateProduct(product.id, payload);
@@ -657,6 +673,9 @@ export default function ProductDetail({
         <h1>{isNew ? '商品追加' : '商品詳細'}</h1>
         <p>商品情報、価格、添付ファイルをSupabaseに同期して管理します。</p>
       </section>
+
+      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
+      {syncError && <p className="form-error-message">{syncError}</p>}
 
       {!isNew && (
         <section className="detail-section inventory-product-summary">

@@ -3,8 +3,6 @@ import {
   canUseCloud,
   deleteRecord,
   fetchRecords,
-  getLocalSyncReason,
-  mergeByUpdatedAt,
   upsertRecords,
 } from '../../../shared/services/recordSyncService.js';
 import {
@@ -161,21 +159,26 @@ function normalizeAttachment(file) {
   };
 }
 
-function readLocalProducts(userId = '') {
+function hasLegacyLocalProducts() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved
-      ? JSON.parse(saved)
-          .map((product) => normalizeProduct(product, userId))
-          .filter((product) => !userId || product.userId === userId)
-      : [];
+    if (!saved) {
+      return false;
+    }
+
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) && parsed.length > 0;
   } catch {
-    return [];
+    return true;
   }
 }
 
-function saveLocalProducts(products) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(products.map((product) => normalizeProduct(product))));
+function legacyLocalDataMessage() {
+  return '\u65e7\u30ed\u30fc\u30ab\u30eb\u5546\u54c1\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u3059\u3002\u5b89\u5168\u306e\u305f\u3081\u81ea\u52d5\u79fb\u884c\u30fb\u81ea\u52d5\u524a\u9664\u306f\u884c\u3044\u307e\u305b\u3093\u3002';
+}
+
+function unavailableMessage() {
+  return 'Supabase is unavailable. Product data cannot be saved.';
 }
 
 function toSupabaseRow(product) {
@@ -239,48 +242,46 @@ function fromSupabaseRow(row) {
 }
 
 export function useProducts(userId = '') {
-  const [products, setProducts] = useState(() => (canUseCloud() ? [] : readLocalProducts(userId)));
-  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'local');
-  const [syncError, setSyncError] = useState('');
+  const [products, setProducts] = useState([]);
+  const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
+  const [syncError, setSyncError] = useState(() => (canUseCloud() ? '' : unavailableMessage()));
+  const [legacyLocalDataWarning, setLegacyLocalDataWarning] = useState('');
   const writeSequenceRef = useRef(0);
+
+  useEffect(() => {
+    setLegacyLocalDataWarning(hasLegacyLocalProducts() ? legacyLocalDataMessage() : '');
+  }, []);
 
   useEffect(() => {
     let ignore = false;
 
     async function syncProducts() {
       if (!canUseCloud()) {
-        setProducts(readLocalProducts(userId));
-        setSyncState('local');
-        setSyncError(getLocalSyncReason());
+        setProducts([]);
+        setSyncState('error');
+        setSyncError(unavailableMessage());
         return;
       }
 
       try {
         setSyncState('syncing');
         setSyncError('');
-        const localProducts = readLocalProducts(userId);
         const remoteProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
-        const mergedProducts = mergeByUpdatedAt(localProducts, remoteProducts)
-          .map((product) => normalizeProduct(product, userId));
-
-        if (localProducts.length > 0) {
-          await upsertRecords(TABLE_NAME, mergedProducts, toSupabaseRow);
-        }
-
-        const refreshedProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
-        const nextProducts = refreshedProducts.length > 0 ? refreshedProducts : mergedProducts;
 
         if (ignore) {
           return;
         }
 
-        setProducts(nextProducts);
-        saveLocalProducts(nextProducts);
+        setProducts(remoteProducts.map((product) => normalizeProduct(product, userId)));
         setSyncState('supabase');
       } catch (error) {
-        setProducts(readLocalProducts(userId));
-        setSyncState('local');
-        setSyncError(getLocalSyncReason(error.message));
+        if (ignore) {
+          return;
+        }
+
+        setProducts([]);
+        setSyncState('error');
+        setSyncError(error.message || unavailableMessage());
       }
     }
 
@@ -301,67 +302,60 @@ export function useProducts(userId = '') {
 
   async function reloadProducts(writeSequence = null) {
     if (!canUseCloud()) {
-      setProducts(readLocalProducts(userId));
-      setSyncState('local');
-      setSyncError(getLocalSyncReason());
+      setProducts([]);
+      setSyncState('error');
+      setSyncError(unavailableMessage());
       return;
     }
 
     try {
       setSyncState('syncing');
+      setSyncError('');
       const remoteProducts = await fetchRecords(TABLE_NAME, userId, fromSupabaseRow);
 
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
         return;
       }
 
-      setProducts(remoteProducts);
-      saveLocalProducts(remoteProducts);
+      setProducts(remoteProducts.map((product) => normalizeProduct(product, userId)));
       setSyncState('supabase');
-      setSyncError('');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) {
         return;
       }
 
-      setSyncState('local');
-      setSyncError(getLocalSyncReason(error.message));
+      setSyncState('error');
+      setSyncError(error.message || unavailableMessage());
+      throw error;
     }
   }
 
-  function syncProducts(nextProducts, changedProduct = null, options = {}) {
-    const { rejectOnError = false } = options;
-    saveLocalProducts(nextProducts);
-
+  async function persistProduct(changedProduct) {
     if (!canUseCloud()) {
-      setSyncState('local');
-      setSyncError(getLocalSyncReason());
-      return Promise.resolve();
+      const message = unavailableMessage();
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
     }
 
     const writeSequence = ++writeSequenceRef.current;
     setSyncState('syncing');
     setSyncError('');
-    const writePromise = changedProduct
-      ? upsertRecords(TABLE_NAME, [changedProduct], toSupabaseRow)
-      : upsertRecords(TABLE_NAME, nextProducts, toSupabaseRow);
 
-    return writePromise
-      .then(() => reloadProducts(writeSequence))
-      .catch((error) => {
-        if (writeSequence !== writeSequenceRef.current) {
-          return;
-        }
+    try {
+      await upsertRecords(TABLE_NAME, [changedProduct], toSupabaseRow);
+      await reloadProducts(writeSequence);
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || unavailableMessage());
+      }
 
-        setSyncState('local');
-        setSyncError(getLocalSyncReason(error.message));
-        if (rejectOnError) {
-          throw error;
-        }
-      });
+      throw error;
+    }
   }
 
-  function addProduct(product) {
+  async function addProduct(product) {
     const now = new Date().toISOString();
     const normalizedProduct = normalizeProduct({
       ...product,
@@ -371,19 +365,20 @@ export function useProducts(userId = '') {
       updatedAt: now,
     }, userId);
 
-    setProducts((current) => {
-      const nextProducts = [normalizedProduct, ...current];
-      syncProducts(nextProducts, normalizedProduct);
-      return nextProducts;
-    });
-
-    return normalizedProduct.id;
+    try {
+      await persistProduct(normalizedProduct);
+      return normalizedProduct.id;
+    } catch {
+      return null;
+    }
   }
 
-  function updateProduct(id, updates) {
+  async function updateProduct(id, updates) {
     const currentProduct = products.find((product) => product.id === id);
     if (!currentProduct) {
-      return Promise.reject(new Error('更新対象の商品が見つかりません。'));
+      const error = new Error('Product was not found.');
+      setSyncError(error.message);
+      throw error;
     }
 
     const changedProduct = normalizeProduct({
@@ -392,28 +387,34 @@ export function useProducts(userId = '') {
       userId,
       updatedAt: new Date().toISOString(),
     }, userId);
-    const nextProducts = products.map((product) => (product.id === id ? changedProduct : product));
 
-    setProducts(nextProducts);
-    return syncProducts(nextProducts, changedProduct, { rejectOnError: true });
+    await persistProduct(changedProduct);
+    return changedProduct;
   }
 
-  function removeProduct(id) {
-    setProducts((current) => {
-      const nextProducts = current.filter((product) => product.id !== id);
-      saveLocalProducts(nextProducts);
+  async function removeProduct(id) {
+    if (!canUseCloud()) {
+      const message = unavailableMessage();
+      setSyncState('error');
+      setSyncError(message);
+      return false;
+    }
 
-      if (canUseCloud()) {
-        deleteRecord(TABLE_NAME, id, userId)
-          .then(reloadProducts)
-          .catch((error) => {
-            setSyncState('local');
-            setSyncError(getLocalSyncReason(error.message));
-          });
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+
+    try {
+      await deleteRecord(TABLE_NAME, id, userId);
+      await reloadProducts(writeSequence);
+      return true;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || unavailableMessage());
       }
-
-      return nextProducts;
-    });
+      return false;
+    }
   }
 
   return {
@@ -424,5 +425,6 @@ export function useProducts(userId = '') {
     reloadProducts,
     productSyncState: syncState,
     productSyncError: syncError,
+    productLegacyLocalDataWarning: legacyLocalDataWarning,
   };
 }

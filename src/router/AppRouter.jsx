@@ -61,8 +61,15 @@ export default function AppRouter({
   updateCustomer,
   removeCustomer,
   products,
+  productSyncState,
+  productSyncError,
+  productLegacyLocalDataWarning,
   brands,
+  brandSyncError,
+  brandLegacyLocalDataWarning,
   productAssets,
+  productAssetSyncError,
+  productAssetLegacyLocalDataWarning,
   customerProductPrices,
   customerProductPriceHistory,
   inventories,
@@ -471,6 +478,13 @@ export default function AppRouter({
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
         onOpenInventory={openInventoryPage}
+        syncState={productSyncState}
+        syncError={productSyncError || brandSyncError || productAssetSyncError}
+        legacyLocalDataWarning={[
+          productLegacyLocalDataWarning,
+          brandLegacyLocalDataWarning,
+          productAssetLegacyLocalDataWarning,
+        ].filter(Boolean).join(' / ')}
       />
     );
   }
@@ -556,6 +570,12 @@ export default function AppRouter({
         addProductAsset={addProductAsset}
         updateProductAsset={updateProductAsset}
         removeProductAsset={removeProductAsset}
+        syncError={productSyncError || brandSyncError || productAssetSyncError}
+        legacyLocalDataWarning={[
+          productLegacyLocalDataWarning,
+          brandLegacyLocalDataWarning,
+          productAssetLegacyLocalDataWarning,
+        ].filter(Boolean).join(' / ')}
         addInventory={addInventory}
         updateInventory={updateInventory}
         removeInventory={removeInventory}
