@@ -479,6 +479,10 @@ function isOverdueTask(task = {}, todayKey = toDateKey(new Date())) {
   return Boolean(task.dueDate && task.dueDate < todayKey && !isTaskComplete(task));
 }
 
+function isIncompleteTask(task = {}) {
+  return !isTaskComplete(task);
+}
+
 function compareTasks(a = {}, b = {}) {
   const completionDiff = Number(isTaskComplete(a)) - Number(isTaskComplete(b));
   if (completionDiff !== 0) return completionDiff;
@@ -575,6 +579,7 @@ export default function CalendarPage({
   const [savingEventId, setSavingEventId] = useState('');
   const [calendarToast, setCalendarToast] = useState('');
   const [calendarError, setCalendarError] = useState('');
+  const [mobileAgendaView, setMobileAgendaView] = useState('today');
 
   const systemEvents = useMemo(
     () => buildSystemEvents({ customers, samples, quotes, complaints }),
@@ -622,6 +627,45 @@ export default function CalendarPage({
   );
   const listEvents = useMemo(() => mergedEvents.filter((event) => event.status !== '中止'), [mergedEvents]);
   const calendarTitle = viewMode === 'week' ? formatWeekTitle(baseDate) : viewMode === 'day' ? formatDateLabel(baseDate) : formatMonthTitle(baseDate);
+  const todayEvents = useMemo(
+    () => mergedEvents.filter((event) => (event.date || eventDate(event)) === today && !isTaskCalendarItem(event)),
+    [mergedEvents, today],
+  );
+  const currentWeekRange = useMemo(() => {
+    const days = buildWeekDays(today);
+    return { start: days[0].dateKey, end: days[6].dateKey };
+  }, [today]);
+  const weekEvents = useMemo(
+    () => mergedEvents.filter((event) => !isTaskCalendarItem(event) && (event.date || eventDate(event)) >= currentWeekRange.start && (event.date || eventDate(event)) <= currentWeekRange.end),
+    [currentWeekRange.end, currentWeekRange.start, mergedEvents],
+  );
+  const todayTasks = useMemo(
+    () => tasks.filter((task) => !task.deletedAt && task.dueDate === today).sort(compareTasks),
+    [tasks, today],
+  );
+  const overdueTasks = useMemo(
+    () => tasks.filter((task) => !task.deletedAt && isOverdueTask(task, today)).sort(compareTasks),
+    [tasks, today],
+  );
+  const incompleteTasks = useMemo(
+    () => tasks.filter((task) => !task.deletedAt && isIncompleteTask(task)).sort(compareTasks),
+    [tasks],
+  );
+  const mobileAgendaItems = useMemo(() => {
+    if (mobileAgendaView === 'week') return weekEvents;
+    if (mobileAgendaView === 'events') return mergedEvents.filter((event) => !isTaskCalendarItem(event)).sort(compareCalendarItems);
+    if (mobileAgendaView === 'tasks') return incompleteTasks.map(taskToCalendarItem);
+    if (mobileAgendaView === 'overdue') return overdueTasks.map(taskToCalendarItem);
+    return [
+      ...todayEvents,
+      ...todayTasks.map(taskToCalendarItem),
+      ...overdueTasks.map(taskToCalendarItem),
+      ...incompleteTasks
+        .filter((task) => task.dueDate !== today && !isOverdueTask(task, today))
+        .slice(0, 5)
+        .map(taskToCalendarItem),
+    ].sort(compareCalendarItems);
+  }, [incompleteTasks, mergedEvents, mobileAgendaView, overdueTasks, today, todayEvents, todayTasks, weekEvents]);
 
   useEffect(() => {
     window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, viewMode);
@@ -1145,6 +1189,23 @@ export default function CalendarPage({
         </label>
       </section>
 
+      <MobileCalendarAgenda
+        contacts={contacts}
+        customers={customers}
+        events={mobileAgendaItems}
+        onAddEvent={() => openAdd(today)}
+        onAddTask={() => openTaskAdd(today)}
+        onOpen={openDetail}
+        onSelectView={setMobileAgendaView}
+        selectedView={mobileAgendaView}
+        stats={{
+          todayEvents: todayEvents.length,
+          todayTasks: todayTasks.length,
+          overdue: overdueTasks.length,
+          incomplete: incompleteTasks.length,
+        }}
+      />
+
       {viewMode === 'list' ? (
         <section className="desktop-panel">
           <div className="section-heading">
@@ -1395,6 +1456,89 @@ export default function CalendarPage({
           updateForm={updateTaskForm}
         />
       )}
+
+      <div className="calendar-mobile-fab" aria-label="予定とタスクの追加">
+        <button className="primary-button" type="button" onClick={() => openAdd(baseDate || today)}>＋予定</button>
+        <button className="ghost-button" type="button" onClick={() => openTaskAdd(baseDate || today)}>＋タスク</button>
+      </div>
+    </section>
+  );
+}
+
+function MobileCalendarAgenda({
+  events,
+  customers,
+  contacts,
+  selectedView,
+  onSelectView,
+  onOpen,
+  onAddEvent,
+  onAddTask,
+  stats,
+}) {
+  const tabs = [
+    { key: 'today', label: '今日', count: stats.todayEvents + stats.todayTasks + stats.overdue },
+    { key: 'week', label: '今週', count: null },
+    { key: 'events', label: '予定', count: stats.todayEvents },
+    { key: 'tasks', label: 'タスク', count: stats.incomplete },
+    { key: 'overdue', label: '期限切れ', count: stats.overdue },
+  ];
+
+  return (
+    <section className="mobile-calendar-agenda" aria-label="今日やること">
+      <div className="mobile-agenda-tabs">
+        {tabs.map((tab) => (
+          <button
+            className={selectedView === tab.key ? 'selected' : ''}
+            key={tab.key}
+            type="button"
+            onClick={() => onSelectView(tab.key)}
+          >
+            <span>{tab.label}</span>
+            {tab.count !== null && <b>{tab.count}</b>}
+          </button>
+        ))}
+      </div>
+      <div className="mobile-agenda-summary">
+        <div>
+          <span>今日の予定</span>
+          <strong>{stats.todayEvents}</strong>
+        </div>
+        <div>
+          <span>今日のタスク</span>
+          <strong>{stats.todayTasks}</strong>
+        </div>
+        <div className={stats.overdue > 0 ? 'is-alert' : ''}>
+          <span>期限切れ</span>
+          <strong>{stats.overdue}</strong>
+        </div>
+        <div>
+          <span>未完了</span>
+          <strong>{stats.incomplete}</strong>
+        </div>
+      </div>
+      <div className="mobile-agenda-actions">
+        <button className="primary-button" type="button" onClick={onAddEvent}>＋予定</button>
+        <button className="ghost-button" type="button" onClick={onAddTask}>＋タスク</button>
+      </div>
+      <div className="mobile-agenda-list">
+        {events.slice(0, 12).map((event) => (
+          <CalendarEventButton
+            compact
+            contacts={contacts}
+            customers={customers}
+            event={event}
+            key={event.id}
+            onClick={() => onOpen(event)}
+          />
+        ))}
+        {events.length === 0 && (
+          <div className="empty-state compact-empty">
+            <h3>今日の予定・タスクはありません</h3>
+            <p>下のボタンからすぐ登録できます。</p>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -1502,6 +1646,12 @@ function CalendarEventButton({
   const isTask = isTaskCalendarItem(event);
   const customer = customerName(customers, event.customerId);
   const assignee = taskAssigneeLabel(event);
+  const complete = isTask ? isTaskComplete(event.originalTask || event) : event.status === EVENT_STATUSES[1];
+  const taskSummary = isTask
+    ? [assignee, event.date ? `締切 ${formatDateLabel(event.date)}` : '', event.priority, event.status]
+      .filter(Boolean)
+      .join(' / ')
+    : '';
   let longPressTimer = null;
 
   function startLongPress(touchEvent) {
@@ -1525,7 +1675,7 @@ function CalendarEventButton({
   return (
     <button
       type="button"
-      className={`calendar-event ${event.tone || event.eventType || 'event'} priority-${priorityClass(event.priority)} ${event.source === 'task' ? 'calendar-task-event' : ''} ${event.status === '完了' ? 'is-complete' : ''} ${compact ? 'compact' : ''}`}
+      className={`calendar-event ${event.tone || event.eventType || 'event'} priority-${priorityClass(event.priority)} ${event.source === 'task' ? 'calendar-task-event' : ''} ${complete ? 'is-complete' : ''} ${compact ? 'compact' : ''}`}
       draggable={editable}
       onClick={onClick}
       onContextMenu={onContextMenu}
@@ -1549,7 +1699,7 @@ function CalendarEventButton({
       </span>
       <strong>{event.title || event.type || event.eventType}</strong>
       {!compact && !isTask && <small>{customer}{names ? ` / ${names}` : ''}</small>}
-      {isTask && <small>{assignee}{customer ? ` / ${customer}` : ''}</small>}
+      {isTask && <small>{taskSummary}{customer ? ` / ${customer}` : ''}</small>}
       {editable && (
         <span
           aria-hidden="true"
@@ -1668,155 +1818,162 @@ function EventEditor({
           <h2>{editing ? '予定編集' : '予定追加'}</h2>
           <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
         </div>
-        <label className="field-label">
-          件名
-          <input value={form.title} onChange={(event) => updateForm('title', event.target.value)} placeholder="例: 新商品提案の商談" required />
-        </label>
-        <label className="field-label">
-          予定種別
-          <select value={form.eventType} onChange={(event) => updateForm('eventType', event.target.value)}>
-            {EVENT_TYPES.map((type) => <option key={type}>{type}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          顧客
-          <select value={form.customerId} onChange={(event) => updateForm('customerId', event.target.value)}>
-            <option value="">未選択</option>
-            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          案件
-          <select value={form.dealId} onChange={(event) => updateForm('dealId', event.target.value)}>
-            <option value="">未選択</option>
-            {projects
-              .filter((project) => !form.customerId || project.customerId === form.customerId)
-              .map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          場所
-          <input value={form.location} onChange={(event) => updateForm('location', event.target.value)} placeholder="訪問先、会議URLなど" />
-        </label>
-        <label className="field-label">
-          開始日時
-          <input type="datetime-local" value={toDateTimeLocal(form.startAt)} onChange={(event) => updateForm('startAt', fromDateTimeLocal(event.target.value))} />
-        </label>
-        <label className="field-label">
-          終了日時
-          <input type="datetime-local" value={toDateTimeLocal(form.endAt)} onChange={(event) => updateForm('endAt', fromDateTimeLocal(event.target.value))} />
-        </label>
-        <label className="switch-row">
-          <input type="checkbox" checked={form.allDay} onChange={(event) => updateForm('allDay', event.target.checked)} />
-          終日
-        </label>
-        <label className="field-label">
-          重要度
-          <select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>
-            {EVENT_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          ステータス
-          <select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
-            {EVENT_STATUSES.map((status) => <option key={status}>{status}</option>)}
-          </select>
-        </label>
-        <div className="calendar-recurrence-fields">
+        <div className="calendar-editor-quick-fields">
           <label className="field-label">
-            繰り返し
-            <select value={form.recurrenceFrequency || 'none'} onChange={(event) => updateForm('recurrenceFrequency', event.target.value)}>
-              {EVENT_RECURRENCE_FREQUENCIES.map((frequency) => (
-                <option key={frequency.value} value={frequency.value}>{frequency.label}</option>
-              ))}
-            </select>
+            件名
+            <input value={form.title} onChange={(event) => updateForm('title', event.target.value)} placeholder="例: 新商品提案の商談" required />
           </label>
           <label className="field-label">
-            終了条件
-            <select value={form.recurrenceEndType || 'none'} onChange={(event) => updateForm('recurrenceEndType', event.target.value)}>
-              {EVENT_RECURRENCE_END_TYPES.map((endType) => (
-                <option key={endType.value} value={endType.value}>{endType.label}</option>
-              ))}
-            </select>
+            開始日時
+            <input type="datetime-local" value={toDateTimeLocal(form.startAt)} onChange={(event) => updateForm('startAt', fromDateTimeLocal(event.target.value))} />
           </label>
-          {(form.recurrenceEndType || 'none') === 'date' && (
+          <label className="field-label">
+            終了日時
+            <input type="datetime-local" value={toDateTimeLocal(form.endAt)} onChange={(event) => updateForm('endAt', fromDateTimeLocal(event.target.value))} />
+          </label>
+        </div>
+        <details className="calendar-editor-details">
+          <summary>詳細設定</summary>
+          <div className="calendar-editor-details-body">
             <label className="field-label">
-              終了日
-              <input type="date" value={form.recurrenceEndDate || ''} onChange={(event) => updateForm('recurrenceEndDate', event.target.value)} />
+              予定種別
+              <select value={form.eventType} onChange={(event) => updateForm('eventType', event.target.value)}>
+                {EVENT_TYPES.map((type) => <option key={type}>{type}</option>)}
+              </select>
             </label>
-          )}
-          {(form.recurrenceFrequency || 'none') === 'weekday_select' && (
-            <div className="field-label calendar-weekday-picker">
-              曜日
-              <div>
-                {WEEKDAY_OPTIONS.map((weekday) => (
-                  <label className="switch-row" key={weekday.value}>
-                    <input
-                      checked={normalizeWeekdays(form.recurrenceWeekdays).includes(weekday.value)}
-                      type="checkbox"
-                      onChange={() => toggleRecurrenceWeekday(weekday.value)}
-                    />
-                    {weekday.label}
-                  </label>
+            <label className="field-label">
+              顧客
+              <select value={form.customerId} onChange={(event) => updateForm('customerId', event.target.value)}>
+                <option value="">未選択</option>
+                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
+              案件
+              <select value={form.dealId} onChange={(event) => updateForm('dealId', event.target.value)}>
+                <option value="">未選択</option>
+                {projects
+                  .filter((project) => !form.customerId || project.customerId === form.customerId)
+                  .map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
+              場所
+              <input value={form.location} onChange={(event) => updateForm('location', event.target.value)} placeholder="訪問先、会議URLなど" />
+            </label>
+            <label className="switch-row">
+              <input type="checkbox" checked={form.allDay} onChange={(event) => updateForm('allDay', event.target.checked)} />
+              終日
+            </label>
+            <label className="field-label">
+              重要度
+              <select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>
+                {EVENT_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
+              ステータス
+              <select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
+                {EVENT_STATUSES.map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+            <div className="calendar-recurrence-fields">
+              <label className="field-label">
+                繰り返し
+                <select value={form.recurrenceFrequency || 'none'} onChange={(event) => updateForm('recurrenceFrequency', event.target.value)}>
+                  {EVENT_RECURRENCE_FREQUENCIES.map((frequency) => (
+                    <option key={frequency.value} value={frequency.value}>{frequency.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                終了条件
+                <select value={form.recurrenceEndType || 'none'} onChange={(event) => updateForm('recurrenceEndType', event.target.value)}>
+                  {EVENT_RECURRENCE_END_TYPES.map((endType) => (
+                    <option key={endType.value} value={endType.value}>{endType.label}</option>
+                  ))}
+                </select>
+              </label>
+              {(form.recurrenceEndType || 'none') === 'date' && (
+                <label className="field-label">
+                  終了日
+                  <input type="date" value={form.recurrenceEndDate || ''} onChange={(event) => updateForm('recurrenceEndDate', event.target.value)} />
+                </label>
+              )}
+              {(form.recurrenceFrequency || 'none') === 'weekday_select' && (
+                <div className="field-label calendar-weekday-picker">
+                  曜日
+                  <div>
+                    {WEEKDAY_OPTIONS.map((weekday) => (
+                      <label className="switch-row" key={weekday.value}>
+                        <input
+                          checked={normalizeWeekdays(form.recurrenceWeekdays).includes(weekday.value)}
+                          type="checkbox"
+                          onChange={() => toggleRecurrenceWeekday(weekday.value)}
+                        />
+                        {weekday.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(form.recurrenceFrequency || 'none') === 'monthly_day' && (
+                <label className="field-label">
+                  毎月の日
+                  <input
+                    max="31"
+                    min="1"
+                    type="number"
+                    value={form.recurrenceMonthDay || startDateMonthDay(form)}
+                    onChange={(event) => updateForm('recurrenceMonthDay', event.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+            <label className="field-label">
+              次回フォロー日
+              <input type="date" value={form.nextFollowDate || ''} onChange={(event) => updateForm('nextFollowDate', event.target.value)} />
+            </label>
+            <label className="field-label">
+              リマインダー
+              <input value={form.reminder} onChange={(event) => updateForm('reminder', event.target.value)} placeholder="例: 30分前、前日朝" />
+            </label>
+            <div className="field-label calendar-color-field">
+              色
+              <div className="calendar-color-grid">
+                {DEFAULT_COLORS.map((color) => (
+                  <button
+                    aria-label={color}
+                    className={form.color === color ? 'selected' : ''}
+                    key={color}
+                    style={{ background: color }}
+                    type="button"
+                    onClick={() => updateForm('color', color)}
+                  />
                 ))}
               </div>
             </div>
-          )}
-          {(form.recurrenceFrequency || 'none') === 'monthly_day' && (
-            <label className="field-label">
-              毎月の日
-              <input
-                max="31"
-                min="1"
-                type="number"
-                value={form.recurrenceMonthDay || startDateMonthDay(form)}
-                onChange={(event) => updateForm('recurrenceMonthDay', event.target.value)}
-              />
+            <div className="field-label calendar-contact-picker">
+              担当者
+              <div>
+                {relatedContacts.length > 0 ? relatedContacts.map((contact) => (
+                  <label className="switch-row" key={contact.id}>
+                    <input
+                      checked={(form.contactIds ?? []).includes(contact.id)}
+                      type="checkbox"
+                      onChange={() => toggleContact(contact.id)}
+                    />
+                    {contact.name || '名称未設定'}
+                  </label>
+                )) : <p className="inline-helper">顧客を選択すると担当者を絞り込めます。</p>}
+              </div>
+            </div>
+            <label className="field-label calendar-editor-wide">
+              メモ
+              <textarea value={form.memo} onChange={(event) => updateForm('memo', event.target.value)} />
             </label>
-          )}
-        </div>
-        <label className="field-label">
-          次回フォロー日
-          <input type="date" value={form.nextFollowDate || ''} onChange={(event) => updateForm('nextFollowDate', event.target.value)} />
-        </label>
-        <label className="field-label">
-          リマインダー
-          <input value={form.reminder} onChange={(event) => updateForm('reminder', event.target.value)} placeholder="例: 30分前、前日朝" />
-        </label>
-        <div className="field-label calendar-color-field">
-          色
-          <div className="calendar-color-grid">
-            {DEFAULT_COLORS.map((color) => (
-              <button
-                aria-label={color}
-                className={form.color === color ? 'selected' : ''}
-                key={color}
-                style={{ background: color }}
-                type="button"
-                onClick={() => updateForm('color', color)}
-              />
-            ))}
           </div>
-        </div>
-        <div className="field-label calendar-contact-picker">
-          担当者
-          <div>
-            {relatedContacts.length > 0 ? relatedContacts.map((contact) => (
-              <label className="switch-row" key={contact.id}>
-                <input
-                  checked={(form.contactIds ?? []).includes(contact.id)}
-                  type="checkbox"
-                  onChange={() => toggleContact(contact.id)}
-                />
-                {contact.name || '名称未設定'}
-              </label>
-            )) : <p className="inline-helper">顧客を選択すると担当者を絞り込めます。</p>}
-          </div>
-        </div>
-        <label className="field-label calendar-editor-wide">
-          メモ
-          <textarea value={form.memo} onChange={(event) => updateForm('memo', event.target.value)} />
-        </label>
+        </details>
         <div className="calendar-editor-actions">
           {editing && <button className="ghost-button danger" type="button" onClick={onDelete}>削除</button>}
           {editing && <button className="ghost-button" type="button" onClick={onPostpone}>延期として新日時を保存</button>}
@@ -1847,55 +2004,62 @@ function TaskEditor({
           <h2>{editing ? 'タスク編集' : 'タスク追加'}</h2>
           <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
         </div>
-        <label className="field-label">
-          記入日
-          <input type="date" value={form.recordedDate || ''} onChange={(event) => updateForm('recordedDate', event.target.value)} />
-        </label>
-        <label className="field-label">
-          締め切り
-          <input type="date" value={form.dueDate || ''} onChange={(event) => updateForm('dueDate', event.target.value)} />
-        </label>
-        <label className="field-label">
-          対応者
-          <input value={form.assigneeName || ''} onChange={(event) => updateForm('assigneeName', event.target.value)} placeholder="担当者名またはメール" />
-        </label>
-        <label className="field-label">
-          件名
-          <input value={form.title || ''} onChange={(event) => updateForm('title', event.target.value)} required />
-        </label>
-        <label className="field-label">
-          ステータス
-          <select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
-            {TASK_STATUSES.map((status) => <option key={status}>{status}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          優先度
-          <select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>
-            {TASK_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          顧客
-          <select value={form.customerId || ''} onChange={(event) => {
-            updateForm('customerId', event.target.value);
-            updateForm('projectId', '');
-          }}>
-            <option value="">未選択</option>
-            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
-          </select>
-        </label>
-        <label className="field-label">
-          案件
-          <select value={form.projectId || ''} onChange={(event) => updateForm('projectId', event.target.value)}>
-            <option value="">未選択</option>
-            {relatedProjects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
-          </select>
-        </label>
-        <label className="field-label calendar-editor-wide">
-          内容
-          <textarea value={form.content || ''} onChange={(event) => updateForm('content', event.target.value)} />
-        </label>
+        <div className="calendar-editor-quick-fields task-quick-fields">
+          <label className="field-label calendar-editor-wide">
+            件名
+            <input value={form.title || ''} onChange={(event) => updateForm('title', event.target.value)} placeholder="例: 見積を確認する" required />
+          </label>
+        </div>
+        <details className="calendar-editor-details">
+          <summary>詳細設定</summary>
+          <div className="calendar-editor-details-body">
+            <label className="field-label">
+              記入日
+              <input type="date" value={form.recordedDate || ''} onChange={(event) => updateForm('recordedDate', event.target.value)} />
+            </label>
+            <label className="field-label">
+              締め切り
+              <input type="date" value={form.dueDate || ''} onChange={(event) => updateForm('dueDate', event.target.value)} />
+            </label>
+            <label className="field-label">
+              対応者
+              <input value={form.assigneeName || ''} onChange={(event) => updateForm('assigneeName', event.target.value)} placeholder="担当者名またはメール" />
+            </label>
+            <label className="field-label">
+              ステータス
+              <select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
+                {TASK_STATUSES.map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
+              優先度
+              <select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>
+                {TASK_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
+              顧客
+              <select value={form.customerId || ''} onChange={(event) => {
+                updateForm('customerId', event.target.value);
+                updateForm('projectId', '');
+              }}>
+                <option value="">未選択</option>
+                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
+              </select>
+            </label>
+            <label className="field-label">
+              案件
+              <select value={form.projectId || ''} onChange={(event) => updateForm('projectId', event.target.value)}>
+                <option value="">未選択</option>
+                {relatedProjects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+              </select>
+            </label>
+            <label className="field-label calendar-editor-wide">
+              内容
+              <textarea value={form.content || ''} onChange={(event) => updateForm('content', event.target.value)} />
+            </label>
+          </div>
+        </details>
         <div className="calendar-editor-actions">
           {editing && <button className="ghost-button danger" type="button" onClick={onDelete}>削除</button>}
           <button className="primary-button" type="submit">保存</button>
