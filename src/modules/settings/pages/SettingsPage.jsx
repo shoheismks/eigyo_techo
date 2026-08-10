@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   countBackupRecords,
   createBackupPayload,
@@ -35,6 +35,9 @@ export default function SettingsPage({
   restoreHandlers,
   onResetTutorial,
   issuers = [],
+  selectedIssuerId = '',
+  currentIssuer = null,
+  onIssuerChange,
   addIssuer,
   updateIssuer,
   issuerSyncState,
@@ -207,6 +210,19 @@ export default function SettingsPage({
     }
   }
 
+  const activeIssuers = useMemo(
+    () => issuers.filter((issuer) => issuer.isActive !== false),
+    [issuers],
+  );
+  const selectedIssuer = useMemo(
+    () =>
+      activeIssuers.find((issuer) => issuer.id === selectedIssuerId) ||
+      currentIssuer ||
+      activeIssuers.find((issuer) => issuer.isDefault) ||
+      activeIssuers[0] ||
+      null,
+    [activeIssuers, currentIssuer, selectedIssuerId],
+  );
   const activeCategoryMeta = SETTINGS_CATEGORIES.find((category) => category.id === activeCategory) ?? SETTINGS_CATEGORIES[0];
 
   return (
@@ -266,6 +282,39 @@ export default function SettingsPage({
 
           {activeCategory === 'basic' && (
             <div className="settings-card-grid">
+              <article className="settings-card current-issuer-card">
+                <header>
+                  <h3>現在の発行元</h3>
+                  <p>画面テーマと新規帳票の初期発行元として使用します。発行元の追加・編集は「帳票設定」で行えます。</p>
+                </header>
+                <label className="field-label">
+                  発行元
+                  <select
+                    value={selectedIssuer?.id || ''}
+                    onChange={(event) => onIssuerChange?.(event.target.value)}
+                    disabled={activeIssuers.length === 0}
+                  >
+                    {activeIssuers.length > 0 ? activeIssuers.map((issuer) => (
+                      <option value={issuer.id} key={issuer.id}>
+                        {issuer.name || issuer.legalName || '名称未設定'}
+                      </option>
+                    )) : <option value="">発行元が未登録です</option>}
+                  </select>
+                </label>
+                {selectedIssuer && (
+                  <div className="current-issuer-summary">
+                    <span
+                      className="issuer-theme-preview"
+                      style={{ '--issuer-preview-color': sanitizeThemeColor(selectedIssuer.themeColor || DEFAULT_THEME_COLOR) }}
+                    >
+                      {selectedIssuer.themeColor || '標準色'}
+                    </span>
+                    <strong>{selectedIssuer.name || selectedIssuer.legalName || '名称未設定'}</strong>
+                    <small>{selectedIssuer.isDefault ? '既定 / ' : ''}税率 {selectedIssuer.defaultTaxRate || DEFAULT_ISSUER_TAX_RATE}%</small>
+                  </div>
+                )}
+              </article>
+
               <article className={['settings-card', syncState === 'supabase' ? 'cloud' : 'local'].join(' ')}>
                 <header>
                   <h3>保存先と同期</h3>

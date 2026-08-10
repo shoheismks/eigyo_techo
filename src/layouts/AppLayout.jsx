@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { APP_VERSION_LABEL } from '../shared/constants/appMeta.js';
-import { DEFAULT_THEME_COLOR, sanitizeThemeColor } from '../shared/utils/themeColor.js';
 import AddActionMenu from './AddActionMenu.jsx';
 import BottomNavigation from './BottomNavigation.jsx';
 import SidebarNavigation from './SidebarNavigation.jsx';
@@ -48,10 +47,6 @@ export default function AppLayout({
   addMenuOpen,
   setAddMenuOpen,
   notice,
-  issuers = [],
-  selectedIssuerId = '',
-  currentIssuer = null,
-  onIssuerChange,
   themeStyle,
   children,
 }) {
@@ -59,7 +54,7 @@ export default function AppLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function handleAction(actionKey) {
-    onAddAction(actionKey);
+    onAddAction?.(actionKey);
     setAddMenuOpen(false);
   }
 
@@ -76,13 +71,6 @@ export default function AppLayout({
     setSidebarOpen(false);
   }
 
-  const activeIssuers = useMemo(
-    () => issuers.filter((issuer) => issuer.isActive !== false),
-    [issuers],
-  );
-  const issuerName = currentIssuer?.name || currentIssuer?.legalName || '標準テーマ';
-  const issuerColor = sanitizeThemeColor(currentIssuer?.themeColor || DEFAULT_THEME_COLOR);
-
   return (
     <div className="app-shell desktop-layout mobile-layout" style={themeStyle}>
       <div className="app-frame app-layout">
@@ -90,6 +78,7 @@ export default function AppLayout({
           activePage={activePage}
           onNavigate={handleNavigate}
           user={user}
+          onSignOut={onSignOut}
           mobileOpen={sidebarOpen}
           onMobileClose={() => setSidebarOpen(false)}
         />
@@ -108,26 +97,6 @@ export default function AppLayout({
             <div className="app-topbar-title">
               <strong>{pageTitleFor(activePage)}</strong>
               <span>営業手帳 / {APP_VERSION_LABEL}</span>
-              <div className="issuer-context-control" aria-label="現在の発行元">
-                <span className="issuer-context-badge">
-                  <span className="issuer-theme-dot" style={{ backgroundColor: issuerColor }} aria-hidden="true" />
-                  <strong>{issuerName}</strong>
-                </span>
-                {activeIssuers.length > 0 && (
-                  <select
-                    className="issuer-context-select"
-                    aria-label="作業中の発行元を切り替え"
-                    value={selectedIssuerId}
-                    onChange={(event) => onIssuerChange?.(event.target.value)}
-                  >
-                    {activeIssuers.map((issuer) => (
-                      <option value={issuer.id} key={issuer.id}>
-                        {issuer.name || issuer.legalName || '名称未設定'}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
             </div>
 
             <form className="desktop-global-search" aria-label="全体検索" onSubmit={handleSearchSubmit}>
