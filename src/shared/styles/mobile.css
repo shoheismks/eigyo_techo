@@ -677,8 +677,28 @@ body,
 }
 
 @media (max-width: 767px) {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root,
+  .app-shell,
+  .app-main,
+  .main-content {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
   .page {
-    padding: 16px 12px calc(110px + env(safe-area-inset-bottom));
+    width: 100%;
+    max-width: 100%;
+    padding: 14px 10px calc(116px + env(safe-area-inset-bottom));
+    overflow-x: clip;
   }
 
   .page-header,
@@ -694,28 +714,379 @@ body,
 
   .page-header {
     margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .page-header h1,
   .hero-panel h1 {
     font-size: 1.72rem;
     line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+
+  .page-header p,
+  .section-heading,
+  .section-heading h2,
+  .section-heading h3,
+  .product-card,
+  .company-card,
+  .pipeline-card,
+  .detail-section,
+  .sync-status-card,
+  .desktop-panel,
+  .empty-state,
+  .info-badge,
+  .notice-text,
+  .inline-helper {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .field-label {
     gap: 7px;
     font-size: 0.86rem;
+    min-width: 0;
   }
 
   input,
-  select {
+  select,
+  button,
+  .primary-button,
+  .ghost-button,
+  .external-button {
     min-height: 54px;
     font-size: 1rem;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    max-width: 100%;
   }
 
   textarea {
     min-height: 132px;
     font-size: 1rem;
+  }
+
+  .segmented-control,
+  .calendar-view-switch,
+  .calendar-toolbar,
+  .calendar-date-actions,
+  .filter-grid,
+  .search-filter-grid,
+  .dashboard-metrics,
+  .status-count-grid,
+  .summary-grid,
+  .quote-summary-grid,
+  .product-detail-layout,
+  .invoice-editor-grid,
+  .project-form-grid,
+  .customer-editor-grid,
+  .inventory-form-grid,
+  .settings-form-grid,
+  .settings-card-grid,
+  .settings-document-layout,
+  .two-column-grid,
+  .desktop-workbench,
+  .result-stack,
+  .pipeline-board,
+  .pipeline-detail-grid,
+  .quote-line-grid,
+  .sample-picker-grid,
+  .date-grid {
+    grid-template-columns: 1fr !important;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .desktop-table-shell:not(.data-table-shell),
+  .desktop-table-pane,
+  .responsive-table {
+    display: none !important;
+  }
+
+  .data-table,
+  .data-table-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .data-table-toolbar,
+  .data-table-toolbar-actions,
+  .data-table-pager {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .data-table-column-menu > div {
+    left: 0;
+    right: auto;
+    width: min(100%, 320px);
+    max-height: 60dvh;
+    overflow-y: auto;
+  }
+
+  .data-table .desktop-data-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: block;
+  }
+
+  .data-table .desktop-data-table thead {
+    display: none;
+  }
+
+  .data-table .desktop-data-table tbody,
+  .data-table .desktop-data-table tr,
+  .data-table .desktop-data-table td {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  .data-table .desktop-data-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .data-table .desktop-data-table tr {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.9);
+    padding: 10px;
+  }
+
+  .data-table .desktop-data-table td {
+    min-height: 36px;
+    padding: 8px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table .desktop-data-table td + td {
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+  }
+
+  .data-table .desktop-data-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 800;
+  }
+
+  .data-table .desktop-table-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding-top: 10px;
+  }
+
+  .card-list-mobile,
+  .desktop-card-fallback,
+  .mobile-card-list {
+    display: grid !important;
+    width: 100%;
+    max-width: 100%;
+    gap: 10px;
+  }
+
+  .mobile-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .data-card,
+  .desktop-card-fallback > *,
+  .card-list-mobile > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .product-card,
+  .company-card,
+  .pipeline-card,
+  .karte-mini-card,
+  .summary-card,
+  .settings-card,
+  .detail-section,
+  .sync-status-card,
+  .desktop-panel {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 10px;
+  }
+
+  .card-actions,
+  .customer-editor-actions,
+  .calendar-editor-actions,
+  .settings-card footer,
+  .settings-card-footer,
+  .quote-form-actions,
+  .document-actions {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .card-actions > *,
+  .customer-editor-actions > *,
+  .calendar-editor-actions > *,
+  .settings-card footer > *,
+  .settings-card-footer > *,
+  .quote-form-actions > *,
+  .document-actions > * {
+    width: 100%;
+  }
+
+  .customer-editor-backdrop,
+  .modal-backdrop,
+  .calendar-editor-backdrop,
+  .add-menu-backdrop {
+    align-items: end;
+    justify-items: stretch;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .customer-editor-modal,
+  .modal-panel,
+  .quote-form-modal,
+  .calendar-editor,
+  .project-editor,
+  .add-action-menu,
+  .asset-preview-modal {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 14px 14px 10px 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+
+  .customer-editor-header,
+  .calendar-editor > .section-heading,
+  .task-editor > .section-heading {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #0d1424;
+  }
+
+  .customer-editor-actions,
+  .calendar-editor-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: -14px;
+    padding: 12px 14px max(14px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    background: linear-gradient(180deg, rgba(13, 20, 36, 0.94), #0d1424);
+  }
+
+  .quote-form-modal {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .quote-form-modal .customer-editor-actions,
+  .invoice-editor-grid > aside,
+  .price-preview {
+    position: static !important;
+  }
+
+  .calendar-mobile-fab,
+  .mobile-primary-actions,
+  .mobile-sticky-actions {
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+  }
+
+  .mobile-primary-actions,
+  .mobile-sticky-actions {
+    position: fixed;
+    z-index: 16;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid rgba(102, 163, 255, 0.22);
+    border-radius: 14px;
+    background: rgba(7, 11, 19, 0.94);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-primary-actions button,
+  .mobile-sticky-actions button {
+    min-height: 52px;
+  }
+
+  .quote-preview-frame,
+  .document-preview,
+  .pdf-preview,
+  .calendar-detail-popover,
+  .task-detail-popover {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .quote-preview-frame *,
+  .document-preview *,
+  .pdf-preview * {
+    max-width: 100%;
+  }
+
+  .settings-page,
+  .settings-shell,
+  .settings-content,
+  .settings-category-list {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .settings-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .settings-category-list {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .settings-category-list button {
+    min-width: 142px;
+    scroll-snap-align: start;
+  }
+
+  @supports not (overflow-x: clip) {
+    html,
+    body,
+    #root,
+    .app-shell,
+    .app-main,
+    .main-content,
+    .page {
+      overflow-x: hidden;
+    }
   }
 
   .mobile-field-panel {

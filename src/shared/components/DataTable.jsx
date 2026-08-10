@@ -224,7 +224,7 @@ export default function DataTable({
                   onClick={() => onRowClick?.(row)}
                 >
                   {selectable && (
-                    <td className="data-table-select-cell" onClick={(event) => event.stopPropagation()}>
+                    <td className="data-table-select-cell" data-label="選択" onClick={(event) => event.stopPropagation()}>
                       <input type="checkbox" checked={selectedRowIds.includes(key)} onChange={(event) => toggleRow(row, event.target.checked)} />
                     </td>
                   )}
@@ -233,13 +233,13 @@ export default function DataTable({
                     const width = columnWidths[column.key] ? `${columnWidths[column.key]}px` : column.minWidth;
                     const style = width ? { minWidth: width, width } : undefined;
                     return (
-                      <td key={column.key} className={className} style={style}>
+                      <td key={column.key} className={className} data-label={column.label} style={style}>
                         {column.render ? column.render(row) : row[column.key] ?? '-'}
                       </td>
                     );
                   })}
                   {actions && (
-                    <td className="desktop-table-actions" style={actionStyle} onClick={(event) => event.stopPropagation()}>
+                    <td className="desktop-table-actions" data-label="操作" style={actionStyle} onClick={(event) => event.stopPropagation()}>
                       {actions(row)}
                     </td>
                   )}

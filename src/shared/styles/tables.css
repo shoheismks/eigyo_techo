@@ -687,3 +687,22 @@
     display: none;
   }
 }
+
+@media (max-width: 767px) {
+  .data-table .desktop-data-table td strong,
+  .data-table .desktop-data-table td span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .data-table .desktop-data-table td::before {
+    display: block !important;
+    content: attr(data-label) !important;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+}
