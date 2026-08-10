@@ -420,7 +420,7 @@
 
 @media (max-width: 767px) {
   .calendar-page {
-    padding-bottom: 108px;
+    padding-bottom: calc(168px + env(safe-area-inset-bottom));
   }
 
   .calendar-page .calendar-page-header {
@@ -734,7 +734,7 @@
     position: fixed;
     left: max(12px, env(safe-area-inset-left));
     right: max(12px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom));
+    bottom: calc(78px + env(safe-area-inset-bottom));
     z-index: 95;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
