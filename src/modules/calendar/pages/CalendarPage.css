@@ -154,6 +154,10 @@
   scrollbar-gutter: stable;
 }
 
+.task-editor-mobile-form {
+  display: none;
+}
+
 .task-editor > .section-heading {
   position: sticky;
   top: -18px;
@@ -220,6 +224,14 @@
   padding: 16px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
   background: #0d1424;
+}
+
+.calendar-detail-header-actions {
+  display: contents;
+}
+
+.task-mobile-detail-edit {
+  display: none;
 }
 
 .task-detail-popover .calendar-detail-list,
@@ -408,17 +420,147 @@
 
 @media (max-width: 767px) {
   .calendar-page {
-    padding-bottom: 96px;
+    padding-bottom: 108px;
+  }
+
+  .calendar-page .calendar-page-header {
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 13px;
+    border-color: rgba(96, 165, 250, 0.34);
+    border-radius: 14px;
+    background:
+      radial-gradient(circle at top left, rgba(40, 120, 255, 0.14), transparent 34%),
+      linear-gradient(180deg, rgba(17, 26, 43, 0.96), rgba(8, 13, 22, 0.96));
+  }
+
+  .calendar-page .calendar-page-header > div:first-child {
+    display: grid;
+    gap: 3px;
+  }
+
+  .calendar-page .calendar-page-header .eyebrow {
+    margin: 0;
+    font-size: 0.68rem;
+  }
+
+  .calendar-page .calendar-page-header h1 {
+    margin: 0;
+    font-size: 1.45rem;
+    line-height: 1.05;
+  }
+
+  .calendar-page .calendar-page-header > div:first-child > p:not(.eyebrow) {
+    margin: 3px 0 0;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .calendar-view-switch {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0;
+    padding: 2px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.24);
+  }
+
+  .calendar-view-switch button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    font-size: 0.88rem;
+  }
+
+  .calendar-view-switch button.selected {
+    background: var(--blue);
+    color: var(--white);
+    box-shadow: 0 10px 24px rgba(40, 120, 255, 0.28);
+  }
+
+  .calendar-navigation {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px;
+    padding: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.54);
+  }
+
+  .calendar-stepper {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    order: 1;
+  }
+
+  .calendar-stepper .ghost-button {
+    min-height: 42px;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+
+  .calendar-stepper .ghost-button:nth-child(2) {
+    min-width: 58px;
+  }
+
+  .calendar-current-title {
+    order: 0;
+    min-height: 38px;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    font-size: 1.12rem;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .calendar-title-holiday-name {
+    margin-top: 3px;
+    font-size: 0.7rem;
+  }
+
+  .calendar-date-actions {
+    order: 2;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 8px;
+  }
+
+  .calendar-date-actions input {
+    grid-column: 1 / -1;
+    min-height: 40px;
+    text-align: center;
+  }
+
+  .calendar-date-actions button {
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 0.84rem;
+    white-space: nowrap;
+  }
+
+  .calendar-task-filters {
+    margin-bottom: 10px;
+    padding: 10px;
+    gap: 8px;
   }
 
   .mobile-calendar-agenda {
     display: grid;
-    gap: 12px;
-    padding: 12px;
+    gap: 10px;
+    padding: 11px;
     border: 1px solid rgba(96, 165, 250, 0.24);
-    border-radius: 16px;
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.84));
-    box-shadow: 0 18px 48px rgba(2, 6, 23, 0.32);
+    border-radius: 14px;
+    background:
+      radial-gradient(circle at top left, rgba(40, 120, 255, 0.12), transparent 42%),
+      linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(10, 18, 31, 0.9));
+    box-shadow: 0 14px 36px rgba(2, 6, 23, 0.28);
   }
 
   .mobile-agenda-tabs {
@@ -464,29 +606,39 @@
   .mobile-agenda-summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
+    gap: 0;
+    border: 1px solid rgba(96, 165, 250, 0.28);
+    border-radius: 13px;
+    overflow: hidden;
+    background: rgba(2, 6, 23, 0.24);
   }
 
   .mobile-agenda-summary div {
     min-width: 0;
     display: grid;
-    gap: 2px;
-    padding: 9px 6px;
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 12px;
-    background: rgba(2, 6, 23, 0.28);
+    gap: 5px;
+    padding: 11px 4px;
+    border: 0;
+    border-right: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 0;
+    background: transparent;
     text-align: center;
+  }
+
+  .mobile-agenda-summary div:last-child {
+    border-right: 0;
   }
 
   .mobile-agenda-summary span {
     color: #94a3b8;
-    font-size: 11px;
+    font-size: 0.68rem;
     font-weight: 800;
+    line-height: 1.15;
   }
 
   .mobile-agenda-summary strong {
     color: #f8fafc;
-    font-size: 20px;
+    font-size: 1.28rem;
     line-height: 1;
   }
 
@@ -512,7 +664,64 @@
 
   .mobile-agenda-list {
     display: grid;
+    gap: 7px;
+  }
+
+  .mobile-agenda-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2px;
+  }
+
+  .mobile-agenda-section-heading h2,
+  .mobile-agenda-mini-section h3 {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.2;
+  }
+
+  .mobile-agenda-sections {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-agenda-mini-section {
+    display: grid;
     gap: 8px;
+    padding: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.22);
+  }
+
+  .mobile-agenda-mini-section .section-heading {
+    min-height: auto;
+  }
+
+  .mobile-agenda-mini-section .section-heading span {
+    font-size: 0.76rem;
+  }
+
+  .mobile-agenda-list .calendar-event {
+    min-height: 52px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .mobile-agenda-list .calendar-event strong {
+    font-size: 0.91rem;
+    line-height: 1.25;
+  }
+
+  .mobile-agenda-list .calendar-event small {
+    font-size: 0.74rem;
+    line-height: 1.25;
+  }
+
+  .mobile-agenda-list .calendar-event-meta {
+    gap: 5px;
+    font-size: 0.72rem;
   }
 
   .mobile-calendar-agenda + .desktop-panel,
@@ -525,12 +734,12 @@
     position: fixed;
     left: max(12px, env(safe-area-inset-left));
     right: max(12px, env(safe-area-inset-right));
-    bottom: max(12px, env(safe-area-inset-bottom));
+    bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 95;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    padding: 10px;
+    padding: 9px;
     border: 1px solid rgba(148, 163, 184, 0.22);
     border-radius: 18px;
     background: rgba(15, 23, 42, 0.94);
@@ -540,7 +749,7 @@
 
   .calendar-mobile-fab button {
     width: 100%;
-    min-height: 46px;
+    min-height: 50px;
   }
 
   .calendar-editor {
@@ -595,10 +804,6 @@
     margin-top: 10px;
   }
 
-  .calendar-date-actions {
-    grid-template-columns: 1fr;
-  }
-
   .calendar-list-popup-backdrop {
     align-items: end;
     padding: 10px;
@@ -640,6 +845,14 @@
     padding: 14px;
   }
 
+  .task-editor-desktop-form {
+    display: none;
+  }
+
+  .task-editor-mobile-form {
+    display: grid;
+  }
+
   .task-editor > .section-heading {
     top: -14px;
     margin: -14px -14px 2px;
@@ -667,6 +880,26 @@
     width: calc(100vw - 20px);
     max-height: calc(100dvh - 20px);
     border-radius: 14px 14px 10px 10px;
+  }
+
+  .task-detail-popover .section-heading {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .task-detail-popover .calendar-detail-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-detail-popover .task-mobile-detail-edit {
+    display: inline-flex;
+  }
+
+  .task-detail-popover .calendar-detail-header-actions button {
+    width: 100%;
+    min-width: 0;
   }
 
   .task-detail-popover .calendar-detail-actions {

@@ -787,6 +787,7 @@ export default function CalendarPage({
     event.preventDefault();
     if (!taskForm?.title?.trim()) return;
     setCalendarError('');
+    const taskBeingEdited = editingTask;
 
     const normalized = normalizeTask({
       ...taskForm,
@@ -796,12 +797,15 @@ export default function CalendarPage({
     }, user?.id ?? '');
 
     try {
-      if (editingTask) {
-        await updateTask?.(editingTask.id, normalized);
+      if (taskBeingEdited) {
+        await updateTask?.(taskBeingEdited.id, normalized);
       } else {
         await addTask?.(normalized);
       }
       closeTaskForm();
+      if (taskBeingEdited) {
+        setDetailEvent(taskToCalendarItem({ ...taskBeingEdited, ...normalized, id: taskBeingEdited.id }));
+      }
       showToast('タスクを保存しました');
     } catch (error) {
       showError(error);
@@ -1753,7 +1757,12 @@ function CalendarEventPopover({
             <p className="eyebrow">{event.eventType || event.type || 'Event'}</p>
             <h2>{event.title || event.type || event.eventType}</h2>
           </div>
-          <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+          <div className="calendar-detail-header-actions">
+            {isTask && canEdit && (
+              <button className="primary-button compact-button task-mobile-detail-edit" type="button" onClick={onEdit}>編集</button>
+            )}
+            <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+          </div>
         </div>
         <div className="calendar-detail-meta">
           <span className="info-badge" style={{ borderColor: event.color || undefined }}>{eventTypeIcon(event)}</span>
@@ -1999,7 +2008,67 @@ function TaskEditor({
 
   return (
     <div className="calendar-editor-backdrop">
-      <form className="calendar-editor task-editor" onSubmit={onSave}>
+      <form className="calendar-editor task-editor task-editor-desktop-form" onSubmit={onSave}>
+        <div className="section-heading">
+          <h2>{editing ? 'タスク編集' : 'タスク追加'}</h2>
+          <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
+        </div>
+        <label className="field-label">
+          記入日
+          <input type="date" value={form.recordedDate || ''} onChange={(event) => updateForm('recordedDate', event.target.value)} />
+        </label>
+        <label className="field-label">
+          締め切り
+          <input type="date" value={form.dueDate || ''} onChange={(event) => updateForm('dueDate', event.target.value)} />
+        </label>
+        <label className="field-label">
+          対応者
+          <input value={form.assigneeName || ''} onChange={(event) => updateForm('assigneeName', event.target.value)} placeholder="担当者名またはメール" />
+        </label>
+        <label className="field-label">
+          件名
+          <input value={form.title || ''} onChange={(event) => updateForm('title', event.target.value)} required />
+        </label>
+        <label className="field-label">
+          ステータス
+          <select value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
+            {TASK_STATUSES.map((status) => <option key={status}>{status}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          優先度
+          <select value={form.priority} onChange={(event) => updateForm('priority', event.target.value)}>
+            {TASK_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          顧客
+          <select value={form.customerId || ''} onChange={(event) => {
+            updateForm('customerId', event.target.value);
+            updateForm('projectId', '');
+          }}>
+            <option value="">未選択</option>
+            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.companyName}</option>)}
+          </select>
+        </label>
+        <label className="field-label">
+          案件
+          <select value={form.projectId || ''} onChange={(event) => updateForm('projectId', event.target.value)}>
+            <option value="">未選択</option>
+            {relatedProjects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+          </select>
+        </label>
+        <label className="field-label calendar-editor-wide">
+          内容
+          <textarea value={form.content || ''} onChange={(event) => updateForm('content', event.target.value)} />
+        </label>
+        <div className="calendar-editor-actions">
+          {editing && <button className="ghost-button danger" type="button" onClick={onDelete}>削除</button>}
+          <button className="primary-button" type="submit">保存</button>
+        </div>
+      </form>
+
+      <form className="calendar-editor task-editor task-editor-mobile-form" onSubmit={onSave}>
         <div className="section-heading">
           <h2>{editing ? 'タスク編集' : 'タスク追加'}</h2>
           <button className="ghost-button" type="button" onClick={onClose}>閉じる</button>
@@ -2010,7 +2079,7 @@ function TaskEditor({
             <input value={form.title || ''} onChange={(event) => updateForm('title', event.target.value)} placeholder="例: 見積を確認する" required />
           </label>
         </div>
-        <details className="calendar-editor-details">
+        <details className="calendar-editor-details" open={editing}>
           <summary>詳細設定</summary>
           <div className="calendar-editor-details-body">
             <label className="field-label">
