@@ -1,10 +1,15 @@
 .karte-workspace {
   display: grid;
+  align-items: start;
   gap: 14px;
+  min-height: 0;
+  overflow: visible;
 }
 
 .karte-main-pane {
   min-width: 0;
+  min-height: 0;
+  overflow: visible;
 }
 
 .karte-kpi-strip {
@@ -206,46 +211,51 @@
 
 .karte-page .karte-grid {
   grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start;
   gap: 12px;
   margin-top: 12px;
+  min-height: 0;
+  overflow: visible;
 }
 
-.karte-page .karte-grid > * {
+.karte-page .karte-grid > [data-karte-section] {
   display: none;
   grid-column: auto !important;
 }
 
-.karte-page.karte-tab-overview .karte-grid > :nth-child(1),
-.karte-page.karte-tab-overview .karte-grid > :nth-child(2),
-.karte-page.karte-tab-overview .karte-grid > :nth-child(3),
-.karte-page.karte-tab-overview .karte-grid > :nth-child(15),
-.karte-page.karte-tab-overview .karte-grid > :nth-child(16),
-.karte-page.karte-tab-projects .karte-grid > :nth-child(5),
-.karte-page.karte-tab-projects .karte-grid > :nth-child(6),
-.karte-page.karte-tab-projects .karte-grid > :nth-child(7),
-.karte-page.karte-tab-quotes .karte-grid > :nth-child(11),
-.karte-page.karte-tab-products .karte-grid > :nth-child(8),
-.karte-page.karte-tab-products .karte-grid > :nth-child(9),
-.karte-page.karte-tab-products .karte-grid > :nth-child(10),
-.karte-page.karte-tab-samples .karte-grid > :nth-child(12),
-.karte-page.karte-tab-calendar .karte-grid > :nth-child(14),
-.karte-page.karte-tab-calendar .karte-grid > :nth-child(15),
-.karte-page.karte-tab-activity .karte-grid > :nth-child(4),
-.karte-page.karte-tab-activity .karte-grid > :nth-child(6),
-.karte-page.karte-tab-activity .karte-grid > :nth-child(7),
-.karte-page.karte-tab-activity .karte-grid > :nth-child(13),
-.karte-page.karte-tab-activity .karte-grid > :nth-child(16) {
+.karte-page.karte-tab-overview .karte-grid > [data-karte-section='basic'],
+.karte-page.karte-tab-overview .karte-grid > [data-karte-section='contacts'],
+.karte-page.karte-tab-overview .karte-grid > [data-karte-section='business-cards'],
+.karte-page.karte-tab-overview .karte-grid > [data-karte-section='follow'],
+.karte-page.karte-tab-projects .karte-grid > [data-karte-section='contract-balance'],
+.karte-page.karte-tab-projects .karte-grid > [data-karte-section='projects'],
+.karte-page.karte-tab-projects .karte-grid > [data-karte-section='deal-histories'],
+.karte-page.karte-tab-quotes .karte-grid > [data-karte-section='quotes'],
+.karte-page.karte-tab-products .karte-grid > [data-karte-section='proposal-products'],
+.karte-page.karte-tab-products .karte-grid > [data-karte-section='inventories'],
+.karte-page.karte-tab-products .karte-grid > [data-karte-section='adoptions'],
+.karte-page.karte-tab-samples .karte-grid > [data-karte-section='samples'],
+.karte-page.karte-tab-calendar .karte-grid > [data-karte-section='events'],
+.karte-page.karte-tab-calendar .karte-grid > [data-karte-section='follow'],
+.karte-page.karte-tab-activity .karte-grid > [data-karte-section='timeline'],
+.karte-page.karte-tab-activity .karte-grid > [data-karte-section='deal-histories'],
+.karte-page.karte-tab-activity .karte-grid > [data-karte-section='complaints'],
+.karte-page.karte-tab-activity .karte-grid > [data-karte-section='attachments'],
+.karte-page.karte-tab-activity .karte-grid > [data-karte-section='ai'] {
   display: block;
 }
 
 .karte-sales-dashboard {
   display: none;
   margin-top: 12px;
+  min-height: 0;
+  overflow: visible;
 }
 
 .karte-page.karte-tab-sales .karte-sales-dashboard {
   display: grid;
   gap: 12px;
+  align-items: start;
 }
 
 .karte-sales-grid {
@@ -311,6 +321,9 @@
   display: grid;
   gap: 12px;
   align-content: start;
+  align-self: start;
+  min-height: 0;
+  overflow: visible;
 }
 
 .karte-side-card {

@@ -463,11 +463,11 @@ function createAdoptionForm(customerId = '', user) {
   }, user?.id ?? '');
 }
 
-function Section({ title, count, defaultOpen = true, action, children }) {
+function Section({ title, count, defaultOpen = true, action, sectionKey, children }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="karte-section">
+    <section className={`karte-section ${sectionKey ? `karte-section-${sectionKey}` : ''}`.trim()} data-karte-section={sectionKey || undefined}>
       <div className="karte-section-header">
         <button className="karte-section-toggle" type="button" onClick={() => setOpen((value) => !value)}>
         <span>{title}</span>
@@ -1907,7 +1907,7 @@ export default function CustomerKarte({
           </section>
 
           <div className="karte-grid">
-        <Section title="会社基本情報">
+        <Section title="会社基本情報" sectionKey="basic">
           <div className="karte-field-grid">
             <Field label="顧客コード" value={customer.customerCode} />
             <Field label="会社名" value={customer.companyName} />
@@ -1956,7 +1956,7 @@ export default function CustomerKarte({
           </label>
         </Section>
 
-        <Section title="担当者一覧" count={karte.contacts.length} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddContact}>＋追加</button>}>
+        <Section title="担当者一覧" count={karte.contacts.length} sectionKey="contacts" action={<button className="ghost-button compact-action-button" type="button" onClick={startAddContact}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleSaveContact}>
             <div className="date-grid">
               <label className="field-label">
@@ -2023,7 +2023,7 @@ export default function CustomerKarte({
           </div>
         </Section>
 
-        <Section title="名刺情報" count={karte.businessCards.length} defaultOpen={karte.businessCards.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddBusinessCard}>＋追加</button>}>
+        <Section title="名刺情報" count={karte.businessCards.length} defaultOpen={karte.businessCards.length > 0} sectionKey="business-cards" action={<button className="ghost-button compact-action-button" type="button" onClick={startAddBusinessCard}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleSaveBusinessCard}>
             <div className="date-grid">
               <label className="field-label">
@@ -2064,7 +2064,7 @@ export default function CustomerKarte({
           </div>
         </Section>
 
-        <Section title="活動タイムライン" count={karte.activityTimeline.length}>
+        <Section title="活動タイムライン" count={karte.activityTimeline.length} sectionKey="timeline">
           <div className="timeline-toolbar">
             <span>表示順</span>
             <div className="segmented-control compact-segmented" aria-label="活動タイムラインの表示順">
@@ -2115,6 +2115,7 @@ export default function CustomerKarte({
           title="契約残"
           count={contractBalanceOrders.length}
           defaultOpen={contractBalanceOrders.length > 0}
+          sectionKey="contract-balance"
           action={(
             <div className="mail-action-row">
               <button className={contractBalanceScope === 'office' ? 'primary-button compact-action-button' : 'ghost-button compact-action-button'} type="button" onClick={() => setContractBalanceScope('office')}>この拠点のみ</button>
@@ -2155,33 +2156,35 @@ export default function CustomerKarte({
           )}
         </Section>
 
-        <ProjectPanel
-          title="案件"
-          projects={projects}
-          customers={customers}
-          suppliers={suppliers}
-          contacts={contacts}
-          products={products}
-          inventories={inventories}
-          issuers={issuers}
-          quotes={quotes}
-          invoices={invoices}
-          samples={samples}
-          complaints={complaints}
-          events={events}
-          tasks={tasks}
-          attachments={attachments}
-          addProject={addProject}
-          updateProject={updateProject}
-          removeProject={removeProject}
-          defaultCustomerId={customer.id}
-          setActivePage={setActivePage}
-          onCreateQuote={onCreateQuote}
-          onCreateInvoice={onCreateInvoice}
-          onCreateSalesOrder={onCreateSalesOrder}
-        />
+        <div className="karte-section-projects" data-karte-section="projects">
+          <ProjectPanel
+            title="案件"
+            projects={projects}
+            customers={customers}
+            suppliers={suppliers}
+            contacts={contacts}
+            products={products}
+            inventories={inventories}
+            issuers={issuers}
+            quotes={quotes}
+            invoices={invoices}
+            samples={samples}
+            complaints={complaints}
+            events={events}
+            tasks={tasks}
+            attachments={attachments}
+            addProject={addProject}
+            updateProject={updateProject}
+            removeProject={removeProject}
+            defaultCustomerId={customer.id}
+            setActivePage={setActivePage}
+            onCreateQuote={onCreateQuote}
+            onCreateInvoice={onCreateInvoice}
+            onCreateSalesOrder={onCreateSalesOrder}
+          />
+        </div>
 
-        <Section title="商談履歴" count={karte.dealHistories.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setHistoryForm(emptyHistoryForm)}>＋追加</button>}>
+        <Section title="商談履歴" count={karte.dealHistories.length} sectionKey="deal-histories" action={<button className="ghost-button compact-action-button" type="button" onClick={() => setHistoryForm(emptyHistoryForm)}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleAddHistory}>
             <div className="date-grid">
               <label className="field-label">
@@ -2249,7 +2252,7 @@ export default function CustomerKarte({
           </div>
         </Section>
 
-        <Section title="クレーム履歴" count={karte.complaints.length} defaultOpen={hasComplaints} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddComplaint}>＋追加</button>}>
+        <Section title="クレーム履歴" count={karte.complaints.length} defaultOpen={hasComplaints} sectionKey="complaints" action={<button className="ghost-button compact-action-button" type="button" onClick={startAddComplaint}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleSaveComplaint}>
             <div className="date-grid">
               <label className="field-label">
@@ -2285,7 +2288,7 @@ export default function CustomerKarte({
           </div>
         </Section>
 
-        <Section title="提案商品" count={karte.products.length} action={<button className="ghost-button compact-action-button" type="button" onClick={() => setActivePage('Products')}>＋追加</button>}>
+        <Section title="提案商品" count={karte.products.length} sectionKey="proposal-products" action={<button className="ghost-button compact-action-button" type="button" onClick={() => setActivePage('Products')}>＋追加</button>}>
           <div className="karte-card-list">
             {karte.products.length > 0 ? karte.products.map((product) => (
               <article className="product-card clickable-card" key={product.id} onClick={() => setActivePage('Products')}>
@@ -2305,7 +2308,7 @@ export default function CustomerKarte({
           </div>
         </Section>
 
-        <Section title="在庫・仕入参照" count={karteInventories.length} defaultOpen={karteInventories.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={() => startAddInventory(karte.products[0]?.id || products[0]?.id || '')}>＋追加</button>}>
+        <Section title="在庫・仕入参照" count={karteInventories.length} defaultOpen={karteInventories.length > 0} sectionKey="inventories" action={<button className="ghost-button compact-action-button" type="button" onClick={() => startAddInventory(karte.products[0]?.id || products[0]?.id || '')}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleSaveInventory}>
             <div className="date-grid">
               <label className="field-label">
@@ -2418,7 +2421,7 @@ export default function CustomerKarte({
           )}
         </Section>
 
-        <Section title="採用品一覧" count={karte.adoptions.length} defaultOpen={karte.adoptions.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddAdoption}>＋追加</button>}>
+        <Section title="採用品一覧" count={karte.adoptions.length} defaultOpen={karte.adoptions.length > 0} sectionKey="adoptions" action={<button className="ghost-button compact-action-button" type="button" onClick={startAddAdoption}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleAddAdoption}>
             <div className="date-grid">
               <label className="field-label">
@@ -2478,7 +2481,7 @@ export default function CustomerKarte({
           {karte.adoptions.length === 0 && <AddCard title="採用品を追加" description="この顧客で採用された商品を記録します" onClick={startAddAdoption} />}
         </Section>
 
-        <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={() => onCreateQuote?.({})}>＋新規見積</button>}>
+        <Section title="見積履歴" count={karte.estimates.length} defaultOpen={karte.estimates.length > 0} sectionKey="quotes" action={<button className="ghost-button compact-action-button" type="button" onClick={() => onCreateQuote?.({})}>＋新規見積</button>}>
           <form className="sample-form" onSubmit={handleAddQuote}>
             <div className="date-grid">
               <label className="field-label">
@@ -2958,7 +2961,7 @@ export default function CustomerKarte({
           {karte.estimates.length === 0 && <AddCard title="見積を追加" description="見積PDFまで作成して履歴に保存します" onClick={() => setQuoteForm(createQuoteForm(customer.id, user, quotes))} />}
         </Section>
 
-        <Section title="サンプル管理" count={karte.samples.length} defaultOpen={karte.samples.length > 0} action={<button className="ghost-button compact-action-button" type="button" onClick={startAddSample}>＋追加</button>}>
+        <Section title="サンプル管理" count={karte.samples.length} defaultOpen={karte.samples.length > 0} sectionKey="samples" action={<button className="ghost-button compact-action-button" type="button" onClick={startAddSample}>＋追加</button>}>
           <form className="sample-form" onSubmit={handleAddSample}>
             <div className="date-grid">
               <label className="field-label">
@@ -3054,7 +3057,7 @@ export default function CustomerKarte({
           {karte.samples.length === 0 && <AddCard title="サンプルを追加" description="発送日やフォロー日を登録します" onClick={startAddSample} />}
         </Section>
 
-        <Section title="添付ファイル" count={karte.attachments.length}>
+        <Section title="添付ファイル" count={karte.attachments.length} sectionKey="attachments">
           <label className="field-label file-field">
             顧客資料を追加
             <input type="file" onChange={(event) => handleAttachment(event.target.files?.[0])} />
@@ -3073,7 +3076,7 @@ export default function CustomerKarte({
           </div>
         </Section>
 
-        <Section title="予定" count={karte.events.length} defaultOpen={karte.events.length > 0}>
+        <Section title="予定" count={karte.events.length} defaultOpen={karte.events.length > 0} sectionKey="events">
           <RecordList
             records={karte.events.map((event) => ({
               ...event,
@@ -3085,7 +3088,7 @@ export default function CustomerKarte({
           />
         </Section>
 
-        <Section title="フォロー予定">
+        <Section title="フォロー予定" sectionKey="follow">
           <div className="karte-field-grid">
             <Field label="次回フォロー日" value={nextFollowDate} />
             <Field label="最終接触日" value={customer.lastContactDate} />
@@ -3102,7 +3105,7 @@ export default function CustomerKarte({
           </label>
         </Section>
 
-        <Section title="AI分析枠" defaultOpen={false}>
+        <Section title="AI分析枠" defaultOpen={false} sectionKey="ai">
           <div className="mail-action-row">
             <button className="primary-button" type="button" onClick={handleSalesAssistant} disabled={assistantLoading}>
               {assistantLoading ? 'AI営業秘書生成中...' : 'AI営業秘書'}
