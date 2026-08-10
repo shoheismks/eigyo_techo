@@ -1295,6 +1295,341 @@ body,
     grid-template-columns: 1fr;
   }
 
+  .quote-form-modal {
+    display: grid;
+    gap: 12px;
+    padding-inline: 12px;
+  }
+
+  .quote-form-modal > .section-heading {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    margin: -12px -12px 0;
+    padding: 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(13, 20, 36, 0.98);
+  }
+
+  .quote-form-modal > .section-heading > .text-button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .quote-form-modal .sample-form {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .quote-form-modal .karte-mini-card {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .quote-form-modal .karte-mini-card .date-grid,
+  .quote-form-modal .company-details,
+  .quote-terms-editor .date-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .quote-form-modal select,
+  .quote-form-modal input,
+  .quote-form-modal textarea,
+  .quote-form-modal option {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .quote-form-modal .field-label,
+  .quote-form-modal .history-meta,
+  .quote-form-modal .company-details dd,
+  .quote-form-modal .company-details dt {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .quote-form-modal .price-preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    position: static !important;
+  }
+
+  .quote-form-modal > .mail-action-row:last-of-type {
+    position: sticky;
+    bottom: 0;
+    z-index: 7;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 0 -12px -12px;
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    background: linear-gradient(180deg, rgba(13, 20, 36, 0.94), #0d1424);
+  }
+
+  .quote-form-modal > .mail-action-row:last-of-type > * {
+    width: 100%;
+  }
+
+  .quote-preview-frame,
+  .document-preview,
+  .pdf-preview {
+    max-height: 52dvh;
+    overflow: auto;
+    border-radius: 10px;
+  }
+
+  .product-detail-layout,
+  .product-assets-section,
+  .inventory-product-summary {
+    display: grid;
+    gap: 10px;
+  }
+
+  .inventory-product-summary {
+    order: -2;
+  }
+
+  .product-detail-layout .save-status-section {
+    order: -1;
+  }
+
+  .product-assets-section {
+    margin-top: 2px;
+  }
+
+  .product-assets-section .section-heading,
+  .asset-drop-zone .section-heading,
+  .product-asset-card .section-heading,
+  .product-document-card .section-heading {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .asset-drop-zone,
+  .product-asset-card,
+  .product-document-card {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .product-asset-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .product-document-card > div,
+  .product-asset-card > div,
+  .product-document-card .mail-action-row,
+  .product-asset-card .mail-action-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .product-document-card span,
+  .product-document-card small,
+  .product-asset-card span,
+  .product-asset-card small,
+  .product-document-card a,
+  .product-asset-card button,
+  .product-document-card button {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .asset-image-button {
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+  }
+
+  .asset-preview-modal .section-heading {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: rgba(13, 20, 36, 0.98);
+  }
+
+  .analytics-page {
+    display: grid;
+    gap: 12px;
+  }
+
+  .analytics-titlebar,
+  .analytics-filter-bar,
+  .analytics-chart-grid,
+  .analytics-ranking-grid,
+  .analytics-detail-tables,
+  .management-alert-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .analytics-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .analytics-kpi {
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .analytics-kpi-main {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .analytics-kpi-main span {
+    font-size: clamp(1.05rem, 7vw, 1.42rem);
+    overflow-wrap: anywhere;
+  }
+
+  .analytics-filter-bar,
+  .analytics-chart-grid,
+  .analytics-chart-grid.compact,
+  .analytics-ranking-grid,
+  .management-alert-grid {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .analytics-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 12px;
+  }
+
+  .analytics-panel-heading {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .analytics-svg-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .analytics-svg-shell svg {
+    width: 100%;
+    height: auto;
+    min-width: 0;
+  }
+
+  .analytics-detail-tables {
+    order: 20;
+  }
+
+  .analytics-detail-tables .dashboard-table,
+  .analytics-detail-tables table {
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .analytics-detail-tables table,
+  .analytics-detail-tables thead,
+  .analytics-detail-tables tbody,
+  .analytics-detail-tables tr,
+  .analytics-detail-tables td,
+  .analytics-detail-tables th {
+    display: block;
+  }
+
+  .analytics-detail-tables thead {
+    display: none;
+  }
+
+  .analytics-detail-tables tr {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.88);
+    padding: 10px;
+  }
+
+  .analytics-detail-tables td {
+    min-width: 0;
+    padding: 6px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .settings-page-v2,
+  .settings-content-panel,
+  .settings-card,
+  .settings-form-card,
+  .settings-document-layout,
+  .settings-card-grid,
+  .settings-form-section,
+  .settings-issuer-list,
+  .issuer-picker-item,
+  .current-issuer-summary {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .settings-page-v2 .page-header {
+    padding-bottom: 12px;
+  }
+
+  .settings-content-header {
+    position: sticky;
+    top: 48px;
+    z-index: 5;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 10px;
+    background: rgba(13, 20, 36, 0.96);
+    backdrop-filter: blur(14px);
+  }
+
+  .settings-mobile-category select {
+    min-height: 48px;
+  }
+
+  .settings-card {
+    gap: 10px;
+  }
+
+  .settings-card header,
+  .settings-form-section h4,
+  .settings-card h3,
+  .settings-card h4 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .settings-form-card .settings-form-section {
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    padding: 10px;
+  }
+
+  .settings-form-card .settings-form-section:focus-within {
+    border-color: rgba(102, 163, 255, 0.42);
+  }
+
+  .settings-terms-list textarea {
+    min-height: 118px;
+  }
+
   .karte-header {
     top: 48px;
     gap: 10px;
