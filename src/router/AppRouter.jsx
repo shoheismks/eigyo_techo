@@ -181,16 +181,16 @@ export default function AppRouter({
   addEvent,
   updateEvent,
   removeEvent,
+  reloadEvents,
   eventSyncState,
   eventSyncError,
-  eventLegacyLocalDataWarning,
   tasks,
   addTask,
   updateTask,
   removeTask,
+  reloadTasks,
   taskSyncState,
   taskSyncError,
-  taskLegacyLocalDataWarning,
   attachments,
   addAttachment,
   updateAttachment,
@@ -714,14 +714,12 @@ export default function AppRouter({
         addTask={addTask}
         updateTask={updateTask}
         removeTask={removeTask}
+        reloadEvents={reloadEvents}
+        reloadTasks={reloadTasks}
         calendarQuickAction={calendarQuickAction}
         onCalendarQuickActionConsumed={onCalendarQuickActionConsumed}
         syncState={eventSyncState === 'error' || taskSyncState === 'error' ? 'error' : eventSyncState}
         syncError={[eventSyncError, taskSyncError].filter(Boolean).join(' / ')}
-        legacyLocalDataWarning={[
-          eventLegacyLocalDataWarning,
-          taskLegacyLocalDataWarning,
-        ].filter(Boolean).join(' / ')}
         updateCustomer={updateCustomer}
         user={user}
         onOpenKarte={openCustomerKarte}

@@ -15,6 +15,7 @@ import {
   normalizeTask,
 } from '../hooks/useTasks.js';
 import { getCalendarDateMeta } from '../services/japaneseHolidayService.js';
+import CalendarLocalMigrationPanel from '../components/CalendarLocalMigrationPanel.jsx';
 import './CalendarPage.css';
 
 const VIEW_LABELS = {
@@ -552,11 +553,12 @@ export default function CalendarPage({
   addTask,
   updateTask,
   removeTask,
+  reloadEvents,
+  reloadTasks,
   calendarQuickAction,
   onCalendarQuickActionConsumed,
   syncState,
   syncError,
-  legacyLocalDataWarning,
   updateCustomer,
   onOpenKarte,
   onOpenProject,
@@ -1168,9 +1170,14 @@ export default function CalendarPage({
         </div>
       </div>
 
-      {(legacyLocalDataWarning || syncError || calendarError || syncState === 'error') && (
+      <CalendarLocalMigrationPanel
+        userId={user?.id || ''}
+        reloadEvents={reloadEvents}
+        reloadTasks={reloadTasks}
+      />
+
+      {(syncError || calendarError || syncState === 'error') && (
         <div className="form-error-message" role="alert">
-          {legacyLocalDataWarning && <p>{legacyLocalDataWarning}</p>}
           {syncError && <p>{syncError}</p>}
           {calendarError && <p>{calendarError}</p>}
         </div>
