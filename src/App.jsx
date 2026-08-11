@@ -103,6 +103,7 @@ function AuthenticatedShell() {
   const [importError, setImportError] = useState('');
   const [importHandled, setImportHandled] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [calendarQuickAction, setCalendarQuickAction] = useState(null);
   const [globalCustomerSearch, setGlobalCustomerSearch] = useState('');
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
@@ -526,6 +527,12 @@ function AuthenticatedShell() {
       return;
     }
 
+    if (actionKey === 'schedule' || actionKey === 'task') {
+      setCalendarQuickAction({ type: actionKey, token: Date.now() });
+      setActivePage('Calendar');
+      return;
+    }
+
     setActivePage(nextPageByAction[actionKey] || 'Home');
   }
 
@@ -646,9 +653,11 @@ function AuthenticatedShell() {
           <Suspense fallback={<PageLoading />}>
             <AppRouter
               activePage={activePage}
+              calendarQuickAction={calendarQuickAction}
               importError={importError}
               initialSearchQuery={globalCustomerSearch}
               inventoryAction={inventoryAction}
+              onCalendarQuickActionConsumed={() => setCalendarQuickAction(null)}
               onCreateDeliveryNoteFromShipment={handleCreateDeliveryNoteFromShipment}
               onCreateInvoice={openInvoiceForm}
               onCreateQuote={openQuoteForm}

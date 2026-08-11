@@ -1,4 +1,6 @@
 const actions = [
+  { key: 'schedule', label: 'スケジュールを追加', description: '商談・打合せなどの予定を登録', tone: 'primary' },
+  { key: 'task', label: 'タスクを追加', description: 'やること・ToDoを登録', tone: 'primary' },
   { key: 'business-card', label: '名刺を撮影', description: 'カメラで名刺を追加', tone: 'primary' },
   { key: 'deal', label: '商談メモ', description: '今すぐ商談内容を記録', tone: 'primary' },
   { key: 'quote', label: '見積作成', description: '顧客と商品を選んで見積PDFを作成', tone: 'primary' },

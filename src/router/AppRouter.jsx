@@ -31,6 +31,7 @@ const Suppliers = lazy(() => import('../modules/suppliers/pages/Suppliers.jsx'))
 
 export default function AppRouter({
   activePage,
+  calendarQuickAction,
   importError,
   initialSearchQuery,
   inventoryAction,
@@ -38,6 +39,7 @@ export default function AppRouter({
   onCreateInvoice,
   onCreateQuote,
   onCreateSalesOrder,
+  onCalendarQuickActionConsumed,
   onOpenCustomerDetail,
   onOpenCustomerKarte,
   onOpenInventoryPage,
@@ -705,6 +707,8 @@ export default function AppRouter({
         addTask={addTask}
         updateTask={updateTask}
         removeTask={removeTask}
+        calendarQuickAction={calendarQuickAction}
+        onCalendarQuickActionConsumed={onCalendarQuickActionConsumed}
         syncState={eventSyncState === 'error' || taskSyncState === 'error' ? 'error' : eventSyncState}
         syncError={[eventSyncError, taskSyncError].filter(Boolean).join(' / ')}
         legacyLocalDataWarning={[

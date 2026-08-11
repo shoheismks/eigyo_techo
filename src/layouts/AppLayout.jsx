@@ -113,7 +113,7 @@ export default function AppLayout({
               <button type="button" className="ghost-button compact-button help-button" aria-label="ヘルプ" onClick={onHelp}>
                 ?
               </button>
-              <button type="button" className="primary-button compact-button" onClick={() => handleAction('company')}>
+              <button type="button" className="primary-button compact-button" onClick={() => setAddMenuOpen(true)}>
                 追加
               </button>
               <button type="button" className="ghost-button compact-button" onClick={() => handleAction('inventory')}>

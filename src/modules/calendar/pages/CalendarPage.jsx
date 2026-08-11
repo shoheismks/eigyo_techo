@@ -552,6 +552,8 @@ export default function CalendarPage({
   addTask,
   updateTask,
   removeTask,
+  calendarQuickAction,
+  onCalendarQuickActionConsumed,
   syncState,
   syncError,
   legacyLocalDataWarning,
@@ -674,6 +676,20 @@ export default function CalendarPage({
   useEffect(() => {
     window.localStorage.setItem(CALENDAR_DATE_STORAGE_KEY, baseDate);
   }, [baseDate]);
+
+  useEffect(() => {
+    if (!calendarQuickAction?.type) return;
+
+    if (calendarQuickAction.type === 'schedule') {
+      openAdd(baseDate || today);
+    }
+
+    if (calendarQuickAction.type === 'task') {
+      openTaskAdd(baseDate || today);
+    }
+
+    onCalendarQuickActionConsumed?.();
+  }, [calendarQuickAction?.token]);
 
   useEffect(() => {
     if (!actionMenu) return undefined;
