@@ -68,6 +68,7 @@ export function AppDataProvider({ userId, children }) {
     addProduct: productsState.addProduct,
     updateProduct: productsState.updateProduct,
     removeProduct: productsState.removeProduct,
+    reloadProducts: productsState.reloadProducts,
     productSyncState: productsState.productSyncState,
     productSyncError: productsState.productSyncError,
     productLegacyLocalDataWarning: productsState.productLegacyLocalDataWarning,
@@ -76,6 +77,7 @@ export function AppDataProvider({ userId, children }) {
     addProductAsset: productAssetsState.addRecord,
     updateProductAsset: productAssetsState.updateRecord,
     removeProductAsset: productAssetsState.removeRecord,
+    reloadProductAssets: productAssetsState.reload,
     productAssetSyncError: productAssetsState.syncError,
     productAssetLegacyLocalDataWarning: productAssetsState.legacyLocalDataWarning,
 
@@ -83,6 +85,7 @@ export function AppDataProvider({ userId, children }) {
     addBrand: brandsState.addRecord,
     updateBrand: brandsState.updateRecord,
     removeBrand: brandsState.removeRecord,
+    reloadBrands: brandsState.reload,
     brandSyncError: brandsState.syncError,
     brandLegacyLocalDataWarning: brandsState.legacyLocalDataWarning,
 

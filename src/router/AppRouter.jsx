@@ -86,12 +86,15 @@ export default function AppRouter({
   addProduct,
   updateProduct,
   removeProduct,
+  reloadProducts,
   addProductAsset,
   updateProductAsset,
   removeProductAsset,
+  reloadProductAssets,
   addBrand,
   updateBrand,
   removeBrand,
+  reloadBrands,
   addCustomerProductPrice,
   updateCustomerProductPrice,
   removeCustomerProductPrice,
@@ -486,6 +489,10 @@ export default function AppRouter({
         customerProductPrices={customerProductPrices}
         inventories={inventories}
         productAssets={productAssets}
+        userId={userId}
+        reloadProducts={reloadProducts}
+        reloadBrands={reloadBrands}
+        reloadProductAssets={reloadProductAssets}
         removeProduct={removeProduct}
         onOpenProductDetail={openProductDetail}
         onOpenInventory={openInventoryPage}
