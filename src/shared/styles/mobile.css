@@ -913,6 +913,10 @@ body,
     overflow: visible;
   }
 
+  .data-table .data-table-shell {
+    display: block !important;
+  }
+
   .data-table-toolbar,
   .data-table-toolbar-actions,
   .data-table-pager {
@@ -933,24 +937,24 @@ body,
   .data-table .desktop-data-table {
     width: 100% !important;
     min-width: 0 !important;
-    display: block;
+    display: block !important;
   }
 
   .data-table .desktop-data-table thead {
-    display: none;
+    display: none !important;
   }
 
   .data-table .desktop-data-table tbody,
   .data-table .desktop-data-table tr,
   .data-table .desktop-data-table td {
-    display: block;
+    display: block !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100%;
   }
 
   .data-table .desktop-data-table tbody {
-    display: grid;
+    display: grid !important;
     gap: 10px;
   }
 
@@ -982,7 +986,7 @@ body,
   }
 
   .data-table .desktop-table-actions {
-    display: grid;
+    display: grid !important;
     grid-template-columns: 1fr;
     gap: 8px;
     padding-top: 10px;
@@ -1144,7 +1148,7 @@ body,
   .mobile-sticky-actions {
     left: max(10px, env(safe-area-inset-left));
     right: max(10px, env(safe-area-inset-right));
-    bottom: calc(78px + env(safe-area-inset-bottom));
+    bottom: calc(96px + env(safe-area-inset-bottom));
     width: auto;
     max-width: none;
   }

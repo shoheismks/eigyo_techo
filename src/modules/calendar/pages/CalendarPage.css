@@ -745,7 +745,7 @@
     position: fixed;
     left: max(12px, env(safe-area-inset-left));
     right: max(12px, env(safe-area-inset-right));
-    bottom: calc(78px + env(safe-area-inset-bottom));
+    bottom: calc(96px + env(safe-area-inset-bottom));
     z-index: 95;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -761,6 +761,13 @@
   .calendar-mobile-fab button {
     width: 100%;
     min-height: 50px;
+  }
+
+  .app-shell:has(.sidebar-nav.mobile-open) .calendar-mobile-fab,
+  .app-shell:has(.add-menu-backdrop) .calendar-mobile-fab,
+  .calendar-page:has(.calendar-editor-backdrop) .calendar-mobile-fab,
+  .calendar-page:has(.calendar-list-popup-backdrop) .calendar-mobile-fab {
+    display: none;
   }
 
   .calendar-editor {
