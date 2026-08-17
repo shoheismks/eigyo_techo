@@ -228,7 +228,6 @@ export default function DeliveryNotes({
         <p>出荷済データから、価格表示を切り替えられる納品書を作成・再発行します。</p>
       </div>
 
-      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
       {syncError && <p className="form-error-message">{syncError}</p>}
 
       <section className="sync-status-card">

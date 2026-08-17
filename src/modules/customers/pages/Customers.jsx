@@ -711,7 +711,6 @@ export default function Customers({
         </div>
       </section>
 
-      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
       {syncError && syncState === 'error' && <p className="form-error-message">{syncError}</p>}
 
       <section className="search-panel compact-panel desktop-filter-panel">

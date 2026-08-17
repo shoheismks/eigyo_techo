@@ -10,7 +10,7 @@ import { getTableConfig } from '../config/TABLE_CONFIG.js';
 const CLOUD_REQUIRED_MESSAGE = 'Supabase is required for business data. Check the network and Supabase settings.';
 const LOCAL_CACHE_MESSAGE = 'Showing an explicitly allowed local cache because Supabase is unavailable.';
 const LOCAL_CACHE_SAVE_MESSAGE = 'Saved to an explicitly allowed local cache because Supabase is unavailable.';
-const LEGACY_LOCAL_WARNING = 'Old LocalStorage business data was detected. It will not be migrated or deleted automatically.';
+const LEGACY_LOCAL_WARNING = '旧ローカル業務データがあります。安全のため自動移行・自動削除は行いません。';
 
 function snakeToCamel(value) {
   return String(value || '').replace(/_([a-z])/g, (_, char) => char.toUpperCase());

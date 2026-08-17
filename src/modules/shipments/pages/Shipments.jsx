@@ -110,7 +110,6 @@ export default function Shipments({
         <p>受注から作成した出荷予定、ピッキング、出荷確定、取消を確認します。</p>
       </div>
 
-      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
       {syncError && <p className="form-error-message">{syncError}</p>}
       {message && <p className={message.includes('失敗') ? 'form-error-message' : 'notice-text'}>{message}</p>}
 

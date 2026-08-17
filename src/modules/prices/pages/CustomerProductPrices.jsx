@@ -268,7 +268,6 @@ export default function CustomerProductPrices({
         <p>顧客・商品ごとの税抜販売単価を管理し、見積と受注へ採用根拠付きで反映します。</p>
       </section>
 
-      {legacyLocalDataWarning && <div className="form-error-message">{legacyLocalDataWarning}</div>}
       {syncError && <div className="form-error-message">{syncError}</div>}
 
       <section className="search-panel desktop-filter-panel">

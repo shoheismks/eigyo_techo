@@ -757,7 +757,6 @@ export default function SalesOrders({
         <p>見積書または成約確認書の内容を固定スナップショットとして受注へ引き継ぎます。</p>
       </div>
 
-      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
       {syncError && <p className="form-error-message">{syncError}</p>}
 
       <section className="sync-status-card">

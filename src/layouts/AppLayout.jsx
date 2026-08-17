@@ -3,6 +3,7 @@ import { APP_VERSION_LABEL } from '../shared/constants/appMeta.js';
 import AddActionMenu from './AddActionMenu.jsx';
 import BottomNavigation from './BottomNavigation.jsx';
 import SidebarNavigation from './SidebarNavigation.jsx';
+import LegacyLocalDataPanel from '../shared/components/LegacyLocalDataPanel.jsx';
 
 const pageTitles = {
   Home: 'ホーム',
@@ -137,7 +138,10 @@ export default function AppLayout({
 
           {notice && <div className="extension-toast">{notice}</div>}
 
-          <div className="main-content">{children}</div>
+          <div className="main-content">
+            <LegacyLocalDataPanel />
+            {children}
+          </div>
           {activePage !== 'Help' && (
             <button type="button" className="floating-help-button" aria-label="ヘルプ" onClick={onHelp}>
               ?

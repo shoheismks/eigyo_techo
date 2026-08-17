@@ -102,7 +102,6 @@ export default function Quotes({
         </label>
       </ActionBar>}
     >
-      {legacyLocalDataWarning && <div className="form-error-message">{legacyLocalDataWarning}</div>}
       {syncError && <div className="form-error-message">{syncError}</div>}
       <section className="result-stack" id="quotes-table">
         <div className="section-heading">
