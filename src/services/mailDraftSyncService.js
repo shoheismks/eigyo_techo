@@ -1,37 +1,58 @@
 import { hasSupabaseConfig, supabase } from '../lib/supabase.js';
 
 const TABLE_NAME = 'mail_drafts';
-const STORAGE_KEY = 'eigyo-techo-mail-drafts';
+export const MAIL_DRAFT_LOCAL_STORAGE_KEY = 'eigyo-techo-mail-drafts';
+
+const CLOUD_REQUIRED_MESSAGE = 'Supabaseに接続できないため、メール下書きを保存・取得できません。ネットワークと設定を確認してください。';
 
 function canUseSupabase() {
   return hasSupabaseConfig && Boolean(supabase) && isOnline();
 }
 
-export function readLocalMailDrafts(customerId = '', userId = '') {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const drafts = saved
-      ? JSON.parse(saved).map((draft) => normalizeMailDraft(draft, userId))
-      : [];
-    return drafts.filter((draft) => {
-      const matchesCustomer = !customerId || draft.customerId === customerId;
-      const matchesUser = !userId || draft.userId === userId;
-      return matchesCustomer && matchesUser;
-    });
-  } catch {
-    return [];
+function ensureSupabase() {
+  if (!canUseSupabase()) {
+    throw new Error(CLOUD_REQUIRED_MESSAGE);
   }
 }
 
-export function saveLocalMailDrafts(drafts) {
-  const normalizedDrafts = drafts.map((draft) => normalizeMailDraft(draft));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedDrafts));
+function readLocalArray(key) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return { records: [], error: '' };
+  }
+
+  const raw = window.localStorage.getItem(key);
+  if (!raw) {
+    return { records: [], error: '' };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      records: Array.isArray(parsed) ? parsed : [],
+      error: Array.isArray(parsed) ? '' : '配列形式ではありません。',
+    };
+  } catch (error) {
+    return { records: [], error: error.message || 'JSONを解析できません。' };
+  }
+}
+
+export function readLegacyMailDrafts(customerId = '', userId = '') {
+  const read = readLocalArray(MAIL_DRAFT_LOCAL_STORAGE_KEY);
+  return read.records
+    .map((draft) => normalizeMailDraft(draft, userId))
+    .filter((draft) => {
+      const matchesCustomer = !customerId || draft.customerId === customerId;
+      const matchesUser = !userId || !draft.userId || draft.userId === userId;
+      return matchesCustomer && matchesUser;
+    });
+}
+
+export function hasLegacyMailDrafts(userId = '') {
+  return readLegacyMailDrafts('', userId).length > 0;
 }
 
 export async function fetchMailDrafts(customerId = '', userId = '') {
-  if (!canUseSupabase()) {
-    return readLocalMailDrafts(customerId, userId);
-  }
+  ensureSupabase();
 
   let query = supabase
     .from(TABLE_NAME)
@@ -52,17 +73,15 @@ export async function fetchMailDrafts(customerId = '', userId = '') {
     throw error;
   }
 
-  const drafts = (data ?? []).map((row) => fromSupabaseRow(row, userId));
-  mergeLocalMailDrafts(drafts, userId);
-  return drafts;
+  return (data ?? []).map((row) => fromSupabaseRow(row, userId));
 }
 
 export async function upsertMailDrafts(drafts, userId = '') {
-  const normalizedDrafts = drafts.map((draft) => normalizeMailDraft(draft, userId));
-  mergeLocalMailDrafts(normalizedDrafts, userId);
+  ensureSupabase();
 
-  if (!canUseSupabase() || normalizedDrafts.length === 0) {
-    return normalizedDrafts;
+  const normalizedDrafts = drafts.map((draft) => normalizeMailDraft(draft, userId));
+  if (normalizedDrafts.length === 0) {
+    return [];
   }
 
   const { error } = await supabase
@@ -78,12 +97,7 @@ export async function upsertMailDrafts(drafts, userId = '') {
 }
 
 export async function deleteMailDraft(id, userId = '') {
-  const remainingDrafts = readLocalMailDrafts('', userId).filter((draft) => draft.id !== id);
-  saveLocalMailDrafts(remainingDrafts);
-
-  if (!canUseSupabase()) {
-    return remainingDrafts;
-  }
+  ensureSupabase();
 
   let query = supabase.from(TABLE_NAME).delete().eq('id', id);
   if (userId) {
@@ -97,6 +111,88 @@ export async function deleteMailDraft(id, userId = '') {
   }
 
   return fetchMailDrafts('', userId);
+}
+
+export async function buildMailDraftLegacyMigrationPreview(userId = '') {
+  const localRead = readLocalArray(MAIL_DRAFT_LOCAL_STORAGE_KEY);
+  const localDrafts = readLegacyMailDrafts('', userId);
+  const remoteDrafts = await fetchMailDrafts('', userId);
+  const conflicts = localDrafts
+    .map((draft) => buildConflict(draft, findDuplicateDraft(draft, remoteDrafts)))
+    .filter(Boolean);
+
+  return {
+    local: {
+      drafts: localDrafts,
+    },
+    remote: {
+      drafts: remoteDrafts,
+    },
+    counts: {
+      localDrafts: localDrafts.length,
+      remoteDrafts: remoteDrafts.length,
+      duplicateDrafts: conflicts.length,
+    },
+    conflicts,
+    errors: {
+      drafts: localRead.error,
+    },
+  };
+}
+
+export async function migrateMailDraftLegacyLocalData({
+  userId = '',
+  preview,
+  conflictActions = {},
+}) {
+  ensureSupabase();
+
+  const localDrafts = preview?.local?.drafts ?? readLegacyMailDrafts('', userId);
+  const remoteDrafts = preview?.remote?.drafts ?? await fetchMailDrafts('', userId);
+  const results = [];
+  const now = new Date().toISOString();
+
+  for (const draft of localDrafts) {
+    const duplicate = findDuplicateDraft(draft, remoteDrafts);
+    const action = duplicate ? conflictActions[draft.id] || 'skip' : 'create';
+
+    if (action === 'skip') {
+      results.push(resultRecord(draft, 'skipped', duplicate ? '重複候補のためスキップしました。' : 'スキップしました。'));
+      continue;
+    }
+
+    const nextId = action === 'create' && duplicate ? crypto.randomUUID() : duplicate?.id || draft.id;
+    const draftForSave = normalizeMailDraft({
+      ...(action === 'update' && duplicate ? duplicate : {}),
+      ...draft,
+      id: nextId,
+      userId,
+      createdAt: action === 'update' && duplicate ? duplicate.createdAt : draft.createdAt || now,
+      updatedAt: now,
+    }, userId);
+
+    try {
+      await supabase
+        .from(TABLE_NAME)
+        .upsert([toSupabaseRow(draftForSave)], { onConflict: 'id' })
+        .throwOnError();
+      results.push(resultRecord(draftForSave, 'success', action === 'update' ? '既存下書きを更新しました。' : '新規下書きとして移行しました。'));
+    } catch (error) {
+      results.push(resultRecord(draft, 'failed', error.message || '保存に失敗しました。'));
+    }
+  }
+
+  return {
+    drafts: results,
+  };
+}
+
+export function deleteMailDraftLegacyLocalData() {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+
+  window.localStorage.removeItem(MAIL_DRAFT_LOCAL_STORAGE_KEY);
 }
 
 export function normalizeGeneratedDrafts({ customer, drafts, productName, purpose, source, userId = '' }) {
@@ -119,30 +215,22 @@ export function normalizeGeneratedDrafts({ customer, drafts, productName, purpos
   );
 }
 
-function mergeLocalMailDrafts(incomingDrafts, userId = '') {
-  const merged = new Map();
-  [...readLocalMailDrafts('', userId), ...incomingDrafts].forEach((draft) => {
-    merged.set(draft.id, normalizeMailDraft(draft, userId));
-  });
-  saveLocalMailDrafts([...merged.values()]);
-}
-
 function normalizeMailDraft(draft, userId = '') {
   const now = new Date().toISOString();
 
   return {
     id: draft.id ?? crypto.randomUUID(),
-    userId: draft.userId ?? userId,
-    customerId: draft.customerId ?? '',
-    customerName: draft.customerName ?? '',
+    userId: draft.userId ?? draft.user_id ?? userId,
+    customerId: draft.customerId ?? draft.customer_id ?? '',
+    customerName: draft.customerName ?? draft.customer_name ?? '',
     title: draft.title ?? 'メール案',
     subject: draft.subject ?? '',
     body: draft.body ?? '',
-    productName: draft.productName ?? '',
+    productName: draft.productName ?? draft.product_name ?? '',
     purpose: draft.purpose ?? '',
     source: draft.source ?? 'Template',
-    createdAt: draft.createdAt ?? now,
-    updatedAt: draft.updatedAt ?? now,
+    createdAt: draft.createdAt ?? draft.created_at ?? now,
+    updatedAt: draft.updatedAt ?? draft.updated_at ?? now,
   };
 }
 
@@ -178,6 +266,48 @@ function fromSupabaseRow(row, userId = '') {
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
   }, userId);
+}
+
+function findDuplicateDraft(localDraft, remoteDrafts) {
+  return remoteDrafts.find((remoteDraft) => duplicateReasons(localDraft, remoteDraft).length > 0) || null;
+}
+
+function duplicateReasons(localDraft, remoteDraft) {
+  const reasons = [];
+  if (localDraft.id && remoteDraft.id === localDraft.id) {
+    reasons.push('id');
+  }
+  if (
+    localDraft.subject &&
+    remoteDraft.subject === localDraft.subject &&
+    remoteDraft.body === localDraft.body &&
+    (remoteDraft.customerId || '') === (localDraft.customerId || '')
+  ) {
+    reasons.push('顧客 + 件名 + 本文');
+  }
+  return reasons;
+}
+
+function buildConflict(localDraft, duplicate) {
+  return duplicate
+    ? {
+        localId: localDraft.id,
+        localName: localDraft.subject || localDraft.title || '(件名なし)',
+        remoteId: duplicate.id,
+        remoteName: duplicate.subject || duplicate.title || '(件名なし)',
+        reasons: duplicateReasons(localDraft, duplicate),
+        action: 'skip',
+      }
+    : null;
+}
+
+function resultRecord(draft, status, detail = '') {
+  return {
+    type: 'メール下書き',
+    name: draft.subject || draft.title || '(件名なし)',
+    status,
+    detail,
+  };
 }
 
 function isOnline() {

@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import MailDraftLocalMigrationPanel from '../components/MailDraftLocalMigrationPanel.jsx';
 import { SALES_PURPOSES, createMailDrafts } from '../services/mailDraftService.js';
 import { createGmailDraft } from '../services/gmailService.js';
 import { createOutlookDraft } from '../services/outlookService.js';
 import { generateMailSupportNote } from '../services/aiService.js';
 import { productDisplayName } from '../modules/products/hooks/useProducts.js';
 import {
+  deleteMailDraft,
   fetchMailDrafts,
   normalizeGeneratedDrafts,
-  readLocalMailDrafts,
   upsertMailDrafts,
 } from '../services/mailDraftSyncService.js';
 
@@ -27,6 +28,8 @@ export default function MailAI({ customers, products = [], userId = '' }) {
   const [notice, setNotice] = useState('');
   const [draftSyncNotice, setDraftSyncNotice] = useState('');
   const [copiedDraftId, setCopiedDraftId] = useState('');
+  const [savingDraftId, setSavingDraftId] = useState('');
+  const [deletingDraftId, setDeletingDraftId] = useState('');
   const [gmailLoadingDraftId, setGmailLoadingDraftId] = useState('');
   const [outlookLoadingDraftId, setOutlookLoadingDraftId] = useState('');
 
@@ -51,6 +54,18 @@ export default function MailAI({ customers, products = [], userId = '' }) {
     }
   }, [selectedProduct]);
 
+  const reloadDrafts = useCallback(async () => {
+    if (!selectedCustomer?.id) {
+      setDrafts([]);
+      return [];
+    }
+
+    const savedDrafts = await fetchMailDrafts(selectedCustomer.id, userId);
+    setDrafts(savedDrafts);
+    setDraftSyncNotice(savedDrafts.length > 0 ? '保存済みメール下書きを読み込みました' : '');
+    return savedDrafts;
+  }, [selectedCustomer?.id, userId]);
+
   useEffect(() => {
     let ignore = false;
 
@@ -66,11 +81,10 @@ export default function MailAI({ customers, products = [], userId = '' }) {
           setDrafts(savedDrafts);
           setDraftSyncNotice(savedDrafts.length > 0 ? '保存済みメール案を読み込みました' : '');
         }
-      } catch {
+      } catch (err) {
         if (!ignore) {
-          const localDrafts = readLocalMailDrafts(selectedCustomer.id, userId);
-          setDrafts(localDrafts);
-          setDraftSyncNotice('メール案はLocalStorageから読み込みます');
+          setDrafts([]);
+          setDraftSyncNotice(err.message || 'メール下書きをSupabaseから読み込めませんでした。');
         }
       }
     }
@@ -105,7 +119,6 @@ export default function MailAI({ customers, products = [], userId = '' }) {
         source: result.source,
         userId,
       });
-      setDrafts(generatedDrafts);
       setGenerationSource(result.source);
       setFallbackReason(result.fallbackReason);
       setDraftSyncNotice('');
@@ -114,8 +127,10 @@ export default function MailAI({ customers, products = [], userId = '' }) {
         const savedDrafts = await upsertMailDrafts(generatedDrafts, userId);
         setDrafts(savedDrafts);
         setDraftSyncNotice('メール案を保存しました');
-      } catch {
-        setDraftSyncNotice('メール案はLocalStorageに保存しました');
+      } catch (err) {
+        setDrafts([]);
+        setError(err.message || 'メール下書きの保存に失敗しました。');
+        setDraftSyncNotice('');
       }
     } catch {
       setError('メール案の作成に失敗しました');
@@ -147,6 +162,45 @@ export default function MailAI({ customers, products = [], userId = '' }) {
         draft.id === draftId ? { ...draft, [field]: value } : draft,
       ),
     );
+  }
+
+  async function handleSaveDraft(draft) {
+    setSavingDraftId(draft.id);
+    setError('');
+    setNotice('');
+    setDraftSyncNotice('');
+
+    try {
+      const savedDrafts = await upsertMailDrafts([
+        {
+          ...draft,
+          updatedAt: new Date().toISOString(),
+        },
+      ], userId);
+      setDrafts(savedDrafts);
+      setDraftSyncNotice('メール下書きを保存しました');
+    } catch (err) {
+      setError(err.message || 'メール下書きの保存に失敗しました。');
+    } finally {
+      setSavingDraftId('');
+    }
+  }
+
+  async function handleDeleteDraft(draftId) {
+    setDeletingDraftId(draftId);
+    setError('');
+    setNotice('');
+    setDraftSyncNotice('');
+
+    try {
+      await deleteMailDraft(draftId, userId);
+      await reloadDrafts();
+      setDraftSyncNotice('メール下書きを削除しました');
+    } catch (err) {
+      setError(err.message || 'メール下書きの削除に失敗しました。');
+    } finally {
+      setDeletingDraftId('');
+    }
   }
 
   async function handleCopy(draft) {
@@ -299,6 +353,8 @@ export default function MailAI({ customers, products = [], userId = '' }) {
         )}
       </section>
 
+      <MailDraftLocalMigrationPanel userId={userId} reloadDrafts={reloadDrafts} />
+
       {aiMailNote && (
         <section className="mail-context">
           <label className="field-label">
@@ -368,6 +424,20 @@ export default function MailAI({ customers, products = [], userId = '' }) {
                     onClick={() => handleCreateOutlookDraft(draft)}
                   >
                     {outlookLoadingDraftId === draft.id ? '作成中...' : 'Outlook下書き作成'}
+                  </button>
+                  <button
+                    className="primary-button compact-button"
+                    disabled={savingDraftId === draft.id}
+                    onClick={() => handleSaveDraft(draft)}
+                  >
+                    {savingDraftId === draft.id ? '保存中...' : '保存'}
+                  </button>
+                  <button
+                    className="ghost-button danger"
+                    disabled={deletingDraftId === draft.id}
+                    onClick={() => handleDeleteDraft(draft.id)}
+                  >
+                    {deletingDraftId === draft.id ? '削除中...' : '削除'}
                   </button>
                 </div>
               </div>
