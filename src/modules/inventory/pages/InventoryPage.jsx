@@ -1088,7 +1088,7 @@ export default function InventoryPage({
         <ReverseInboundReceiptDialog
           receipt={reverseReceipt}
           receiptLines={reverseReceiptLines}
-          inboundShipmentLines={inboundShipmentLines}
+          inboundShipmentLines={selectedInboundShipment?.lines || []}
           products={products}
           reason={reverseReason}
           saving={reverseSaving}
