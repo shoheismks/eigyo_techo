@@ -78,6 +78,17 @@ export default function AppRouter({
   inventoryLots,
   inventoryMovements,
   inventoryReservations,
+  inboundShipments,
+  inboundShipmentLines,
+  supplierProductAliases,
+  saveInboundShipmentPreview,
+  addInboundShipment,
+  updateInboundShipment,
+  addInboundShipmentLine,
+  updateInboundShipmentLine,
+  addSupplierProductAlias,
+  inboundShipmentSyncState,
+  inboundShipmentSyncError,
   stocktakes,
   stocktakeLines,
   addInventory,
@@ -551,6 +562,14 @@ export default function AppRouter({
         projects={projects}
         quotes={quotes}
         invoices={invoices}
+        inboundShipments={inboundShipments}
+        inboundShipmentLines={inboundShipmentLines}
+        supplierProductAliases={supplierProductAliases}
+        saveInboundShipmentPreview={saveInboundShipmentPreview}
+        updateInboundShipmentLine={updateInboundShipmentLine}
+        addSupplierProductAlias={addSupplierProductAlias}
+        inboundShipmentSyncState={inboundShipmentSyncState}
+        inboundShipmentSyncError={inboundShipmentSyncError}
         addInventory={addInventory}
         updateInventory={updateInventory}
         removeInventory={removeInventory}
@@ -755,6 +774,9 @@ export default function AppRouter({
           inventoryLots,
           inventoryMovements,
           inventoryReservations,
+          inboundShipments,
+          inboundShipmentLines,
+          supplierProductAliases,
           stocktakes,
           stocktakeLines,
           contacts,
@@ -782,6 +804,9 @@ export default function AppRouter({
           customerProductPrices: { records: customerProductPrices, add: addCustomerProductPrice, update: updateCustomerProductPrice },
           customerProductPriceHistory: { records: customerProductPriceHistory, add: addCustomerProductPriceHistory, update: () => {} },
           inventories: { records: inventories, add: addInventory, update: updateInventory },
+          inboundShipments: { records: inboundShipments, add: addInboundShipment, update: updateInboundShipment },
+          inboundShipmentLines: { records: inboundShipmentLines, add: addInboundShipmentLine, update: updateInboundShipmentLine },
+          supplierProductAliases: { records: supplierProductAliases, add: addSupplierProductAlias, update: () => {} },
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },
           suppliers: { records: suppliers, add: addSupplier, update: updateSupplier },

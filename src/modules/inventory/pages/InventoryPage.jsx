@@ -17,6 +17,7 @@ import {
 
 const TABS = [
   { key: 'list', label: '在庫一覧' },
+  { key: 'arrival', label: '入荷予定' },
   { key: 'inbound', label: '入庫' },
   { key: 'outbound', label: '出庫' },
   { key: 'stocktake', label: '棚卸' },
@@ -144,6 +145,13 @@ export default function InventoryPage({
   projects = [],
   quotes = [],
   invoices = [],
+  inboundShipments = [],
+  supplierProductAliases = [],
+  saveInboundShipmentPreview,
+  updateInboundShipmentLine,
+  addSupplierProductAlias,
+  inboundShipmentSyncState = '',
+  inboundShipmentSyncError = '',
   addInventory,
   updateInventory,
   removeInventory,
@@ -160,6 +168,11 @@ export default function InventoryPage({
   const [form, setForm] = useState(() => emptyMovementForm(initialAction || {}, user));
   const [adjustmentInventoryId, setAdjustmentInventoryId] = useState('');
   const [adjustmentForm, setAdjustmentForm] = useState(() => emptyAdjustmentForm(null, user));
+  const [deliveryNoticePreview, setDeliveryNoticePreview] = useState(null);
+  const [deliveryNoticeParsing, setDeliveryNoticeParsing] = useState(false);
+  const [deliveryNoticeSaving, setDeliveryNoticeSaving] = useState(false);
+  const [deliveryNoticeError, setDeliveryNoticeError] = useState('');
+  const [selectedInboundShipmentId, setSelectedInboundShipmentId] = useState('');
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -185,6 +198,7 @@ export default function InventoryPage({
   const selectedProduct = products.find((product) => product.id === form.productId);
   const selectedInventory = inventories.find((inventory) => inventory.id === form.inventoryId);
   const adjustmentInventory = inventories.find((inventory) => inventory.id === adjustmentInventoryId);
+  const selectedInboundShipment = inboundShipments.find((shipment) => shipment.id === selectedInboundShipmentId) || inboundShipments[0];
   const historyRows = useMemo(
     () => buildHistory(inventories, products, suppliers),
     [inventories, products, suppliers],
@@ -448,6 +462,89 @@ export default function InventoryPage({
     setForm(emptyMovementForm({}, user));
   }
 
+  async function handleDeliveryNoticeUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (file.type && file.type !== 'application/pdf') {
+      setDeliveryNoticeError('PDFファイルを選択してください。');
+      setDeliveryNoticePreview(null);
+      return;
+    }
+
+    setDeliveryNoticeParsing(true);
+    setDeliveryNoticeError('');
+    setToast('');
+    setError('');
+
+    try {
+      const { parseDeliveryNoticePdfFile } = await import('../services/deliveryNoticePdfParser.js');
+      const preview = await parseDeliveryNoticePdfFile(file);
+      setDeliveryNoticePreview(preview);
+      setToast('デリバリー予定案内PDFを解析しました。在庫にはまだ反映していません。');
+    } catch (parseError) {
+      setDeliveryNoticePreview(null);
+      setDeliveryNoticeError(parseError.message || 'PDF解析に失敗しました。');
+    } finally {
+      setDeliveryNoticeParsing(false);
+    }
+  }
+
+  async function handleSaveDeliveryNoticePreview() {
+    if (!deliveryNoticePreview) return;
+    setDeliveryNoticeSaving(true);
+    setDeliveryNoticeError('');
+    setToast('');
+    setError('');
+
+    try {
+      const result = await saveInboundShipmentPreview?.(deliveryNoticePreview);
+      if (result?.status === 'duplicate') {
+        setSelectedInboundShipmentId(result.shipmentId);
+        setToast('このPDFはすでに取り込み済みです。既存の入荷予定を表示しました。');
+      } else {
+        setSelectedInboundShipmentId(result?.shipmentId || '');
+        setToast('入荷予定として保存しました。まだ在庫数量には反映していません。');
+      }
+    } catch (saveError) {
+      setDeliveryNoticeError(saveError.message || '入荷予定の保存に失敗しました。');
+    } finally {
+      setDeliveryNoticeSaving(false);
+    }
+  }
+
+  async function handleInboundLineChange(line, updates) {
+    try {
+      await updateInboundShipmentLine?.(line.id, updates);
+      setToast('入荷予定明細を保存しました。');
+    } catch (lineError) {
+      setError(lineError.message || '入荷予定明細の保存に失敗しました。');
+    }
+  }
+
+  async function handleSaveInboundAlias(line) {
+    const shipment = inboundShipments.find((item) => item.id === line.inboundShipmentId);
+    if (!line.matchedProductId) {
+      setError('商品を選択してから別名を保存してください。');
+      return;
+    }
+
+    try {
+      await addSupplierProductAlias?.({
+        supplierName: shipment?.supplierName || '',
+        productId: line.matchedProductId,
+        aliasName: line.productNameRaw,
+        brandName: line.brandNameRaw,
+        factoryNo: line.factoryNo,
+        originCountry: line.originCountry,
+      });
+      setToast('仕入先商品別名を保存しました。次回以降の自動照合候補に使われます。');
+    } catch (aliasError) {
+      setError(aliasError.message || '仕入先商品別名の保存に失敗しました。');
+    }
+  }
+
   const listColumns = [
     {
       key: 'image',
@@ -643,6 +740,26 @@ export default function InventoryPage({
         />
       )}
 
+      {activeTab === 'arrival' && (
+        <DeliveryNoticeImportPanel
+          onUpload={handleDeliveryNoticeUpload}
+          onSavePreview={handleSaveDeliveryNoticePreview}
+          saving={deliveryNoticeSaving}
+          parsing={deliveryNoticeParsing}
+          preview={deliveryNoticePreview}
+          error={deliveryNoticeError}
+          inboundShipments={inboundShipments}
+          selectedInboundShipment={selectedInboundShipment}
+          onSelectInboundShipment={setSelectedInboundShipmentId}
+          products={products}
+          aliases={supplierProductAliases}
+          onLineChange={handleInboundLineChange}
+          onSaveAlias={handleSaveInboundAlias}
+          syncState={inboundShipmentSyncState}
+          syncError={inboundShipmentSyncError}
+        />
+      )}
+
       {activeTab === 'outbound' && (
         <InventoryOutboundForm
           form={form}
@@ -719,6 +836,374 @@ function InventoryProductSelect({ value, products, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function inboundStatusLabel(status) {
+  const labels = {
+    draft: '下書き',
+    matching: '照合中',
+    confirmed: '確定前',
+    cancelled: '取消',
+    deleted: '削除',
+  };
+  return labels[status] || status || '-';
+}
+
+function matchStatusLabel(status) {
+  const labels = {
+    matched: '自動照合',
+    manual: '手動照合',
+    ambiguous: '要確認',
+    unmatched: '未照合',
+  };
+  return labels[status] || status || '-';
+}
+
+function matchBadgeClass(status) {
+  if (status === 'matched' || status === 'manual') return 'ready';
+  if (status === 'ambiguous') return 'warning';
+  return 'danger';
+}
+
+function DeliveryNoticeImportPanel({
+  onUpload,
+  onSavePreview,
+  onLineChange,
+  onSaveAlias,
+  onSelectInboundShipment,
+  parsing,
+  saving,
+  preview,
+  error,
+  inboundShipments = [],
+  selectedInboundShipment = null,
+  products = [],
+  syncState = '',
+  syncError = '',
+}) {
+  const shipmentColumns = [
+    { key: 'createdAt', label: '取込日', minWidth: '120px', render: (row) => String(row.createdAt || '').slice(0, 10) || '-' },
+    { key: 'supplierName', label: '仕入先', minWidth: '180px', render: (row) => row.supplierName || '-' },
+    { key: 'documentNumber', label: '帳票番号', minWidth: '120px', render: (row) => row.documentNumber || '-' },
+    { key: 'contractNo', label: '契約No', minWidth: '120px', render: (row) => [...new Set((row.lines || []).map((line) => line.contractNo).filter(Boolean))].join(' / ') || '-' },
+    { key: 'customs', label: '通関予定', minWidth: '120px', render: (row) => (row.lines || [])[0]?.customsClearancePlannedDate || '-' },
+    { key: 'lineCount', label: '明細数', width: '90px', render: (row) => row.lines?.length || 0 },
+    { key: 'unmatched', label: '未照合', width: '90px', render: (row) => (row.lines || []).filter((line) => line.matchStatus !== 'matched' && line.matchStatus !== 'manual' && line.status !== 'excluded').length },
+    { key: 'status', label: 'Status', width: '110px', render: (row) => <span className="info-badge muted">{inboundStatusLabel(row.status)}</span> },
+  ];
+
+  const detailColumns = [
+    { key: 'lineNumber', label: '行', width: '64px', render: (row) => row.lineNumber || '-' },
+    { key: 'contractNo', label: '契約No', minWidth: '110px', render: (row) => row.contractNo || '-' },
+    { key: 'brand', label: 'ブランド', minWidth: '120px', render: (row) => row.brand || '-' },
+    { key: 'productName', label: '商品名', minWidth: '240px', render: (row) => row.productName || '-' },
+    { key: 'pieces', label: '個数', width: '80px', render: (row) => formatPrice(row.pieceCount) || '-' },
+    { key: 'weight', label: '重量', width: '100px', render: (row) => row.weight !== '' ? `${formatPrice(row.weight)} ${row.unit || ''}` : '-' },
+    { key: 'unitPrice', label: '単価', width: '110px', render: (row) => row.unitPrice !== '' ? `${formatPrice(row.unitPrice)} ${row.currency || ''}` : '-' },
+    { key: 'origin', label: '原産国', minWidth: '120px', render: (row) => row.originCountry || '-' },
+    { key: 'factory', label: '工場No', width: '90px', render: (row) => row.factoryNo || '-' },
+    { key: 'customs', label: '通関予定', minWidth: '120px', render: (row) => row.customsClearancePlannedDate || '-' },
+    { key: 'packing', label: 'Packing', minWidth: '210px', render: (row) => row.packingFrom || row.packingTo ? `${row.packingFrom || '-'} ～ ${row.packingTo || '-'}` : '-' },
+    { key: 'expiry', label: '賞味期限', minWidth: '120px', render: (row) => row.expiryDate || '-' },
+    { key: 'warehouse', label: '倉庫', minWidth: '160px', render: (row) => row.warehouse || '-' },
+    { key: 'warnings', label: 'Warning', minWidth: '180px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
+  ];
+
+  const savedLineColumns = [
+    { key: 'lineNo', label: '行', width: '64px', render: (line) => line.lineNo || '-' },
+    { key: 'contractNo', label: '契約No', minWidth: '110px', render: (line) => line.contractNo || '-' },
+    { key: 'rawProduct', label: 'PDF商品名', minWidth: '240px', render: (line) => line.productNameRaw || '-' },
+    {
+      key: 'matchedProduct',
+      label: '商品照合',
+      minWidth: '260px',
+      render: (line) => (
+        <select
+          value={line.matchedProductId || ''}
+          onChange={(event) => onLineChange?.(line, { matchedProductId: event.target.value })}
+        >
+          <option value="">未照合</option>
+          {products.map((product) => (
+            <option value={product.id} key={product.id}>
+              {product.productCode ? `${product.productCode} / ` : ''}{productDisplayName(product, '商品名未設定')}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    { key: 'matchStatus', label: '照合状態', minWidth: '110px', render: (line) => <span className={`info-badge ${matchBadgeClass(line.matchStatus)}`}>{matchStatusLabel(line.matchStatus)}</span> },
+    { key: 'pieces', label: '個数', width: '80px', render: (line) => formatPrice(line.quantityPieces) || '-' },
+    {
+      key: 'weight',
+      label: '重量',
+      width: '130px',
+      render: (line) => (
+        <input
+          inputMode="decimal"
+          defaultValue={line.weight ?? ''}
+          onBlur={(event) => onLineChange?.(line, { weight: event.target.value })}
+        />
+      ),
+    },
+    {
+      key: 'unitPrice',
+      label: '単価',
+      width: '130px',
+      render: (line) => (
+        <input
+          inputMode="decimal"
+          defaultValue={line.unitPrice ?? ''}
+          onBlur={(event) => onLineChange?.(line, { unitPrice: event.target.value })}
+        />
+      ),
+    },
+    {
+      key: 'expiry',
+      label: '賞味期限',
+      minWidth: '140px',
+      render: (line) => <input type="date" defaultValue={line.expiryDate || ''} onBlur={(event) => onLineChange?.(line, { expiryDate: event.target.value })} />,
+    },
+    {
+      key: 'warehouse',
+      label: '倉庫',
+      minWidth: '180px',
+      render: (line) => <input defaultValue={line.warehouseName || ''} onBlur={(event) => onLineChange?.(line, { warehouseName: event.target.value })} />,
+    },
+    {
+      key: 'status',
+      label: '明細',
+      width: '100px',
+      render: (line) => (
+        <label className="inline-check">
+          <input
+            type="checkbox"
+            checked={line.status === 'excluded'}
+            onChange={(event) => onLineChange?.(line, { status: event.target.checked ? 'excluded' : 'draft' })}
+          />
+          除外
+        </label>
+      ),
+    },
+    { key: 'alias', label: '別名', width: '110px', render: (line) => <button type="button" className="ghost-button" onClick={() => onSaveAlias?.(line)}>保存</button> },
+    { key: 'warnings', label: 'Warning', minWidth: '180px', render: (line) => line.warnings?.length ? line.warnings.join(' / ') : 'なし' },
+  ];
+
+  return (
+    <section className="detail-section delivery-notice-import-panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Delivery notice PDF</p>
+          <h2>入荷予定PDF取込</h2>
+          <p className="inline-helper">Phase2は入荷予定DB登録と商品照合までです。在庫登録、入庫RPC実行は行いません。</p>
+        </div>
+        <label className="primary-button delivery-notice-upload-button">
+          PDFアップロード
+          <input type="file" accept="application/pdf,.pdf" onChange={onUpload} />
+        </label>
+      </div>
+
+      {parsing && <p className="notice-text">PDFを解析しています...</p>}
+      {saving && <p className="notice-text">入荷予定として保存しています...</p>}
+      {error && <p className="error-text">{error}</p>}
+      {syncError && <p className="error-text">{syncError}</p>}
+
+      {!preview && !parsing && inboundShipments.length === 0 && (
+        <div className="empty-state delivery-notice-empty">
+          <h3>デリバリー予定案内PDFを選択してください</h3>
+          <p>日鉄物産の帳票を解析し、契約No、ブランド、商品名、重量、単価、通関予定日などを確認できます。</p>
+        </div>
+      )}
+
+      {preview && (
+        <div className="delivery-notice-preview">
+          <div className="delivery-notice-summary">
+            <div className="summary-card"><span>発行日</span><strong>{preview.issueDate || '-'}</strong></div>
+            <div className="summary-card"><span>帳票番号</span><strong>{preview.documentNumber || '-'}</strong></div>
+            <div className="summary-card"><span>仕入先</span><strong>{preview.supplier || '-'}</strong></div>
+            <div className="summary-card"><span>明細数</span><strong>{preview.lines.length}</strong></div>
+          </div>
+
+          <dl className="company-details delivery-notice-file-details">
+            <div><dt>ファイル名</dt><dd>{preview.fileName || '-'}</dd></div>
+            <div><dt>file_hash</dt><dd>{preview.fileHash || '-'}</dd></div>
+            <div><dt>ページ数</dt><dd>{preview.pageCount || 0}</dd></div>
+          </dl>
+
+          {preview.warnings.length > 0 && (
+            <div className="delivery-notice-warning-box">
+              <h3>PDF全体のWarning</h3>
+              <ul>
+                {preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <div className="section-heading">
+            <h3>解析明細</h3>
+            <span className="info-badge muted">未取得項目はWarningで確認</span>
+          </div>
+
+          <div className="delivery-notice-actions">
+            <button type="button" className="primary-button" disabled={saving || parsing} onClick={onSavePreview}>
+              入荷予定として保存
+            </button>
+            <span className="inline-helper">保存しても在庫数量には加算されません。</span>
+          </div>
+
+          <DesktopTable
+            className="inventory-common-table delivery-notice-detail-table"
+            columns={detailColumns}
+            rows={preview.lines}
+            getRowKey={(row) => row.id}
+            minWidth={1780}
+          />
+
+          <div className="card-list-mobile delivery-notice-card-list">
+            {preview.lines.map((line) => (
+              <article className="product-card delivery-notice-card" key={line.id}>
+                <div className="company-heading">
+                  <p>{line.contractNo || '契約No未取得'} / {line.brand || 'ブランド未取得'}</p>
+                  <h3>{line.productName || '商品名未取得'}</h3>
+                </div>
+                <dl className="company-details">
+                  <div><dt>行番号</dt><dd>{line.lineNumber || '-'}</dd></div>
+                  <div><dt>個数</dt><dd>{formatPrice(line.pieceCount) || '-'}</dd></div>
+                  <div><dt>重量</dt><dd>{line.weight !== '' ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
+                  <div><dt>単価</dt><dd>{line.unitPrice !== '' ? `${formatPrice(line.unitPrice)} ${line.currency || ''}` : '-'}</dd></div>
+                  <div><dt>原産国</dt><dd>{line.originCountry || '-'}</dd></div>
+                  <div><dt>工場No</dt><dd>{line.factoryNo || '-'}</dd></div>
+                  <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>
+                  <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
+                  <div><dt>賞味期限</dt><dd>{line.expiryDate || '-'}</dd></div>
+                  <div><dt>倉庫</dt><dd>{line.warehouse || '-'}</dd></div>
+                </dl>
+                {line.warnings.length > 0 && (
+                  <div className="delivery-notice-line-warnings">
+                    {line.warnings.map((warning) => <span className="info-badge muted" key={warning}>{warning}</span>)}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {inboundShipments.length > 0 && (
+        <div className="delivery-notice-saved">
+          <div className="section-heading">
+            <div>
+              <h3>保存済み入荷予定</h3>
+              <p className="inline-helper">PDF単位で保存した入荷予定です。入荷確定までは在庫数量に影響しません。</p>
+            </div>
+            <span className="info-badge muted">{syncState || 'supabase'}</span>
+          </div>
+
+          <DesktopTable
+            className="inventory-common-table delivery-notice-shipment-table"
+            columns={shipmentColumns}
+            rows={inboundShipments}
+            getRowKey={(row) => row.id}
+            minWidth={1040}
+            actions={(shipment) => (
+              <button type="button" className="ghost-button" onClick={() => onSelectInboundShipment?.(shipment.id)}>
+                詳細
+              </button>
+            )}
+          />
+
+          <div className="card-list-mobile delivery-notice-card-list">
+            {inboundShipments.map((shipment) => (
+              <button
+                type="button"
+                className={`product-card delivery-notice-card delivery-notice-card-button ${selectedInboundShipment?.id === shipment.id ? 'active' : ''}`}
+                key={shipment.id}
+                onClick={() => onSelectInboundShipment?.(shipment.id)}
+              >
+                <div className="company-heading">
+                  <p>{String(shipment.createdAt || '').slice(0, 10)} / {inboundStatusLabel(shipment.status)}</p>
+                  <h3>{shipment.supplierName || '仕入先未取得'}</h3>
+                </div>
+                <dl className="company-details">
+                  <div><dt>帳票番号</dt><dd>{shipment.documentNumber || '-'}</dd></div>
+                  <div><dt>契約No</dt><dd>{[...new Set((shipment.lines || []).map((line) => line.contractNo).filter(Boolean))].join(' / ') || '-'}</dd></div>
+                  <div><dt>通関予定</dt><dd>{shipment.lines?.[0]?.customsClearancePlannedDate || '-'}</dd></div>
+                  <div><dt>明細数</dt><dd>{shipment.lines?.length || 0}</dd></div>
+                  <div><dt>未照合</dt><dd>{(shipment.lines || []).filter((line) => line.matchStatus !== 'matched' && line.matchStatus !== 'manual' && line.status !== 'excluded').length}</dd></div>
+                </dl>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedInboundShipment && (
+        <div className="delivery-notice-detail-editor">
+          <div className="section-heading">
+            <div>
+              <h3>入荷予定詳細・商品照合</h3>
+              <p className="inline-helper">{selectedInboundShipment.sourceFileName || '-'} / {selectedInboundShipment.fileHash || '-'}</p>
+            </div>
+            <span className="info-badge muted">在庫化前</span>
+          </div>
+
+          <DesktopTable
+            className="inventory-common-table delivery-notice-line-editor-table"
+            columns={savedLineColumns}
+            rows={selectedInboundShipment.lines || []}
+            getRowKey={(row) => row.id}
+            minWidth={1840}
+          />
+
+          <div className="card-list-mobile delivery-notice-card-list">
+            {(selectedInboundShipment.lines || []).map((line) => (
+              <article className="product-card delivery-notice-card" key={line.id}>
+                <div className="company-heading">
+                  <p>{line.contractNo || '契約No未取得'} / {line.brandNameRaw || 'ブランド未取得'}</p>
+                  <h3>{line.productNameRaw || '商品名未取得'}</h3>
+                  <span className={`info-badge ${matchBadgeClass(line.matchStatus)}`}>{matchStatusLabel(line.matchStatus)}</span>
+                </div>
+                <label className="field-label">
+                  商品照合
+                  <select value={line.matchedProductId || ''} onChange={(event) => onLineChange?.(line, { matchedProductId: event.target.value })}>
+                    <option value="">未照合</option>
+                    {products.map((product) => (
+                      <option value={product.id} key={product.id}>
+                        {product.productCode ? `${product.productCode} / ` : ''}{productDisplayName(product, '商品名未設定')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <dl className="company-details">
+                  <div><dt>個数</dt><dd>{formatPrice(line.quantityPieces) || '-'}</dd></div>
+                  <div><dt>重量</dt><dd>{line.weight !== null ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
+                  <div><dt>単価</dt><dd>{line.unitPrice !== null ? `${formatPrice(line.unitPrice)} ${line.currency || ''}` : '-'}</dd></div>
+                  <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>
+                  <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
+                </dl>
+                <div className="inventory-form-grid compact-grid">
+                  <label className="field-label">重量<input inputMode="decimal" defaultValue={line.weight ?? ''} onBlur={(event) => onLineChange?.(line, { weight: event.target.value })} /></label>
+                  <label className="field-label">単価<input inputMode="decimal" defaultValue={line.unitPrice ?? ''} onBlur={(event) => onLineChange?.(line, { unitPrice: event.target.value })} /></label>
+                  <label className="field-label">賞味期限<input type="date" defaultValue={line.expiryDate || ''} onBlur={(event) => onLineChange?.(line, { expiryDate: event.target.value })} /></label>
+                  <label className="field-label">倉庫<input defaultValue={line.warehouseName || ''} onBlur={(event) => onLineChange?.(line, { warehouseName: event.target.value })} /></label>
+                </div>
+                <div className="card-actions">
+                  <button type="button" className="ghost-button" onClick={() => onLineChange?.(line, { status: line.status === 'excluded' ? 'draft' : 'excluded' })}>
+                    {line.status === 'excluded' ? '除外を戻す' : '明細除外'}
+                  </button>
+                  <button type="button" className="ghost-button" onClick={() => onSaveAlias?.(line)}>別名保存</button>
+                </div>
+                {line.warnings?.length > 0 && (
+                  <div className="delivery-notice-line-warnings">
+                    {line.warnings.map((warning) => <span className="info-badge muted" key={warning}>{warning}</span>)}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

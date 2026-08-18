@@ -157,6 +157,18 @@
   color: #ffbec7;
 }
 
+.info-badge.warning {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbd38d;
+}
+
+.info-badge.danger {
+  border-color: rgba(255, 107, 123, 0.34);
+  background: rgba(255, 107, 123, 0.12);
+  color: #ffbec7;
+}
+
 .company-details {
   display: grid;
   gap: 10px;
@@ -2875,6 +2887,140 @@
   text-align: left;
 }
 
+.delivery-notice-import-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.delivery-notice-upload-button {
+  cursor: pointer;
+  display: inline-flex;
+  position: relative;
+}
+
+.delivery-notice-upload-button input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.delivery-notice-empty {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px dashed rgba(96, 165, 250, 0.45);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.delivery-notice-preview {
+  display: grid;
+  gap: 16px;
+}
+
+.delivery-notice-saved,
+.delivery-notice-detail-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.delivery-notice-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.delivery-notice-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.delivery-notice-file-details {
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.delivery-notice-file-details dd {
+  overflow-wrap: anywhere;
+}
+
+.delivery-notice-warning-box {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.42);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 14px;
+}
+
+.delivery-notice-warning-box h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.delivery-notice-warning-box ul {
+  color: var(--muted);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.delivery-notice-detail-table {
+  font-size: 12px;
+}
+
+.delivery-notice-shipment-table,
+.delivery-notice-line-editor-table {
+  font-size: 12px;
+}
+
+.delivery-notice-line-editor-table input,
+.delivery-notice-line-editor-table select {
+  min-width: 0;
+  width: 100%;
+}
+
+.delivery-notice-card-list {
+  display: none;
+}
+
+.delivery-notice-card {
+  gap: 12px;
+}
+
+.delivery-notice-card-button {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.delivery-notice-card-button.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.32);
+}
+
+.delivery-notice-line-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inline-check {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.compact-grid {
+  gap: 10px;
+}
+
 @media (min-width: 768px) {
   .invoice-editor-grid {
     grid-template-columns: minmax(0, 1.6fr) minmax(320px, .8fr);
@@ -2883,6 +3029,36 @@
 
   .inventory-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .delivery-notice-import-panel > .section-heading {
+    align-items: stretch;
+    display: grid;
+    gap: 12px;
+  }
+
+  .delivery-notice-upload-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .delivery-notice-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .delivery-notice-actions {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .delivery-notice-file-details {
+    grid-template-columns: 1fr;
+  }
+
+  .delivery-notice-card-list {
+    display: grid;
   }
 }
 

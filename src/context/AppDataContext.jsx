@@ -8,6 +8,7 @@ import { useCustomers } from '../modules/customers/hooks/useCustomers.js';
 import { useProjects } from '../modules/deals/hooks/useProjects.js';
 import { useEvents } from '../modules/calendar/hooks/useEvents.js';
 import { useTasks } from '../modules/calendar/hooks/useTasks.js';
+import { useInboundShipments } from '../modules/inventory/hooks/useInboundShipments.js';
 import { useInventory } from '../modules/inventory/hooks/useInventory.js';
 import { useInvoices } from '../modules/invoices/hooks/useInvoices.js';
 import { useBrands } from '../modules/products/hooks/useBrands.js';
@@ -35,6 +36,7 @@ export function AppDataProvider({ userId, children }) {
   const brandsState = useBrands(userId);
   const pricesState = useCustomerProductPrices(userId);
   const inventoryState = useInventory(userId);
+  const inboundShipmentsState = useInboundShipments(userId, productsState.products);
   const adoptionsState = useAdoptions(userId);
   const samplesState = useSamples(userId);
   const quotesState = useQuotes(userId);
@@ -113,6 +115,19 @@ export function AppDataProvider({ userId, children }) {
     inventorySyncState: inventoryState.syncState,
     inventorySyncError: inventoryState.syncError,
     inventoryLegacyLocalDataWarning: inventoryState.legacyLocalDataWarning,
+
+    inboundShipments: toArray(inboundShipmentsState.records),
+    inboundShipmentLines: toArray(inboundShipmentsState.lines),
+    supplierProductAliases: toArray(inboundShipmentsState.aliases),
+    saveInboundShipmentPreview: inboundShipmentsState.saveParsedShipment,
+    addInboundShipment: inboundShipmentsState.addInboundShipment,
+    updateInboundShipment: inboundShipmentsState.updateInboundShipment,
+    addInboundShipmentLine: inboundShipmentsState.addInboundLine,
+    updateInboundShipmentLine: inboundShipmentsState.updateInboundLine,
+    addSupplierProductAlias: inboundShipmentsState.addSupplierProductAlias,
+    reloadInboundShipments: inboundShipmentsState.reload,
+    inboundShipmentSyncState: inboundShipmentsState.syncState,
+    inboundShipmentSyncError: inboundShipmentsState.syncError,
 
     adoptions: toArray(adoptionsState.records),
     addAdoption: adoptionsState.addRecord,
