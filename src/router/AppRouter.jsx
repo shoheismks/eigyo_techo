@@ -80,13 +80,18 @@ export default function AppRouter({
   inventoryReservations,
   inboundShipments,
   inboundShipmentLines,
+  inboundReceipts,
+  inboundReceiptLines,
   supplierProductAliases,
   saveInboundShipmentPreview,
   addInboundShipment,
   updateInboundShipment,
   addInboundShipmentLine,
   updateInboundShipmentLine,
+  addInboundReceipt,
+  addInboundReceiptLine,
   addSupplierProductAlias,
+  confirmInboundReceipt,
   inboundShipmentSyncState,
   inboundShipmentSyncError,
   stocktakes,
@@ -564,12 +569,16 @@ export default function AppRouter({
         invoices={invoices}
         inboundShipments={inboundShipments}
         inboundShipmentLines={inboundShipmentLines}
+        inboundReceipts={inboundReceipts}
+        inboundReceiptLines={inboundReceiptLines}
         supplierProductAliases={supplierProductAliases}
         saveInboundShipmentPreview={saveInboundShipmentPreview}
         updateInboundShipmentLine={updateInboundShipmentLine}
         addSupplierProductAlias={addSupplierProductAlias}
+        confirmInboundReceipt={confirmInboundReceipt}
         inboundShipmentSyncState={inboundShipmentSyncState}
         inboundShipmentSyncError={inboundShipmentSyncError}
+        reloadInventory={reloadInventory}
         addInventory={addInventory}
         updateInventory={updateInventory}
         removeInventory={removeInventory}
@@ -776,6 +785,8 @@ export default function AppRouter({
           inventoryReservations,
           inboundShipments,
           inboundShipmentLines,
+          inboundReceipts,
+          inboundReceiptLines,
           supplierProductAliases,
           stocktakes,
           stocktakeLines,
@@ -806,6 +817,8 @@ export default function AppRouter({
           inventories: { records: inventories, add: addInventory, update: updateInventory },
           inboundShipments: { records: inboundShipments, add: addInboundShipment, update: updateInboundShipment },
           inboundShipmentLines: { records: inboundShipmentLines, add: addInboundShipmentLine, update: updateInboundShipmentLine },
+          inboundReceipts: { records: inboundReceipts, add: addInboundReceipt, update: () => {} },
+          inboundReceiptLines: { records: inboundReceiptLines, add: addInboundReceiptLine, update: () => {} },
           supplierProductAliases: { records: supplierProductAliases, add: addSupplierProductAlias, update: () => {} },
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../../../lib/supabase.js';
 import { canUseCloud, fetchRecords, upsertRecords } from '../../../shared/services/recordSyncService.js';
 import { normalizeProductCode } from '../../products/hooks/useProducts.js';
 
 const SHIPMENTS_TABLE = 'inbound_shipments';
 const LINES_TABLE = 'inbound_shipment_lines';
 const ALIASES_TABLE = 'supplier_product_aliases';
+const RECEIPTS_TABLE = 'inbound_receipts';
+const RECEIPT_LINES_TABLE = 'inbound_receipt_lines';
 const PARSER_VERSION = 'nippon-steel-delivery-notice-v1';
 
 function nowIso() {
@@ -94,6 +97,11 @@ export function normalizeInboundShipment(shipment = {}, userId = '') {
 }
 
 export function normalizeInboundShipmentLine(line = {}, userId = '') {
+  const plannedWeight = numericOrNull(line.plannedWeight ?? line.planned_weight ?? line.weight);
+  const plannedPieces = numericOrNull(line.plannedPieces ?? line.planned_pieces ?? line.quantityPieces ?? line.quantity_pieces ?? line.pieceCount);
+  const receivedWeightTotal = numericOrNull(line.receivedWeightTotal ?? line.received_weight_total) ?? 0;
+  const receivedPiecesTotal = numericOrNull(line.receivedPiecesTotal ?? line.received_pieces_total) ?? 0;
+
   return {
     id: line.id ?? crypto.randomUUID(),
     userId: line.userId ?? line.user_id ?? userId,
@@ -107,6 +115,12 @@ export function normalizeInboundShipmentLine(line = {}, userId = '') {
     matchScore: numericOrNull(line.matchScore ?? line.match_score),
     quantityPieces: numericOrNull(line.quantityPieces ?? line.quantity_pieces ?? line.pieceCount),
     weight: numericOrNull(line.weight),
+    plannedWeight,
+    receivedWeightTotal,
+    remainingWeight: numericOrNull(line.remainingWeight ?? line.remaining_weight) ?? Math.max((plannedWeight ?? 0) - receivedWeightTotal, 0),
+    plannedPieces,
+    receivedPiecesTotal,
+    remainingPieces: numericOrNull(line.remainingPieces ?? line.remaining_pieces) ?? Math.max((plannedPieces ?? 0) - receivedPiecesTotal, 0),
     unit: line.unit ?? '',
     unitPrice: numericOrNull(line.unitPrice ?? line.unit_price),
     currency: line.currency ?? 'JPY',
@@ -178,6 +192,12 @@ export function inboundShipmentLineToRow(line) {
     match_score: line.matchScore,
     quantity_pieces: line.quantityPieces,
     weight: line.weight,
+    planned_weight: line.plannedWeight,
+    received_weight_total: line.receivedWeightTotal ?? 0,
+    remaining_weight: line.remainingWeight ?? Math.max((line.plannedWeight ?? line.weight ?? 0) - (line.receivedWeightTotal ?? 0), 0),
+    planned_pieces: line.plannedPieces,
+    received_pieces_total: line.receivedPiecesTotal ?? 0,
+    remaining_pieces: line.remainingPieces ?? Math.max((line.plannedPieces ?? line.quantityPieces ?? 0) - (line.receivedPiecesTotal ?? 0), 0),
     unit: line.unit,
     unit_price: line.unitPrice,
     currency: line.currency,
@@ -211,6 +231,12 @@ export function inboundShipmentLineFromRow(row) {
     matchScore: row.match_score,
     quantityPieces: row.quantity_pieces,
     weight: row.weight,
+    plannedWeight: row.planned_weight,
+    receivedWeightTotal: row.received_weight_total,
+    remainingWeight: row.remaining_weight,
+    plannedPieces: row.planned_pieces,
+    receivedPiecesTotal: row.received_pieces_total,
+    remainingPieces: row.remaining_pieces,
     unit: row.unit,
     unitPrice: row.unit_price,
     currency: row.currency,
@@ -262,6 +288,68 @@ export function supplierProductAliasFromRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
+}
+
+export function normalizeInboundReceipt(receipt = {}, userId = '') {
+  return {
+    id: receipt.id ?? crypto.randomUUID(),
+    userId: receipt.userId ?? receipt.user_id ?? userId,
+    inboundShipmentId: receipt.inboundShipmentId ?? receipt.inbound_shipment_id ?? '',
+    receiptNo: receipt.receiptNo ?? receipt.receipt_no ?? '',
+    receivedAt: receipt.receivedAt ?? receipt.received_at ?? nowIso(),
+    warehouseName: receipt.warehouseName ?? receipt.warehouse_name ?? '',
+    memo: receipt.memo ?? '',
+    createdAt: receipt.createdAt ?? receipt.created_at ?? nowIso(),
+    updatedAt: receipt.updatedAt ?? receipt.updated_at ?? nowIso(),
+  };
+}
+
+export function normalizeInboundReceiptLine(line = {}, userId = '') {
+  return {
+    id: line.id ?? crypto.randomUUID(),
+    userId: line.userId ?? line.user_id ?? userId,
+    inboundReceiptId: line.inboundReceiptId ?? line.inbound_receipt_id ?? '',
+    inboundShipmentLineId: line.inboundShipmentLineId ?? line.inbound_shipment_line_id ?? '',
+    productId: line.productId ?? line.product_id ?? '',
+    receivedPieces: numericOrNull(line.receivedPieces ?? line.received_pieces),
+    receivedWeight: numericOrNull(line.receivedWeight ?? line.received_weight),
+    purchaseUnitCost: numericOrNull(line.purchaseUnitCost ?? line.purchase_unit_cost),
+    expiryDate: line.expiryDate ?? line.expiry_date ?? '',
+    warehouseName: line.warehouseName ?? line.warehouse_name ?? '',
+    inventoryLotId: line.inventoryLotId ?? line.inventory_lot_id ?? '',
+    createdAt: line.createdAt ?? line.created_at ?? nowIso(),
+  };
+}
+
+export function inboundReceiptToRow(receipt) {
+  return {
+    id: receipt.id,
+    user_id: receipt.userId,
+    inbound_shipment_id: receipt.inboundShipmentId,
+    receipt_no: receipt.receiptNo,
+    received_at: receipt.receivedAt,
+    warehouse_name: receipt.warehouseName,
+    memo: receipt.memo,
+    created_at: receipt.createdAt,
+    updated_at: receipt.updatedAt,
+  };
+}
+
+export function inboundReceiptLineToRow(line) {
+  return {
+    id: line.id,
+    user_id: line.userId,
+    inbound_receipt_id: line.inboundReceiptId,
+    inbound_shipment_line_id: line.inboundShipmentLineId,
+    product_id: line.productId,
+    received_pieces: line.receivedPieces,
+    received_weight: line.receivedWeight,
+    purchase_unit_cost: line.purchaseUnitCost,
+    expiry_date: toDateValue(line.expiryDate) || null,
+    warehouse_name: line.warehouseName,
+    inventory_lot_id: line.inventoryLotId,
+    created_at: line.createdAt,
+  };
 }
 
 export function matchInboundLineToProduct(line, products = [], aliases = [], supplierName = '') {
@@ -326,6 +414,8 @@ export function useInboundShipments(userId = '', products = []) {
   const [shipments, setShipments] = useState([]);
   const [lines, setLines] = useState([]);
   const [aliases, setAliases] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [receiptLines, setReceiptLines] = useState([]);
   const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
   const [syncError, setSyncError] = useState('');
   const writeSequenceRef = useRef(0);
@@ -335,6 +425,8 @@ export function useInboundShipments(userId = '', products = []) {
       setShipments([]);
       setLines([]);
       setAliases([]);
+      setReceipts([]);
+      setReceiptLines([]);
       setSyncState('error');
       setSyncError('Supabaseに接続できないため、入荷予定を取得できません。');
       return;
@@ -343,21 +435,27 @@ export function useInboundShipments(userId = '', products = []) {
     try {
       setSyncState('syncing');
       setSyncError('');
-      const [nextShipments, nextLines, nextAliases] = await Promise.all([
+      const [nextShipments, nextLines, nextAliases, nextReceipts, nextReceiptLines] = await Promise.all([
         fetchRecords(SHIPMENTS_TABLE, userId, inboundShipmentFromRow),
         fetchRecords(LINES_TABLE, userId, inboundShipmentLineFromRow),
         fetchRecords(ALIASES_TABLE, userId, supplierProductAliasFromRow),
+        fetchRecords(RECEIPTS_TABLE, userId, normalizeInboundReceipt),
+        fetchRecords(RECEIPT_LINES_TABLE, userId, normalizeInboundReceiptLine),
       ]);
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
       setShipments(nextShipments.filter((shipment) => shipment.status !== 'deleted'));
       setLines(nextLines.filter((line) => line.status !== 'deleted'));
       setAliases(nextAliases.filter((alias) => alias.isActive !== false));
+      setReceipts(nextReceipts);
+      setReceiptLines(nextReceiptLines);
       setSyncState('supabase');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
       setShipments([]);
       setLines([]);
       setAliases([]);
+      setReceipts([]);
+      setReceiptLines([]);
       setSyncState('error');
       setSyncError(error.message || '入荷予定の取得に失敗しました。');
     }
@@ -439,7 +537,13 @@ export function useInboundShipments(userId = '', products = []) {
         expiryDate: parsedLine.expiryDate,
         warehouseName: parsedLine.warehouse,
         duplicateKey: buildInboundDuplicateKey({ shipment, line: parsedLine }),
-        status: 'draft',
+        plannedWeight: parsedLine.weight,
+        plannedPieces: parsedLine.pieceCount,
+        receivedWeightTotal: 0,
+        receivedPiecesTotal: 0,
+        remainingWeight: numericOrNull(parsedLine.weight) ?? 0,
+        remainingPieces: numericOrNull(parsedLine.pieceCount) ?? 0,
+        status: 'pending',
         rawRow: parsedLine,
         warnings,
         createdAt: now,
@@ -597,16 +701,116 @@ export function useInboundShipments(userId = '', products = []) {
     }
   }
 
+  async function addInboundReceipt(record) {
+    const normalized = normalizeInboundReceipt({
+      ...record,
+      id: record.id ?? crypto.randomUUID(),
+      userId,
+      createdAt: record.createdAt ?? nowIso(),
+      updatedAt: record.updatedAt ?? nowIso(),
+    }, userId);
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+    try {
+      await upsertRecords(RECEIPTS_TABLE, [normalized], inboundReceiptToRow);
+      await reload(writeSequence);
+      return normalized.id;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || '入荷確定履歴の復元に失敗しました。');
+      }
+      throw error;
+    }
+  }
+
+  async function addInboundReceiptLine(record) {
+    const normalized = normalizeInboundReceiptLine({
+      ...record,
+      id: record.id ?? crypto.randomUUID(),
+      userId,
+      createdAt: record.createdAt ?? nowIso(),
+    }, userId);
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+    try {
+      await upsertRecords(RECEIPT_LINES_TABLE, [normalized], inboundReceiptLineToRow);
+      await reload(writeSequence);
+      return normalized.id;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || '入荷確定明細の復元に失敗しました。');
+      }
+      throw error;
+    }
+  }
+
+  async function confirmInboundReceipt({ inboundShipmentId, receivedAt, warehouseName, memo, lines: receiptLinesInput = [] } = {}) {
+    if (!canUseCloud()) {
+      const message = 'Supabaseに接続できないため、入荷確定できません。';
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
+    }
+
+    const payloadLines = receiptLinesInput
+      .filter((line) => line && line.enabled !== false)
+      .map((line) => ({
+        inbound_shipment_line_id: line.inboundShipmentLineId,
+        received_pieces: numericOrNull(line.receivedPieces),
+        received_weight: numericOrNull(line.receivedWeight),
+        purchase_unit_cost: numericOrNull(line.purchaseUnitCost),
+        expiry_date: toDateValue(line.expiryDate) || null,
+        warehouse_name: line.warehouseName || '',
+      }));
+
+    if (payloadLines.length === 0) {
+      throw new Error('入荷対象の明細を選択してください。');
+    }
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+    try {
+      const { data, error } = await supabase.rpc('confirm_inbound_receipt', {
+        p_inbound_shipment_id: inboundShipmentId,
+        p_received_at: receivedAt || new Date().toISOString(),
+        p_warehouse_name: warehouseName || null,
+        p_memo: memo || null,
+        p_lines: payloadLines,
+      });
+      if (error) throw error;
+      await reload(writeSequence);
+      return data;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || '入荷確定に失敗しました。');
+      }
+      throw error;
+    }
+  }
+
   return {
     records: shipmentsWithLines,
     lines,
     aliases,
+    receipts,
+    receiptLines,
     saveParsedShipment,
     addInboundShipment,
     updateInboundShipment,
     addInboundLine,
     updateInboundLine,
     addSupplierProductAlias,
+    addInboundReceipt,
+    addInboundReceiptLine,
+    confirmInboundReceipt,
     reload,
     syncState,
     syncError,

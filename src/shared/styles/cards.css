@@ -3008,6 +3008,97 @@
   gap: 6px;
 }
 
+.delivery-notice-receipts {
+  background: rgba(6, 13, 26, 0.42);
+  border: 1px solid rgba(102, 163, 255, 0.24);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.delivery-receipt-list {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-receipt-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.delivery-receipt-card strong {
+  color: var(--white);
+  font-size: 0.92rem;
+}
+
+.delivery-receipt-card p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 4px 0 0;
+}
+
+.inbound-receipt-dialog {
+  max-height: min(88vh, 900px);
+  overflow: auto;
+  width: min(1180px, calc(100vw - 32px));
+}
+
+.inbound-receipt-dialog-header {
+  backdrop-filter: blur(12px);
+  background: rgba(12, 22, 39, 0.96);
+  border-bottom: 1px solid var(--line);
+  margin: -4px -4px 12px;
+  padding: 4px 4px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.inbound-receipt-summary,
+.inbound-receipt-meta {
+  margin-bottom: 14px;
+}
+
+.inbound-receipt-table input {
+  min-width: 96px;
+}
+
+.receipt-difference {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.inbound-receipt-card-list {
+  display: none;
+  gap: 12px;
+}
+
+.inbound-receipt-card {
+  border-left: 4px solid var(--success);
+}
+
+.inbound-receipt-dialog-actions {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  background: rgba(12, 22, 39, 0.96);
+  border-top: 1px solid var(--line);
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin: 14px -4px -4px;
+  padding: 12px 4px 4px;
+  position: sticky;
+  z-index: 2;
+}
+
 .inline-check {
   align-items: center;
   color: var(--muted);
@@ -3059,6 +3150,34 @@
 
   .delivery-notice-card-list {
     display: grid;
+  }
+
+  .inbound-receipt-dialog {
+    max-height: calc(100dvh - 28px);
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    width: min(calc(100vw - 20px), 720px);
+  }
+
+  .inbound-receipt-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inbound-receipt-table {
+    display: none;
+  }
+
+  .inbound-receipt-card-list {
+    display: grid;
+  }
+
+  .inbound-receipt-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .inbound-receipt-dialog-actions .inline-helper {
+    grid-column: 1 / -1;
   }
 }
 

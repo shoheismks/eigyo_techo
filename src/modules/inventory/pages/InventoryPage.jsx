@@ -43,6 +43,64 @@ function parseNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function emptyToNumber(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(String(value).replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function numberInputValue(value) {
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function formatQuantity(value, unit = '') {
+  const numberValue = emptyToNumber(value);
+  if (numberValue === null) return '-';
+  return `${formatPrice(numberValue)}${unit ? ` ${unit}` : ''}`;
+}
+
+function lineRemainingWeight(line) {
+  if (line?.remainingWeight !== null && line?.remainingWeight !== undefined) return Number(line.remainingWeight) || 0;
+  return Math.max(parseNumber(line?.plannedWeight ?? line?.weight) - parseNumber(line?.receivedWeightTotal), 0);
+}
+
+function lineRemainingPieces(line) {
+  if (line?.remainingPieces !== null && line?.remainingPieces !== undefined) return Number(line.remainingPieces) || 0;
+  return Math.max(parseNumber(line?.plannedPieces ?? line?.quantityPieces) - parseNumber(line?.receivedPiecesTotal), 0);
+}
+
+function canReceiveInboundLine(line) {
+  return Boolean(
+    line &&
+    line.matchedProductId &&
+    ['matched', 'manual'].includes(line.matchStatus) &&
+    !['excluded', 'skipped', 'cancelled', 'deleted', 'received'].includes(line.status),
+  );
+}
+
+function defaultReceiptLine(line) {
+  const remainingWeight = lineRemainingWeight(line);
+  const remainingPieces = lineRemainingPieces(line);
+  return {
+    inboundShipmentLineId: line.id,
+    enabled: canReceiveInboundLine(line) && (remainingWeight > 0 || remainingPieces > 0),
+    receivedPieces: remainingPieces > 0 ? String(remainingPieces) : '',
+    receivedWeight: remainingWeight > 0 ? String(remainingWeight) : '',
+    purchaseUnitCost: numberInputValue(line.unitPrice),
+    expiryDate: line.expiryDate || '',
+    warehouseName: line.warehouseName || '',
+  };
+}
+
+function buildReceiptForm(shipment) {
+  return {
+    receivedAt: new Date().toISOString().slice(0, 16),
+    warehouseName: shipment?.lines?.find((line) => line.warehouseName)?.warehouseName || '',
+    memo: '',
+    lines: (shipment?.lines || []).map(defaultReceiptLine),
+  };
+}
+
 function textIncludes(value, keyword) {
   return String(value ?? '').toLowerCase().includes(keyword);
 }
@@ -146,12 +204,16 @@ export default function InventoryPage({
   quotes = [],
   invoices = [],
   inboundShipments = [],
+  inboundReceipts = [],
+  inboundReceiptLines = [],
   supplierProductAliases = [],
   saveInboundShipmentPreview,
   updateInboundShipmentLine,
   addSupplierProductAlias,
+  confirmInboundReceipt,
   inboundShipmentSyncState = '',
   inboundShipmentSyncError = '',
+  reloadInventory,
   addInventory,
   updateInventory,
   removeInventory,
@@ -173,6 +235,9 @@ export default function InventoryPage({
   const [deliveryNoticeSaving, setDeliveryNoticeSaving] = useState(false);
   const [deliveryNoticeError, setDeliveryNoticeError] = useState('');
   const [selectedInboundShipmentId, setSelectedInboundShipmentId] = useState('');
+  const [receiptShipmentId, setReceiptShipmentId] = useState('');
+  const [receiptForm, setReceiptForm] = useState(() => buildReceiptForm(null));
+  const [receiptSaving, setReceiptSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -199,6 +264,7 @@ export default function InventoryPage({
   const selectedInventory = inventories.find((inventory) => inventory.id === form.inventoryId);
   const adjustmentInventory = inventories.find((inventory) => inventory.id === adjustmentInventoryId);
   const selectedInboundShipment = inboundShipments.find((shipment) => shipment.id === selectedInboundShipmentId) || inboundShipments[0];
+  const receiptShipment = inboundShipments.find((shipment) => shipment.id === receiptShipmentId);
   const historyRows = useMemo(
     () => buildHistory(inventories, products, suppliers),
     [inventories, products, suppliers],
@@ -545,6 +611,98 @@ export default function InventoryPage({
     }
   }
 
+  function openInboundReceiptDialog(shipment) {
+    setError('');
+    setToast('');
+    setReceiptShipmentId(shipment.id);
+    setReceiptForm(buildReceiptForm(shipment));
+  }
+
+  function closeInboundReceiptDialog() {
+    setReceiptShipmentId('');
+    setReceiptForm(buildReceiptForm(null));
+  }
+
+  function setReceiptField(field, value) {
+    setError('');
+    setToast('');
+    setReceiptForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function setReceiptLineField(lineId, field, value) {
+    setError('');
+    setToast('');
+    setReceiptForm((current) => ({
+      ...current,
+      lines: current.lines.map((line) =>
+        line.inboundShipmentLineId === lineId ? { ...line, [field]: value } : line,
+      ),
+    }));
+  }
+
+  async function handleConfirmInboundReceipt(event) {
+    event.preventDefault();
+    if (!receiptShipment) {
+      setError('入荷確定する入荷予定を選択してください。');
+      return;
+    }
+
+    const enabledLines = receiptForm.lines.filter((line) => line.enabled);
+    if (enabledLines.length === 0) {
+      setError('入荷対象の明細を選択してください。');
+      return;
+    }
+
+    const invalidLine = enabledLines.find((line) =>
+      parseNumber(line.receivedPieces) <= 0 && parseNumber(line.receivedWeight) <= 0,
+    );
+    if (invalidLine) {
+      setError('実入荷個数または実入荷重量を入力してください。');
+      return;
+    }
+
+    const exceededLine = enabledLines.find((line) => {
+      const sourceLine = receiptShipment.lines.find((item) => item.id === line.inboundShipmentLineId);
+      return (
+        emptyToNumber(line.receivedWeight) !== null &&
+        emptyToNumber(sourceLine?.plannedWeight ?? sourceLine?.weight) !== null &&
+        parseNumber(line.receivedWeight) > lineRemainingWeight(sourceLine)
+      ) || (
+        emptyToNumber(line.receivedPieces) !== null &&
+        emptyToNumber(sourceLine?.plannedPieces ?? sourceLine?.quantityPieces) !== null &&
+        parseNumber(line.receivedPieces) > lineRemainingPieces(sourceLine)
+      );
+    });
+    if (exceededLine) {
+      setError('残数量を超える入荷はできません。');
+      return;
+    }
+
+    if (!window.confirm('選択した明細を入荷確定し、在庫へ反映します。よろしいですか？')) {
+      return;
+    }
+
+    setReceiptSaving(true);
+    setError('');
+    setToast('');
+    try {
+      const receiptId = await confirmInboundReceipt?.({
+        inboundShipmentId: receiptShipment.id,
+        receivedAt: receiptForm.receivedAt ? new Date(receiptForm.receivedAt).toISOString() : new Date().toISOString(),
+        warehouseName: receiptForm.warehouseName,
+        memo: receiptForm.memo,
+        lines: enabledLines,
+      });
+      await reloadInventory?.();
+      setToast(`入荷確定しました。Receipt ID: ${receiptId}`);
+      closeInboundReceiptDialog();
+    } catch (confirmError) {
+      setError(confirmError.message || '入荷確定に失敗しました。在庫は更新されていません。');
+    } finally {
+      setReceiptSaving(false);
+    }
+  }
+
   const listColumns = [
     {
       key: 'image',
@@ -749,12 +907,15 @@ export default function InventoryPage({
           preview={deliveryNoticePreview}
           error={deliveryNoticeError}
           inboundShipments={inboundShipments}
+          inboundReceipts={inboundReceipts}
+          inboundReceiptLines={inboundReceiptLines}
           selectedInboundShipment={selectedInboundShipment}
           onSelectInboundShipment={setSelectedInboundShipmentId}
           products={products}
           aliases={supplierProductAliases}
           onLineChange={handleInboundLineChange}
           onSaveAlias={handleSaveInboundAlias}
+          onOpenReceipt={openInboundReceiptDialog}
           syncState={inboundShipmentSyncState}
           syncError={inboundShipmentSyncError}
         />
@@ -788,7 +949,13 @@ export default function InventoryPage({
             <h2>入出庫履歴</h2>
             <span>{filteredHistory.length}件</span>
           </div>
-          <DesktopTable columns={historyColumns} rows={filteredHistory} getRowKey={(row) => row.id} minWidth={1300} />
+          <DesktopTable
+            className="inventory-common-table inventory-history-table"
+            columns={historyColumns}
+            rows={filteredHistory}
+            getRowKey={(row) => row.id}
+            minWidth={1300}
+          />
           <div className="card-list-mobile inventory-card-list">
             {filteredHistory.map((row) => (
               <article className="product-card inventory-card" key={row.id}>
@@ -819,6 +986,19 @@ export default function InventoryPage({
           onSubmit={handleAdjustmentSubmit}
         />
       )}
+
+      {receiptShipment && (
+        <InboundReceiptDialog
+          form={receiptForm}
+          products={products}
+          saving={receiptSaving}
+          shipment={receiptShipment}
+          onChange={setReceiptField}
+          onLineChange={setReceiptLineField}
+          onClose={closeInboundReceiptDialog}
+          onSubmit={handleConfirmInboundReceipt}
+        />
+      )}
     </main>
   );
 }
@@ -844,6 +1024,8 @@ function inboundStatusLabel(status) {
     draft: '下書き',
     matching: '照合中',
     confirmed: '確定前',
+    partially_received: '一部入荷',
+    received: '入荷済',
     cancelled: '取消',
     deleted: '削除',
   };
@@ -858,6 +1040,28 @@ function matchStatusLabel(status) {
     unmatched: '未照合',
   };
   return labels[status] || status || '-';
+}
+
+function inboundLineStatusLabel(status) {
+  const labels = {
+    draft: '未入荷',
+    pending: '未入荷',
+    partially_received: '一部入荷',
+    received: '入荷済',
+    skipped: 'スキップ',
+    excluded: '除外',
+    cancelled: '取消',
+    failed: '失敗',
+    deleted: '削除',
+  };
+  return labels[status] || status || '-';
+}
+
+function inboundStatusBadgeClass(status) {
+  if (status === 'received') return 'ready';
+  if (status === 'partially_received') return 'warning';
+  if (status === 'cancelled' || status === 'failed') return 'danger';
+  return 'muted';
 }
 
 function matchBadgeClass(status) {
@@ -877,8 +1081,11 @@ function DeliveryNoticeImportPanel({
   preview,
   error,
   inboundShipments = [],
+  inboundReceipts = [],
+  inboundReceiptLines = [],
   selectedInboundShipment = null,
   products = [],
+  onOpenReceipt,
   syncState = '',
   syncError = '',
 }) {
@@ -890,7 +1097,8 @@ function DeliveryNoticeImportPanel({
     { key: 'customs', label: '通関予定', minWidth: '120px', render: (row) => (row.lines || [])[0]?.customsClearancePlannedDate || '-' },
     { key: 'lineCount', label: '明細数', width: '90px', render: (row) => row.lines?.length || 0 },
     { key: 'unmatched', label: '未照合', width: '90px', render: (row) => (row.lines || []).filter((line) => line.matchStatus !== 'matched' && line.matchStatus !== 'manual' && line.status !== 'excluded').length },
-    { key: 'status', label: 'Status', width: '110px', render: (row) => <span className="info-badge muted">{inboundStatusLabel(row.status)}</span> },
+    { key: 'received', label: '入荷状況', minWidth: '130px', render: (row) => `${(row.lines || []).filter((line) => line.status === 'received').length}/${row.lines?.length || 0}` },
+    { key: 'status', label: 'Status', width: '110px', render: (row) => <span className={`info-badge ${inboundStatusBadgeClass(row.status)}`}>{inboundStatusLabel(row.status)}</span> },
   ];
 
   const detailColumns = [
@@ -933,7 +1141,10 @@ function DeliveryNoticeImportPanel({
       ),
     },
     { key: 'matchStatus', label: '照合状態', minWidth: '110px', render: (line) => <span className={`info-badge ${matchBadgeClass(line.matchStatus)}`}>{matchStatusLabel(line.matchStatus)}</span> },
-    { key: 'pieces', label: '個数', width: '80px', render: (line) => formatPrice(line.quantityPieces) || '-' },
+    { key: 'lineStatus', label: '入荷状態', minWidth: '110px', render: (line) => <span className={`info-badge ${inboundStatusBadgeClass(line.status)}`}>{inboundLineStatusLabel(line.status)}</span> },
+    { key: 'pieces', label: '予定個数', width: '90px', render: (line) => formatQuantity(line.plannedPieces ?? line.quantityPieces) },
+    { key: 'receivedPieces', label: '入荷済個数', width: '100px', render: (line) => formatQuantity(line.receivedPiecesTotal) },
+    { key: 'remainingPieces', label: '残個数', width: '90px', render: (line) => formatQuantity(lineRemainingPieces(line)) },
     {
       key: 'weight',
       label: '重量',
@@ -946,6 +1157,8 @@ function DeliveryNoticeImportPanel({
         />
       ),
     },
+    { key: 'receivedWeight', label: '入荷済重量', width: '110px', render: (line) => formatQuantity(line.receivedWeightTotal, line.unit) },
+    { key: 'remainingWeight', label: '残重量', width: '100px', render: (line) => formatQuantity(lineRemainingWeight(line), line.unit) },
     {
       key: 'unitPrice',
       label: '単価',
@@ -988,6 +1201,15 @@ function DeliveryNoticeImportPanel({
     { key: 'alias', label: '別名', width: '110px', render: (line) => <button type="button" className="ghost-button" onClick={() => onSaveAlias?.(line)}>保存</button> },
     { key: 'warnings', label: 'Warning', minWidth: '180px', render: (line) => line.warnings?.length ? line.warnings.join(' / ') : 'なし' },
   ];
+
+  const receiptRows = inboundReceipts
+    .filter((receipt) => receipt.inboundShipmentId === selectedInboundShipment?.id)
+    .map((receipt) => ({
+      ...receipt,
+      lines: inboundReceiptLines.filter((line) => line.inboundReceiptId === receipt.id),
+    }));
+
+  const hasReceivableLines = (selectedInboundShipment?.lines || []).some(canReceiveInboundLine);
 
   return (
     <section className="detail-section delivery-notice-import-panel">
@@ -1106,9 +1328,14 @@ function DeliveryNoticeImportPanel({
             getRowKey={(row) => row.id}
             minWidth={1040}
             actions={(shipment) => (
-              <button type="button" className="ghost-button" onClick={() => onSelectInboundShipment?.(shipment.id)}>
-                詳細
-              </button>
+              <>
+                <button type="button" className="ghost-button" onClick={() => onSelectInboundShipment?.(shipment.id)}>
+                  詳細
+                </button>
+                <button type="button" className="primary-button" disabled={!shipment.lines?.some(canReceiveInboundLine)} onClick={() => onOpenReceipt?.(shipment)}>
+                  入荷確定
+                </button>
+              </>
             )}
           />
 
@@ -1130,7 +1357,15 @@ function DeliveryNoticeImportPanel({
                   <div><dt>通関予定</dt><dd>{shipment.lines?.[0]?.customsClearancePlannedDate || '-'}</dd></div>
                   <div><dt>明細数</dt><dd>{shipment.lines?.length || 0}</dd></div>
                   <div><dt>未照合</dt><dd>{(shipment.lines || []).filter((line) => line.matchStatus !== 'matched' && line.matchStatus !== 'manual' && line.status !== 'excluded').length}</dd></div>
+                  <div><dt>入荷状況</dt><dd>{(shipment.lines || []).filter((line) => line.status === 'received').length}/{shipment.lines?.length || 0}</dd></div>
                 </dl>
+                <div className="card-actions">
+                  <span className={`info-badge ${inboundStatusBadgeClass(shipment.status)}`}>{inboundStatusLabel(shipment.status)}</span>
+                  <span className="ghost-button">詳細</span>
+                  {shipment.lines?.some(canReceiveInboundLine) && (
+                    <span className="primary-button">入荷確定</span>
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -1144,7 +1379,12 @@ function DeliveryNoticeImportPanel({
               <h3>入荷予定詳細・商品照合</h3>
               <p className="inline-helper">{selectedInboundShipment.sourceFileName || '-'} / {selectedInboundShipment.fileHash || '-'}</p>
             </div>
-            <span className="info-badge muted">在庫化前</span>
+            <div className="delivery-notice-actions">
+              <span className={`info-badge ${inboundStatusBadgeClass(selectedInboundShipment.status)}`}>{inboundStatusLabel(selectedInboundShipment.status)}</span>
+              <button type="button" className="primary-button" disabled={!hasReceivableLines} onClick={() => onOpenReceipt?.(selectedInboundShipment)}>
+                入荷確定
+              </button>
+            </div>
           </div>
 
           <DesktopTable
@@ -1176,7 +1416,11 @@ function DeliveryNoticeImportPanel({
                 </label>
                 <dl className="company-details">
                   <div><dt>個数</dt><dd>{formatPrice(line.quantityPieces) || '-'}</dd></div>
+                  <div><dt>入荷済個数</dt><dd>{formatQuantity(line.receivedPiecesTotal)}</dd></div>
+                  <div><dt>残個数</dt><dd>{formatQuantity(lineRemainingPieces(line))}</dd></div>
                   <div><dt>重量</dt><dd>{line.weight !== null ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
+                  <div><dt>入荷済重量</dt><dd>{formatQuantity(line.receivedWeightTotal, line.unit)}</dd></div>
+                  <div><dt>残重量</dt><dd>{formatQuantity(lineRemainingWeight(line), line.unit)}</dd></div>
                   <div><dt>単価</dt><dd>{line.unitPrice !== null ? `${formatPrice(line.unitPrice)} ${line.currency || ''}` : '-'}</dd></div>
                   <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>
                   <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
@@ -1203,7 +1447,219 @@ function DeliveryNoticeImportPanel({
           </div>
         </div>
       )}
+
+      {selectedInboundShipment && receiptRows.length > 0 && (
+        <div className="delivery-notice-receipts">
+          <div className="section-heading">
+            <h3>入荷確定履歴</h3>
+            <span className="info-badge muted">{receiptRows.length}件</span>
+          </div>
+          <div className="delivery-receipt-list">
+            {receiptRows.map((receipt) => (
+              <article className="delivery-receipt-card" key={receipt.id}>
+                <div>
+                  <strong>{receipt.receiptNo || receipt.id}</strong>
+                  <p>{String(receipt.receivedAt || '').slice(0, 10)} / {receipt.warehouseName || '-'}</p>
+                </div>
+                <span className="info-badge ready">{receipt.lines.length}明細</span>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+function InboundReceiptDialog({ shipment, products, form, saving, onChange, onLineChange, onClose, onSubmit }) {
+  const enabledLines = form.lines.filter((line) => line.enabled);
+  const selectedWeightTotal = enabledLines.reduce((sum, line) => sum + parseNumber(line.receivedWeight), 0);
+  const selectedPieceTotal = enabledLines.reduce((sum, line) => sum + parseNumber(line.receivedPieces), 0);
+
+  const columns = [
+    {
+      key: 'enabled',
+      label: '対象',
+      width: '72px',
+      render: (line) => {
+        const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+        return (
+          <input
+            type="checkbox"
+            checked={Boolean(formLine.enabled)}
+            disabled={!canReceiveInboundLine(line)}
+            onChange={(event) => onLineChange(line.id, 'enabled', event.target.checked)}
+          />
+        );
+      },
+    },
+    { key: 'product', label: '商品', minWidth: '220px', render: (line) => productDisplayName(products.find((product) => product.id === line.matchedProductId), line.productNameRaw || '未照合') },
+    { key: 'contractNo', label: '契約No', minWidth: '110px', render: (line) => line.contractNo || '-' },
+    { key: 'plannedPieces', label: '予定個数', width: '100px', render: (line) => formatQuantity(line.plannedPieces ?? line.quantityPieces) },
+    { key: 'plannedWeight', label: '予定重量', width: '110px', render: (line) => formatQuantity(line.plannedWeight ?? line.weight, line.unit) },
+    {
+      key: 'receivedPieces',
+      label: '実入荷個数',
+      width: '130px',
+      render: (line) => {
+        const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+        return (
+          <input
+            inputMode="decimal"
+            value={formLine.receivedPieces}
+            disabled={!formLine.enabled || !canReceiveInboundLine(line)}
+            onChange={(event) => onLineChange(line.id, 'receivedPieces', event.target.value)}
+          />
+        );
+      },
+    },
+    {
+      key: 'receivedWeight',
+      label: '実入荷重量',
+      width: '130px',
+      render: (line) => {
+        const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+        return (
+          <input
+            inputMode="decimal"
+            value={formLine.receivedWeight}
+            disabled={!formLine.enabled || !canReceiveInboundLine(line)}
+            onChange={(event) => onLineChange(line.id, 'receivedWeight', event.target.value)}
+          />
+        );
+      },
+    },
+    { key: 'unitPrice', label: '単価', width: '110px', render: (line) => formatQuantity(line.unitPrice, line.currency) },
+    {
+      key: 'expiryDate',
+      label: '賞味期限',
+      minWidth: '140px',
+      render: (line) => {
+        const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+        return <input type="date" value={formLine.expiryDate} disabled={!formLine.enabled || !canReceiveInboundLine(line)} onChange={(event) => onLineChange(line.id, 'expiryDate', event.target.value)} />;
+      },
+    },
+    {
+      key: 'warehouse',
+      label: '倉庫',
+      minWidth: '160px',
+      render: (line) => {
+        const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+        return <input value={formLine.warehouseName} disabled={!formLine.enabled || !canReceiveInboundLine(line)} onChange={(event) => onLineChange(line.id, 'warehouseName', event.target.value)} />;
+      },
+    },
+    {
+      key: 'difference',
+      label: '差異',
+      minWidth: '150px',
+      render: (line) => {
+        const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+        const weightDiff = emptyToNumber(formLine.receivedWeight) === null ? null : parseNumber(formLine.receivedWeight) - parseNumber(line.plannedWeight ?? line.weight);
+        const pieceDiff = emptyToNumber(formLine.receivedPieces) === null ? null : parseNumber(formLine.receivedPieces) - parseNumber(line.plannedPieces ?? line.quantityPieces);
+        return (
+          <span className="receipt-difference">
+            W {weightDiff === null ? '-' : `${weightDiff > 0 ? '+' : ''}${formatPrice(weightDiff)} ${line.unit || ''}`}
+            <br />
+            P {pieceDiff === null ? '-' : `${pieceDiff > 0 ? '+' : ''}${formatPrice(pieceDiff)}`}
+          </span>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="modal-backdrop inbound-receipt-backdrop" role="presentation" onMouseDown={onClose}>
+      <form
+        className="modal-panel inbound-receipt-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inbound-receipt-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={onSubmit}
+      >
+        <div className="section-heading inbound-receipt-dialog-header">
+          <div>
+            <p className="eyebrow">Inbound receipt</p>
+            <h2 id="inbound-receipt-title">入荷確定</h2>
+            <p className="inline-helper">{shipment.supplierName || '-'} / {shipment.documentNumber || shipment.sourceFileName || '-'}</p>
+          </div>
+          <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>閉じる</button>
+        </div>
+
+        <div className="dashboard-metrics inbound-receipt-summary">
+          <div className="summary-card"><span>対象明細</span><strong>{enabledLines.length}</strong></div>
+          <div className="summary-card"><span>実入荷重量</span><strong>{formatQuantity(selectedWeightTotal, 'kg')}</strong></div>
+          <div className="summary-card"><span>実入荷個数</span><strong>{formatQuantity(selectedPieceTotal)}</strong></div>
+          <div className="summary-card"><span>在庫反映</span><strong>確定時のみ</strong></div>
+        </div>
+
+        <div className="inventory-form-grid inbound-receipt-meta">
+          <label className="field-label">
+            入荷日時
+            <input type="datetime-local" value={form.receivedAt} onChange={(event) => onChange('receivedAt', event.target.value)} />
+          </label>
+          <label className="field-label">
+            共通倉庫
+            <input value={form.warehouseName} onChange={(event) => onChange('warehouseName', event.target.value)} placeholder="明細側の倉庫を優先" />
+          </label>
+          <label className="field-label full-width">
+            メモ
+            <textarea value={form.memo} onChange={(event) => onChange('memo', event.target.value)} rows={3} />
+          </label>
+        </div>
+
+        <DesktopTable
+          className="inventory-common-table inbound-receipt-table"
+          columns={columns}
+          rows={shipment.lines || []}
+          getRowKey={(line) => line.id}
+          minWidth={1360}
+        />
+
+        <div className="card-list-mobile inbound-receipt-card-list">
+          {(shipment.lines || []).map((line) => {
+            const formLine = form.lines.find((item) => item.inboundShipmentLineId === line.id) || defaultReceiptLine(line);
+            const disabled = !formLine.enabled || !canReceiveInboundLine(line);
+            return (
+              <article className="product-card inbound-receipt-card" key={line.id}>
+                <div className="company-heading">
+                  <p>{line.contractNo || '契約No未取得'} / {inboundLineStatusLabel(line.status)}</p>
+                  <h3>{productDisplayName(products.find((product) => product.id === line.matchedProductId), line.productNameRaw || '未照合')}</h3>
+                  <span className={`info-badge ${matchBadgeClass(line.matchStatus)}`}>{matchStatusLabel(line.matchStatus)}</span>
+                </div>
+                <label className="inline-check">
+                  <input type="checkbox" checked={Boolean(formLine.enabled)} disabled={!canReceiveInboundLine(line)} onChange={(event) => onLineChange(line.id, 'enabled', event.target.checked)} />
+                  入荷対象
+                </label>
+                <dl className="company-details">
+                  <div><dt>予定個数</dt><dd>{formatQuantity(line.plannedPieces ?? line.quantityPieces)}</dd></div>
+                  <div><dt>予定重量</dt><dd>{formatQuantity(line.plannedWeight ?? line.weight, line.unit)}</dd></div>
+                  <div><dt>入荷済個数</dt><dd>{formatQuantity(line.receivedPiecesTotal)}</dd></div>
+                  <div><dt>入荷済重量</dt><dd>{formatQuantity(line.receivedWeightTotal, line.unit)}</dd></div>
+                  <div><dt>残個数</dt><dd>{formatQuantity(lineRemainingPieces(line))}</dd></div>
+                  <div><dt>残重量</dt><dd>{formatQuantity(lineRemainingWeight(line), line.unit)}</dd></div>
+                  <div><dt>単価</dt><dd>{formatQuantity(line.unitPrice, line.currency)}</dd></div>
+                  <div><dt>倉庫</dt><dd>{line.warehouseName || '-'}</dd></div>
+                </dl>
+                <div className="inventory-form-grid compact-grid">
+                  <label className="field-label">実入荷個数<input inputMode="decimal" value={formLine.receivedPieces} disabled={disabled} onChange={(event) => onLineChange(line.id, 'receivedPieces', event.target.value)} /></label>
+                  <label className="field-label">実入荷重量<input inputMode="decimal" value={formLine.receivedWeight} disabled={disabled} onChange={(event) => onLineChange(line.id, 'receivedWeight', event.target.value)} /></label>
+                  <label className="field-label">単価<input inputMode="decimal" value={formLine.purchaseUnitCost} disabled={disabled} onChange={(event) => onLineChange(line.id, 'purchaseUnitCost', event.target.value)} /></label>
+                  <label className="field-label">賞味期限<input type="date" value={formLine.expiryDate} disabled={disabled} onChange={(event) => onLineChange(line.id, 'expiryDate', event.target.value)} /></label>
+                  <label className="field-label full-width">倉庫<input value={formLine.warehouseName} disabled={disabled} onChange={(event) => onLineChange(line.id, 'warehouseName', event.target.value)} /></label>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="modal-actions inbound-receipt-dialog-actions">
+          <span className="inline-helper">確定後、inventory_lots と inventory_movements へ1トランザクションで反映します。</span>
+          <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button>
+          <button type="submit" className="primary-button" disabled={saving}>{saving ? '確定中...' : '入荷確定'}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
