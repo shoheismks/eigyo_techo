@@ -91,6 +91,12 @@ export function normalizeInboundShipment(shipment = {}, userId = '') {
     rawText: shipment.rawText ?? shipment.raw_text ?? '',
     parseResult: shipment.parseResult ?? shipment.parse_result ?? {},
     warnings: normalizeWarnings(shipment.warnings),
+    cancelledAt: shipment.cancelledAt ?? shipment.cancelled_at ?? '',
+    cancelledBy: shipment.cancelledBy ?? shipment.cancelled_by ?? '',
+    cancelReason: shipment.cancelReason ?? shipment.cancel_reason ?? '',
+    deletedAt: shipment.deletedAt ?? shipment.deleted_at ?? '',
+    deletedBy: shipment.deletedBy ?? shipment.deleted_by ?? '',
+    deleteReason: shipment.deleteReason ?? shipment.delete_reason ?? '',
     createdAt: shipment.createdAt ?? shipment.created_at ?? nowIso(),
     updatedAt: shipment.updatedAt ?? shipment.updated_at ?? nowIso(),
   };
@@ -135,6 +141,12 @@ export function normalizeInboundShipmentLine(line = {}, userId = '') {
     status: line.status ?? 'draft',
     rawRow: line.rawRow ?? line.raw_row ?? line,
     warnings: normalizeWarnings(line.warnings),
+    cancelledAt: line.cancelledAt ?? line.cancelled_at ?? '',
+    cancelledBy: line.cancelledBy ?? line.cancelled_by ?? '',
+    cancelReason: line.cancelReason ?? line.cancel_reason ?? '',
+    deletedAt: line.deletedAt ?? line.deleted_at ?? '',
+    deletedBy: line.deletedBy ?? line.deleted_by ?? '',
+    deleteReason: line.deleteReason ?? line.delete_reason ?? '',
     createdAt: line.createdAt ?? line.created_at ?? nowIso(),
     updatedAt: line.updatedAt ?? line.updated_at ?? nowIso(),
   };
@@ -154,6 +166,12 @@ export function inboundShipmentToRow(shipment) {
     raw_text: shipment.rawText,
     parse_result: shipment.parseResult,
     warnings: shipment.warnings,
+    cancelled_at: shipment.cancelledAt || null,
+    cancelled_by: shipment.cancelledBy || null,
+    cancel_reason: shipment.cancelReason || null,
+    deleted_at: shipment.deletedAt || null,
+    deleted_by: shipment.deletedBy || null,
+    delete_reason: shipment.deleteReason || null,
     created_at: shipment.createdAt,
     updated_at: shipment.updatedAt,
   };
@@ -173,6 +191,12 @@ export function inboundShipmentFromRow(row) {
     rawText: row.raw_text,
     parseResult: row.parse_result,
     warnings: row.warnings,
+    cancelledAt: row.cancelled_at,
+    cancelledBy: row.cancelled_by,
+    cancelReason: row.cancel_reason,
+    deletedAt: row.deleted_at,
+    deletedBy: row.deleted_by,
+    deleteReason: row.delete_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -212,6 +236,12 @@ export function inboundShipmentLineToRow(line) {
     status: line.status,
     raw_row: line.rawRow,
     warnings: line.warnings,
+    cancelled_at: line.cancelledAt || null,
+    cancelled_by: line.cancelledBy || null,
+    cancel_reason: line.cancelReason || null,
+    deleted_at: line.deletedAt || null,
+    deleted_by: line.deletedBy || null,
+    delete_reason: line.deleteReason || null,
     created_at: line.createdAt,
     updated_at: line.updatedAt,
   };
@@ -251,6 +281,12 @@ export function inboundShipmentLineFromRow(row) {
     status: row.status,
     rawRow: row.raw_row,
     warnings: row.warnings,
+    cancelledAt: row.cancelled_at,
+    cancelledBy: row.cancelled_by,
+    cancelReason: row.cancel_reason,
+    deletedAt: row.deleted_at,
+    deletedBy: row.deleted_by,
+    deleteReason: row.delete_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -299,6 +335,9 @@ export function normalizeInboundReceipt(receipt = {}, userId = '') {
     receivedAt: receipt.receivedAt ?? receipt.received_at ?? nowIso(),
     warehouseName: receipt.warehouseName ?? receipt.warehouse_name ?? '',
     memo: receipt.memo ?? '',
+    voidedAt: receipt.voidedAt ?? receipt.voided_at ?? '',
+    voidedBy: receipt.voidedBy ?? receipt.voided_by ?? '',
+    voidReason: receipt.voidReason ?? receipt.void_reason ?? '',
     createdAt: receipt.createdAt ?? receipt.created_at ?? nowIso(),
     updatedAt: receipt.updatedAt ?? receipt.updated_at ?? nowIso(),
   };
@@ -317,6 +356,9 @@ export function normalizeInboundReceiptLine(line = {}, userId = '') {
     expiryDate: line.expiryDate ?? line.expiry_date ?? '',
     warehouseName: line.warehouseName ?? line.warehouse_name ?? '',
     inventoryLotId: line.inventoryLotId ?? line.inventory_lot_id ?? '',
+    voidedAt: line.voidedAt ?? line.voided_at ?? '',
+    voidedBy: line.voidedBy ?? line.voided_by ?? '',
+    voidReason: line.voidReason ?? line.void_reason ?? '',
     createdAt: line.createdAt ?? line.created_at ?? nowIso(),
   };
 }
@@ -330,6 +372,9 @@ export function inboundReceiptToRow(receipt) {
     received_at: receipt.receivedAt,
     warehouse_name: receipt.warehouseName,
     memo: receipt.memo,
+    voided_at: receipt.voidedAt || null,
+    voided_by: receipt.voidedBy || null,
+    void_reason: receipt.voidReason || null,
     created_at: receipt.createdAt,
     updated_at: receipt.updatedAt,
   };
@@ -348,6 +393,9 @@ export function inboundReceiptLineToRow(line) {
     expiry_date: toDateValue(line.expiryDate) || null,
     warehouse_name: line.warehouseName,
     inventory_lot_id: line.inventoryLotId,
+    voided_at: line.voidedAt || null,
+    voided_by: line.voidedBy || null,
+    void_reason: line.voidReason || null,
     created_at: line.createdAt,
   };
 }
@@ -796,6 +844,42 @@ export function useInboundShipments(userId = '', products = []) {
     }
   }
 
+  async function reverseInboundReceipt(inboundReceiptId, reason = '') {
+    if (!canUseCloud()) {
+      const message = 'Supabaseに接続できないため、入荷取消できません。';
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
+    }
+
+    const normalizedReason = String(reason || '').trim();
+    if (!inboundReceiptId) {
+      throw new Error('入荷取消対象が見つかりません。');
+    }
+    if (!normalizedReason) {
+      throw new Error('取消理由を入力してください。');
+    }
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+    try {
+      const { data, error } = await supabase.rpc('reverse_inbound_receipt', {
+        p_inbound_receipt_id: inboundReceiptId,
+        p_reason: normalizedReason,
+      });
+      if (error) throw error;
+      await reload(writeSequence);
+      return data;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || '入荷取消に失敗しました。');
+      }
+      throw error;
+    }
+  }
+
   return {
     records: shipmentsWithLines,
     lines,
@@ -811,6 +895,7 @@ export function useInboundShipments(userId = '', products = []) {
     addInboundReceipt,
     addInboundReceiptLine,
     confirmInboundReceipt,
+    reverseInboundReceipt,
     reload,
     syncState,
     syncError,

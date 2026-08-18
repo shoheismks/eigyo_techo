@@ -92,6 +92,7 @@ export default function AppRouter({
   addInboundReceiptLine,
   addSupplierProductAlias,
   confirmInboundReceipt,
+  reverseInboundReceipt,
   inboundShipmentSyncState,
   inboundShipmentSyncError,
   stocktakes,
@@ -576,6 +577,7 @@ export default function AppRouter({
         updateInboundShipmentLine={updateInboundShipmentLine}
         addSupplierProductAlias={addSupplierProductAlias}
         confirmInboundReceipt={confirmInboundReceipt}
+        reverseInboundReceipt={reverseInboundReceipt}
         inboundShipmentSyncState={inboundShipmentSyncState}
         inboundShipmentSyncError={inboundShipmentSyncError}
         reloadInventory={reloadInventory}

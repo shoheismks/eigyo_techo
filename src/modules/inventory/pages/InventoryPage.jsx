@@ -215,6 +215,7 @@ export default function InventoryPage({
   updateInboundShipmentLine,
   addSupplierProductAlias,
   confirmInboundReceipt,
+  reverseInboundReceipt,
   inboundShipmentSyncState = '',
   inboundShipmentSyncError = '',
   reloadInventory,
@@ -242,6 +243,9 @@ export default function InventoryPage({
   const [receiptShipmentId, setReceiptShipmentId] = useState('');
   const [receiptForm, setReceiptForm] = useState(() => buildReceiptForm(null));
   const [receiptSaving, setReceiptSaving] = useState(false);
+  const [reverseReceiptId, setReverseReceiptId] = useState('');
+  const [reverseReason, setReverseReason] = useState('');
+  const [reverseSaving, setReverseSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -269,6 +273,8 @@ export default function InventoryPage({
   const adjustmentInventory = inventories.find((inventory) => inventory.id === adjustmentInventoryId);
   const selectedInboundShipment = inboundShipments.find((shipment) => shipment.id === selectedInboundShipmentId) || inboundShipments[0];
   const receiptShipment = inboundShipments.find((shipment) => shipment.id === receiptShipmentId);
+  const reverseReceipt = inboundReceipts.find((receipt) => receipt.id === reverseReceiptId);
+  const reverseReceiptLines = inboundReceiptLines.filter((line) => line.inboundReceiptId === reverseReceiptId);
   const historyRows = useMemo(
     () => buildHistory(inventories, products, suppliers),
     [inventories, products, suppliers],
@@ -637,6 +643,19 @@ export default function InventoryPage({
     setReceiptForm(buildReceiptForm(null));
   }
 
+  function openReverseReceiptDialog(receipt) {
+    setError('');
+    setToast('');
+    setReverseReceiptId(receipt?.id || '');
+    setReverseReason('');
+  }
+
+  function closeReverseReceiptDialog() {
+    if (reverseSaving) return;
+    setReverseReceiptId('');
+    setReverseReason('');
+  }
+
   function setReceiptField(field, value) {
     setError('');
     setToast('');
@@ -714,6 +733,35 @@ export default function InventoryPage({
       setError(confirmError.message || '入荷確定に失敗しました。在庫は更新されていません。');
     } finally {
       setReceiptSaving(false);
+    }
+  }
+
+  async function handleReverseInboundReceipt(event) {
+    event.preventDefault();
+    if (!reverseReceipt) {
+      setError('取消対象の入荷実績が見つかりません。');
+      return;
+    }
+    if (!reverseReason.trim()) {
+      setError('取消理由を入力してください。');
+      return;
+    }
+    if (!window.confirm('この入荷実績を取り消し、在庫へ逆仕訳を記録します。よろしいですか？')) {
+      return;
+    }
+
+    setReverseSaving(true);
+    setError('');
+    setToast('');
+    try {
+      await reverseInboundReceipt?.(reverseReceipt.id, reverseReason);
+      await reloadInventory?.();
+      setToast('入荷実績を取り消しました。');
+      closeReverseReceiptDialog();
+    } catch (reverseError) {
+      setError(reverseError.message || '入荷取消に失敗しました。');
+    } finally {
+      setReverseSaving(false);
     }
   }
 
@@ -951,6 +999,7 @@ export default function InventoryPage({
           onLineChange={handleInboundLineChange}
           onSaveAlias={handleSaveInboundAlias}
           onOpenReceipt={openInboundReceiptDialog}
+          onOpenReverseReceipt={openReverseReceiptDialog}
           syncState={inboundShipmentSyncState}
           syncError={inboundShipmentSyncError}
         />
@@ -1032,6 +1081,20 @@ export default function InventoryPage({
           onLineChange={setReceiptLineField}
           onClose={closeInboundReceiptDialog}
           onSubmit={handleConfirmInboundReceipt}
+        />
+      )}
+
+      {reverseReceipt && (
+        <ReverseInboundReceiptDialog
+          receipt={reverseReceipt}
+          receiptLines={reverseReceiptLines}
+          inboundShipmentLines={inboundShipmentLines}
+          products={products}
+          reason={reverseReason}
+          saving={reverseSaving}
+          onReasonChange={setReverseReason}
+          onClose={closeReverseReceiptDialog}
+          onSubmit={handleReverseInboundReceipt}
         />
       )}
     </main>
@@ -1206,6 +1269,7 @@ function DeliveryNoticeImportPanel({
   selectedInboundShipment = null,
   products = [],
   onOpenReceipt,
+  onOpenReverseReceipt,
   syncState = '',
   syncError = '',
 }) {
@@ -1580,14 +1644,102 @@ function DeliveryNoticeImportPanel({
                 <div>
                   <strong>{receipt.receiptNo || receipt.id}</strong>
                   <p>{String(receipt.receivedAt || '').slice(0, 10)} / {receipt.warehouseName || '-'}</p>
+                  {receipt.voidedAt && <p>取消済み: {String(receipt.voidedAt).slice(0, 10)} / {receipt.voidReason || '-'}</p>}
                 </div>
-                <span className="info-badge ready">{receipt.lines.length}明細</span>
+                <div className="delivery-receipt-actions">
+                  <span className={`info-badge ${receipt.voidedAt ? 'muted' : 'ready'}`}>
+                    {receipt.voidedAt ? '取消済み' : `${receipt.lines.length}明細`}
+                  </span>
+                  <button
+                    type="button"
+                    className="ghost-button receipt-reverse-button"
+                    disabled={Boolean(receipt.voidedAt)}
+                    onClick={() => onOpenReverseReceipt?.(receipt)}
+                  >
+                    入荷取消
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function ReverseInboundReceiptDialog({ receipt, receiptLines = [], inboundShipmentLines = [], products = [], reason, saving, onReasonChange, onClose, onSubmit }) {
+  const totalWeight = receiptLines.reduce((sum, line) => sum + parseNumber(line.receivedWeight), 0);
+  const totalPieces = receiptLines.reduce((sum, line) => sum + parseNumber(line.receivedPieces), 0);
+
+  return (
+    <div className="modal-backdrop inbound-receipt-backdrop" role="presentation" onMouseDown={onClose}>
+      <form
+        className="modal-panel inbound-receipt-dialog reverse-inbound-receipt-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reverse-inbound-receipt-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={onSubmit}
+      >
+        <div className="section-heading inbound-receipt-dialog-header">
+          <div>
+            <p className="eyebrow">Reverse receipt</p>
+            <h2 id="reverse-inbound-receipt-title">入荷取消</h2>
+            <p className="inline-helper">{receipt.receiptNo || receipt.id} / {String(receipt.receivedAt || '').slice(0, 10)}</p>
+          </div>
+          <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>閉じる</button>
+        </div>
+
+        <div className="dashboard-metrics inbound-receipt-summary">
+          <div className="summary-card"><span>対象明細</span><strong>{receiptLines.length}</strong></div>
+          <div className="summary-card"><span>取消重量</span><strong>{formatQuantity(totalWeight, 'kg')}</strong></div>
+          <div className="summary-card"><span>取消個数</span><strong>{formatQuantity(totalPieces)}</strong></div>
+          <div className="summary-card"><span>処理</span><strong>逆仕訳</strong></div>
+        </div>
+
+        <div className="delivery-receipt-list reverse-receipt-line-list">
+          {receiptLines.map((line) => {
+            const product = products.find((item) => item.id === line.productId);
+            const inboundLine = inboundShipmentLines.find((item) => item.id === line.inboundShipmentLineId);
+            return (
+              <article className="delivery-receipt-card reverse-receipt-line-card" key={line.id}>
+                <div>
+                  <strong>{productDisplayName(product, line.productId || '商品未設定')}</strong>
+                  <p>契約No: {inboundLine?.contractNo || '-'}</p>
+                  <p>数量: {formatQuantity(line.receivedWeight, 'kg')} / {formatQuantity(line.receivedPieces)}</p>
+                  <p>倉庫: {line.warehouseName || '-'} / 賞味期限: {line.expiryDate || '-'}</p>
+                </div>
+                <span className="info-badge warning">取消対象</span>
+              </article>
+            );
+          })}
+        </div>
+
+        <label className="field-label full-width">
+          取消理由
+          <textarea
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            rows={4}
+            placeholder="例: 入荷数量の誤入力のため"
+            required
+          />
+        </label>
+
+        <p className="error-text">
+          既に引当・出荷・後続の在庫変更がある入荷は取消できません。既存の入荷履歴は削除せず、在庫履歴へ逆仕訳を追加します。
+        </p>
+
+        <div className="modal-actions inbound-receipt-dialog-actions">
+          <span className="inline-helper">取消は1トランザクションで実行され、途中失敗時は在庫数量を変更しません。</span>
+          <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button>
+          <button type="submit" className="primary-button danger-action-button" disabled={saving}>
+            {saving ? '取消中...' : '入荷取消'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

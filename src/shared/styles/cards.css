@@ -3131,6 +3131,32 @@
   margin: 4px 0 0;
 }
 
+.delivery-receipt-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.receipt-reverse-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.danger-action-button {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  border-color: rgba(248, 113, 113, 0.48);
+}
+
+.reverse-receipt-line-list {
+  margin-bottom: 14px;
+}
+
+.reverse-receipt-line-card {
+  align-items: flex-start;
+}
+
 .inbound-receipt-dialog {
   max-height: min(88vh, 900px);
   overflow: auto;
@@ -3280,6 +3306,15 @@
 
   .inbound-receipt-dialog-actions .inline-helper {
     grid-column: 1 / -1;
+  }
+
+  .delivery-receipt-card {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .delivery-receipt-actions {
+    justify-content: flex-start;
   }
 }
 

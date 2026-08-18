@@ -130,6 +130,7 @@ export function AppDataProvider({ userId, children }) {
     addInboundReceiptLine: inboundShipmentsState.addInboundReceiptLine,
     addSupplierProductAlias: inboundShipmentsState.addSupplierProductAlias,
     confirmInboundReceipt: inboundShipmentsState.confirmInboundReceipt,
+    reverseInboundReceipt: inboundShipmentsState.reverseInboundReceipt,
     reloadInboundShipments: inboundShipmentsState.reload,
     inboundShipmentSyncState: inboundShipmentsState.syncState,
     inboundShipmentSyncError: inboundShipmentsState.syncError,
