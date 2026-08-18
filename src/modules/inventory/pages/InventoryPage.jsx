@@ -14,6 +14,10 @@ import {
   normalizeInventory,
   normalizeInventoryCode,
 } from '../hooks/useInventory.js';
+import {
+  buildPlannedInventoryRows,
+  formatPlannedQuantity,
+} from '../services/plannedInventoryService.js';
 
 const TABS = [
   { key: 'list', label: '在庫一覧' },
@@ -317,6 +321,16 @@ export default function InventoryPage({
       return matchesKeyword && matchesFilter;
     });
   }, [filter, inventories, keyword, products, suppliers]);
+
+  const plannedInventoryRows = useMemo(
+    () => buildPlannedInventoryRows({ products, inventories, inboundShipments }),
+    [inboundShipments, inventories, products],
+  );
+
+  const plannedInventoryByProduct = useMemo(
+    () => new Map(plannedInventoryRows.map((row) => [row.productId, row])),
+    [plannedInventoryRows],
+  );
 
   const filteredHistory = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -721,6 +735,24 @@ export default function InventoryPage({
     { key: 'quantity', label: '現在庫', width: '90px', render: (inventory) => `${formatPrice(inventory.quantity) || 0}` },
     { key: 'reserved', label: '引当', width: '90px', render: (inventory) => formatPrice(inventory.reservedQuantity) || 0 },
     { key: 'available', label: '使用可能', width: '100px', render: (inventory) => inventoryAvailableQuantity(inventory).toLocaleString('ja-JP') },
+    {
+      key: 'plannedInbound',
+      label: '入荷予定',
+      width: '120px',
+      render: (inventory) => {
+        const row = plannedInventoryByProduct.get(inventory.productId);
+        return row ? formatPlannedQuantity(row.plannedInbound, row.unit) : '-';
+      },
+    },
+    {
+      key: 'projectedStock',
+      label: '入荷後見込',
+      width: '130px',
+      render: (inventory) => {
+        const row = plannedInventoryByProduct.get(inventory.productId);
+        return row ? formatPlannedQuantity(row.projectedStock, row.unit) : '-';
+      },
+    },
     { key: 'unit', label: '単位', width: '80px', render: (inventory) => inventory.unit || '-' },
     { key: 'location', label: '保管場所', minWidth: '140px', render: (inventory) => inventory.location || '-' },
     { key: 'lot', label: 'LOT', minWidth: '130px', render: (inventory) => inventory.lot || '-' },
@@ -839,6 +871,7 @@ export default function InventoryPage({
             <h2>在庫一覧</h2>
             <span>{filteredInventories.length}件</span>
           </div>
+          <PlannedInventoryOverview rows={plannedInventoryRows} onOpenProductDetail={onOpenProductDetail} />
           <DesktopTable
             actionWidth="300px"
             actions={(inventory) => (
@@ -851,7 +884,7 @@ export default function InventoryPage({
             )}
             className="inventory-common-table"
             columns={listColumns}
-            minWidth={1600}
+            minWidth={1840}
             rowClassName={inventoryAlertClass}
             rows={filteredInventories}
           />
@@ -871,6 +904,8 @@ export default function InventoryPage({
                   <dl className="company-details">
                     <div><dt>現在庫</dt><dd>{formatPrice(inventory.quantity) || 0} {inventory.unit}</dd></div>
                     <div><dt>使用可能</dt><dd>{inventoryAvailableQuantity(inventory).toLocaleString('ja-JP')} {inventory.unit}</dd></div>
+                    <div><dt>入荷予定</dt><dd>{formatPlannedQuantity(plannedInventoryByProduct.get(inventory.productId)?.plannedInbound || 0, plannedInventoryByProduct.get(inventory.productId)?.unit || inventory.unit)}</dd></div>
+                    <div><dt>入荷後見込</dt><dd>{formatPlannedQuantity(plannedInventoryByProduct.get(inventory.productId)?.projectedStock || inventory.quantity || 0, plannedInventoryByProduct.get(inventory.productId)?.unit || inventory.unit)}</dd></div>
                     <div><dt>保管場所</dt><dd>{inventory.location || '-'}</dd></div>
                     <div><dt>賞味期限</dt><dd>{inventory.expiryDate || '-'}</dd></div>
                     <div><dt>仕入先</dt><dd>{supplier?.name || supplier?.companyName || '-'}</dd></div>
@@ -1000,6 +1035,91 @@ export default function InventoryPage({
         />
       )}
     </main>
+  );
+}
+
+function PlannedInventoryOverview({ rows = [], onOpenProductDetail }) {
+  const visibleRows = rows.filter((row) => row.currentStock > 0 || row.plannedInbound > 0 || row.reserved > 0);
+  const columns = [
+    { key: 'product', label: '商品名', minWidth: '220px', render: (row) => row.productName },
+    { key: 'code', label: '商品コード', minWidth: '130px', render: (row) => row.productCode || '-' },
+    { key: 'current', label: '現在庫', width: '120px', render: (row) => formatPlannedQuantity(row.currentStock, row.unit) },
+    { key: 'reserved', label: '引当済', width: '110px', render: (row) => formatPlannedQuantity(row.reserved, row.unit) },
+    { key: 'available', label: '使用可能', width: '120px', render: (row) => formatPlannedQuantity(row.available, row.unit) },
+    { key: 'planned', label: '入荷予定', width: '120px', render: (row) => formatPlannedQuantity(row.plannedInbound, row.unit) },
+    { key: 'projected', label: '入荷後見込', width: '130px', render: (row) => formatPlannedQuantity(row.projectedStock, row.unit) },
+    { key: 'nextCustoms', label: '次回通関予定', width: '130px', render: (row) => row.nextCustomsDate || '-' },
+    { key: 'count', label: '予定件数', width: '90px', render: (row) => row.inboundCount },
+    { key: 'warning', label: 'Warning', minWidth: '200px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
+  ];
+
+  return (
+    <section className="planned-inventory-overview" aria-label="予定在庫">
+      <div className="section-heading">
+        <div>
+          <h3>予定在庫</h3>
+          <p className="inline-helper">現在庫 + 未入荷の入荷予定数量を商品単位で表示します。日付は通関予定です。</p>
+        </div>
+        <span className="info-badge muted">{visibleRows.length}商品</span>
+      </div>
+
+      {visibleRows.length === 0 ? (
+        <div className="empty-state compact-empty">
+          <h3>予定在庫はありません</h3>
+          <p>未入荷の入荷予定が保存されると、ここに商品別の入荷後見込が表示されます。</p>
+        </div>
+      ) : (
+        <>
+          <DesktopTable
+            className="inventory-common-table planned-inventory-table"
+            columns={columns}
+            rows={visibleRows}
+            getRowKey={(row) => row.productId}
+            minWidth={1280}
+            actions={(row) => (
+              <button type="button" className="ghost-button" onClick={() => onOpenProductDetail?.(row.productId)}>
+                商品詳細
+              </button>
+            )}
+          />
+
+          <div className="card-list-mobile planned-inventory-card-list">
+            {visibleRows.map((row) => (
+              <article className="product-card planned-inventory-card" key={row.productId}>
+                <button type="button" className="planned-inventory-title" onClick={() => onOpenProductDetail?.(row.productId)}>
+                  <span>{row.productCode || '商品コード未設定'}</span>
+                  <strong>{row.productName}</strong>
+                </button>
+                <dl className="company-details">
+                  <div><dt>現在庫</dt><dd>{formatPlannedQuantity(row.currentStock, row.unit)}</dd></div>
+                  <div><dt>引当済</dt><dd>{formatPlannedQuantity(row.reserved, row.unit)}</dd></div>
+                  <div><dt>使用可能</dt><dd>{formatPlannedQuantity(row.available, row.unit)}</dd></div>
+                  <div><dt>入荷予定</dt><dd>{formatPlannedQuantity(row.plannedInbound, row.unit)}</dd></div>
+                  <div><dt>入荷後見込</dt><dd>{formatPlannedQuantity(row.projectedStock, row.unit)}</dd></div>
+                  <div><dt>次回通関予定</dt><dd>{row.nextCustomsDate || '-'}</dd></div>
+                </dl>
+                {row.timeline.length > 0 && (
+                  <div className="planned-inventory-timeline">
+                    {row.timeline.slice(0, 3).map((item) => (
+                      <div className="planned-inventory-timeline-row" key={item.id}>
+                        <time>{item.customsDate || '通関予定未定'}</time>
+                        <strong>+{formatPlannedQuantity(item.quantity, item.unit)}</strong>
+                        <span>{item.contractNo || '契約No未設定'} / {item.warehouseName || '-'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {row.warnings.length > 0 && (
+                  <div className="delivery-notice-line-warnings">
+                    {row.warnings.map((warning) => <span className="info-badge warning" key={warning}>{warning}</span>)}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

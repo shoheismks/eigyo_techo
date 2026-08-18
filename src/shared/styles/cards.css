@@ -2986,6 +2986,95 @@
   display: none;
 }
 
+.planned-inventory-overview {
+  background: rgba(6, 13, 26, 0.42);
+  border: 1px solid rgba(102, 163, 255, 0.24);
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px;
+  width: 100%;
+}
+
+.planned-inventory-table {
+  font-size: 12px;
+}
+
+.planned-inventory-card-list {
+  display: none;
+  gap: 12px;
+}
+
+.planned-inventory-card {
+  border-left: 4px solid var(--accent);
+}
+
+.planned-inventory-title {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.planned-inventory-title span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.planned-inventory-title strong {
+  color: var(--white);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.planned-inventory-product-timeline {
+  background: rgba(15, 23, 42, 0.56);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.planned-inventory-timeline {
+  display: grid;
+  gap: 8px;
+}
+
+.planned-inventory-timeline-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 110px 120px minmax(0, 1fr);
+  padding: 10px 12px;
+}
+
+.planned-inventory-timeline-row time {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.planned-inventory-timeline-row strong {
+  color: var(--success);
+  font-size: 0.96rem;
+}
+
+.planned-inventory-timeline-row span {
+  overflow-wrap: anywhere;
+}
+
 .delivery-notice-card {
   gap: 12px;
 }
@@ -3150,6 +3239,19 @@
 
   .delivery-notice-card-list {
     display: grid;
+  }
+
+  .planned-inventory-overview {
+    padding: 12px;
+  }
+
+  .planned-inventory-card-list {
+    display: grid;
+  }
+
+  .planned-inventory-timeline-row {
+    align-items: start;
+    grid-template-columns: 1fr;
   }
 
   .inbound-receipt-dialog {

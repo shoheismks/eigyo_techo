@@ -599,6 +599,7 @@ export default function AppRouter({
         products={products}
         brands={brands}
         inventories={inventories}
+        inboundShipments={inboundShipments}
         adoptions={adoptions}
         samples={samples}
         quotes={quotes}

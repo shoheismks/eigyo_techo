@@ -34,6 +34,11 @@ import {
   normalizeInventoryCode,
   normalizeInventory,
 } from '../../inventory/hooks/useInventory.js';
+import {
+  buildPlannedInventoryRows,
+  findPlannedInventoryRow,
+  formatPlannedQuantity,
+} from '../../inventory/services/plannedInventoryService.js';
 import { calculateProjectProductProposal } from '../../deals/services/projectProductProposalService.js';
 
 function fileLabel(file) {
@@ -95,6 +100,7 @@ export default function ProductDetail({
   products = [],
   brands = [],
   inventories = [],
+  inboundShipments = [],
   adoptions = [],
   samples = [],
   quotes = [],
@@ -243,6 +249,15 @@ export default function ProductDetail({
     const unit = relatedInventories[0]?.unit || form.costUnit || form.sellingPriceUnit || '';
     return { total, reserved, available, unit };
   }, [form.costUnit, form.sellingPriceUnit, relatedInventories]);
+
+  const plannedInventorySummary = useMemo(() => {
+    const rows = buildPlannedInventoryRows({
+      products,
+      inventories,
+      inboundShipments,
+    });
+    return findPlannedInventoryRow(rows, form.id);
+  }, [form.id, inboundShipments, inventories, products]);
   const filteredInventories = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
 
@@ -697,7 +712,32 @@ export default function ProductDetail({
             <div className="metric-card blue"><span>現在庫</span><strong>{inventorySummary.total.toLocaleString('ja-JP')} {inventorySummary.unit}</strong></div>
             <div className="metric-card orange"><span>引当在庫</span><strong>{inventorySummary.reserved.toLocaleString('ja-JP')} {inventorySummary.unit}</strong></div>
             <div className="metric-card gold"><span>使用可能在庫</span><strong>{inventorySummary.available.toLocaleString('ja-JP')} {inventorySummary.unit}</strong></div>
+            <div className="metric-card green"><span>入荷予定</span><strong>{formatPlannedQuantity(plannedInventorySummary?.plannedInbound || 0, plannedInventorySummary?.unit || inventorySummary.unit)}</strong></div>
+            <div className="metric-card blue"><span>入荷後見込</span><strong>{formatPlannedQuantity(plannedInventorySummary?.projectedStock ?? inventorySummary.total, plannedInventorySummary?.unit || inventorySummary.unit)}</strong></div>
+            <div className="metric-card"><span>次回通関予定</span><strong>{plannedInventorySummary?.nextCustomsDate || '-'}</strong></div>
           </div>
+          {plannedInventorySummary?.timeline?.length > 0 && (
+            <div className="planned-inventory-product-timeline">
+              <div className="section-heading">
+                <h3>今後の入荷予定</h3>
+                <span className="info-badge muted">{plannedInventorySummary.inboundCount}件</span>
+              </div>
+              <div className="planned-inventory-timeline">
+                {plannedInventorySummary.timeline.map((item) => (
+                  <article className="planned-inventory-timeline-row" key={item.id}>
+                    <time>{item.customsDate || '通関予定未定'}</time>
+                    <strong>+{formatPlannedQuantity(item.quantity, item.unit)}</strong>
+                    <span>{item.contractNo || '契約No未設定'} / {item.warehouseName || '-'}</span>
+                  </article>
+                ))}
+              </div>
+              {plannedInventorySummary.warnings.length > 0 && (
+                <div className="delivery-notice-line-warnings">
+                  {plannedInventorySummary.warnings.map((warning) => <span className="info-badge warning" key={warning}>{warning}</span>)}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
