@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useAppData } from '../context/AppDataContext.jsx';
 
 const AnalyticsPage = lazy(() => import('../modules/dashboard/pages/AnalyticsPage.jsx'));
@@ -227,6 +227,12 @@ export default function AppRouter({
   const openInventoryPage = onOpenInventoryPage;
   const openProductDetail = onOpenProductDetail;
   const createDeliveryNoteFromShipment = onCreateDeliveryNoteFromShipment;
+  const [homeCalendarQuickAction, setHomeCalendarQuickAction] = useState(null);
+
+  function openCalendarQuickAction(type) {
+    setHomeCalendarQuickAction({ type, token: Date.now() });
+    setActivePage('Calendar');
+  }
 
   if (activePage === 'Import') {
     return <ImportPage error={importError} onGoCustomers={() => setActivePage('Customers')} />;
@@ -236,7 +242,9 @@ export default function AppRouter({
     return (
       <Home
         customers={customers}
+        tasks={tasks}
         samples={samples}
+        projects={projects}
         quotes={quotes}
         salesOrders={salesOrders}
         shipments={shipments}
@@ -244,11 +252,16 @@ export default function AppRouter({
         inventories={inventories}
         complaints={complaints}
         events={events}
+        inboundShipments={inboundShipments}
+        inboundShipmentLines={inboundShipmentLines}
+        inventoryLots={inventoryLots}
         setActivePage={setActivePage}
         syncState={syncState}
         syncError={syncError}
         reloadFromCloud={reloadFromCloud}
         onOpenKarte={openCustomerKarte}
+        onOpenInventoryPage={openInventoryPage}
+        onCreateCalendarItem={openCalendarQuickAction}
       />
     );
   }
@@ -752,8 +765,11 @@ export default function AppRouter({
         removeTask={removeTask}
         reloadEvents={reloadEvents}
         reloadTasks={reloadTasks}
-        calendarQuickAction={calendarQuickAction}
-        onCalendarQuickActionConsumed={onCalendarQuickActionConsumed}
+        calendarQuickAction={homeCalendarQuickAction || calendarQuickAction}
+        onCalendarQuickActionConsumed={() => {
+          setHomeCalendarQuickAction(null);
+          onCalendarQuickActionConsumed?.();
+        }}
         syncState={eventSyncState === 'error' || taskSyncState === 'error' ? 'error' : eventSyncState}
         syncError={[eventSyncError, taskSyncError].filter(Boolean).join(' / ')}
         updateCustomer={updateCustomer}
@@ -858,17 +874,25 @@ export default function AppRouter({
   return (
     <Home
       customers={customers}
+      tasks={tasks}
       samples={samples}
+      projects={projects}
       quotes={quotes}
       salesOrders={salesOrders}
       shipments={shipments}
+      inventories={inventories}
       complaints={complaints}
       events={events}
+      inboundShipments={inboundShipments}
+      inboundShipmentLines={inboundShipmentLines}
+      inventoryLots={inventoryLots}
       setActivePage={setActivePage}
       syncState={syncState}
       syncError={syncError}
       reloadFromCloud={reloadFromCloud}
       onOpenKarte={openCustomerKarte}
+      onOpenInventoryPage={openInventoryPage}
+      onCreateCalendarItem={openCalendarQuickAction}
     />
   );
 }
