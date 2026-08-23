@@ -11,6 +11,7 @@ const CLOUD_REQUIRED_MESSAGE = 'Supabase is required for business data. Check th
 const LOCAL_CACHE_MESSAGE = 'Showing an explicitly allowed local cache because Supabase is unavailable.';
 const LOCAL_CACHE_SAVE_MESSAGE = 'Saved to an explicitly allowed local cache because Supabase is unavailable.';
 const LEGACY_LOCAL_WARNING = '旧ローカル業務データがあります。安全のため自動移行・自動削除は行いません。';
+const FOCUS_REFETCH_THROTTLE_MS = 1500;
 
 function snakeToCamel(value) {
   return String(value || '').replace(/_([a-z])/g, (_, char) => char.toUpperCase());
@@ -30,6 +31,7 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
   const resolvedOrderColumn = orderColumn || tableConfig.orderColumn || 'updated_at';
   const allowLocalPersistence = tableConfig.localPersistence === true;
   const returnWritePromise = tableConfig.returnWritePromise === true;
+  const refetchOnFocus = tableConfig.focusRefetch === true;
 
   function readLocalSnapshot(userId = '') {
     if (!localStorageAvailable() || !storageKey) {
@@ -80,6 +82,8 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
     const [syncError, setSyncError] = useState(() => (canUseCloud() || allowLocalPersistence ? '' : CLOUD_REQUIRED_MESSAGE));
     const [legacyLocalDataWarning, setLegacyLocalDataWarning] = useState('');
     const writeSequenceRef = useRef(0);
+    const focusReloadTimerRef = useRef(null);
+    const lastFocusReloadAtRef = useRef(0);
 
     async function reload(writeSequence = null) {
       if (!canUseCloud()) {
@@ -136,6 +140,50 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
       setLegacyLocalDataWarning(hasLegacyLocalRecords() ? LEGACY_LOCAL_WARNING : '');
       reload();
     }, [userId]);
+
+    useEffect(() => {
+      if (!refetchOnFocus || !userId || typeof window === 'undefined' || typeof document === 'undefined') {
+        return undefined;
+      }
+
+      function clearScheduledReload() {
+        if (focusReloadTimerRef.current) {
+          window.clearTimeout(focusReloadTimerRef.current);
+          focusReloadTimerRef.current = null;
+        }
+      }
+
+      function scheduleFocusReload() {
+        if (document.visibilityState && document.visibilityState !== 'visible') {
+          return;
+        }
+
+        if (focusReloadTimerRef.current) {
+          return;
+        }
+
+        const now = Date.now();
+        const elapsed = now - lastFocusReloadAtRef.current;
+        const delay = elapsed < FOCUS_REFETCH_THROTTLE_MS
+          ? FOCUS_REFETCH_THROTTLE_MS - elapsed
+          : 150;
+
+        focusReloadTimerRef.current = window.setTimeout(() => {
+          focusReloadTimerRef.current = null;
+          lastFocusReloadAtRef.current = Date.now();
+          reload();
+        }, delay);
+      }
+
+      window.addEventListener('focus', scheduleFocusReload);
+      document.addEventListener('visibilitychange', scheduleFocusReload);
+
+      return () => {
+        window.removeEventListener('focus', scheduleFocusReload);
+        document.removeEventListener('visibilitychange', scheduleFocusReload);
+        clearScheduledReload();
+      };
+    }, [refetchOnFocus, userId]);
 
     const sortedRecords = useMemo(
       () =>

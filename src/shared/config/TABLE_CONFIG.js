@@ -1,6 +1,7 @@
 const DEFAULT_TABLE_CONFIG = {
   orderColumn: 'updated_at',
   realtime: false,
+  focusRefetch: false,
   audit: true,
   softDelete: false,
   localPersistence: false,
@@ -207,6 +208,7 @@ export const TABLE_CONFIG = {
   events: {
     orderColumn: 'updated_at',
     realtime: true,
+    focusRefetch: true,
     audit: true,
     softDelete: true,
     returnWritePromise: true,
@@ -217,6 +219,7 @@ export const TABLE_CONFIG = {
   tasks: {
     orderColumn: 'updated_at',
     realtime: true,
+    focusRefetch: true,
     audit: true,
     softDelete: true,
     returnWritePromise: true,
