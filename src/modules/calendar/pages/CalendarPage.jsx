@@ -171,10 +171,11 @@ function contactName(contacts, contactId) {
   return contacts.find((contact) => contact.id === contactId)?.name || '';
 }
 
-function createFormForDate(dateKey, user) {
+function createFormForDate(dateKey, user, defaults = {}) {
   const { startAt, endAt } = addHours(dateKey, 9, 1);
   return normalizeEvent({
     ...emptyEvent,
+    ...defaults,
     title: '',
     startAt,
     endAt,
@@ -183,9 +184,10 @@ function createFormForDate(dateKey, user) {
   }, user?.id ?? '');
 }
 
-function createTaskFormForDate(dateKey, user) {
+function createTaskFormForDate(dateKey, user, defaults = {}) {
   return normalizeTask({
     ...emptyTask,
+    ...defaults,
     recordedDate: toDateKey(new Date()),
     dueDate: /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : toDateKey(new Date()),
     createdBy: user?.id ?? '',
@@ -683,11 +685,11 @@ export default function CalendarPage({
     if (!calendarQuickAction?.type) return;
 
     if (calendarQuickAction.type === 'schedule') {
-      openAdd(baseDate || today);
+      openAdd(baseDate || today, 9, { customerId: calendarQuickAction.customerId || '' });
     }
 
     if (calendarQuickAction.type === 'task') {
-      openTaskAdd(baseDate || today);
+      openTaskAdd(baseDate || today, { customerId: calendarQuickAction.customerId || '' });
     }
 
     onCalendarQuickActionConsumed?.();
@@ -753,9 +755,9 @@ export default function CalendarPage({
       .filter((event) => new Date(event.startAt || `${dateKey}T00:00:00`).getHours() === hour);
   }
 
-  function openAdd(dateKey, hour = 9) {
+  function openAdd(dateKey, hour = 9, defaults = {}) {
     const safeDateKey = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : today;
-    const nextForm = createFormForDate(safeDateKey, user);
+    const nextForm = createFormForDate(safeDateKey, user, defaults);
     if (hour !== null) {
       const times = addHours(safeDateKey, hour, 1);
       nextForm.startAt = times.startAt;
@@ -766,10 +768,10 @@ export default function CalendarPage({
     setEditorOpen(true);
   }
 
-  function openTaskAdd(dateKey) {
+  function openTaskAdd(dateKey, defaults = {}) {
     const safeDateKey = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : today;
     setEditingTask(null);
-    setTaskForm(createTaskFormForDate(safeDateKey, user));
+    setTaskForm(createTaskFormForDate(safeDateKey, user, defaults));
     setTaskEditorOpen(true);
   }
 

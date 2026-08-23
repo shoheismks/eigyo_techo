@@ -34,6 +34,8 @@ import {
 } from '../../quotes/services/quotePdfService.js';
 import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../../samples/hooks/useSamples.js';
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
+import { buildCustomerBriefing } from '../services/customerBriefingService.js';
+import CustomerBriefing from '../components/karteSummary/CustomerBriefing.jsx';
 import {
   generateAiMeetingPrep,
   generateProductProposalNote,
@@ -566,6 +568,7 @@ export default function CustomerKarte({
   onCreateQuote,
   onCreateInvoice,
   onCreateSalesOrder,
+  onCalendarQuickAction,
   user,
 }) {
   const [analysis, setAnalysis] = useState(null);
@@ -704,6 +707,20 @@ export default function CustomerKarte({
   const printSummary = useMemo(
     () => (karte ? buildPrintSummary({ karte, projects, products, inventories, suppliers }) : null),
     [inventories, karte, products, projects, suppliers],
+  );
+  const briefing = useMemo(
+    () => (karte ? buildCustomerBriefing({
+      karte,
+      customer: karte.customer,
+      contacts: karte.contacts,
+      tasks,
+      events,
+      projects,
+      quotes: karte.estimates,
+      samples: karte.samples,
+      complaints: karte.complaints,
+    }) : null),
+    [events, karte, projects, tasks],
   );
 
   useEffect(() => {
@@ -1659,6 +1676,34 @@ export default function CustomerKarte({
     setLineNote(createLineFollowNote({ customer, contacts: karte.contacts }));
   }
 
+  function openKarteTab(tab) {
+    setKarteTab(tab);
+    window.requestAnimationFrame(() => {
+      document.querySelector('.karte-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  function openMeetingHistoryForm() {
+    setHistoryForm((current) => ({
+      ...emptyHistoryForm,
+      date: current.date || todayString(),
+      type: current.type || '商談',
+    }));
+    openKarteTab('activity');
+  }
+
+  function openCalendarForCustomer(type) {
+    if (onCalendarQuickAction) {
+      onCalendarQuickAction(type, { customerId: customer.id });
+      return;
+    }
+    openKarteTab('calendar');
+  }
+
+  function handleBriefingNavigate(tab) {
+    openKarteTab(tab);
+  }
+
   async function handleAttachment(file, field = 'customer-file') {
     if (!file) return;
 
@@ -1762,6 +1807,15 @@ export default function CustomerKarte({
       onSelect: startAddSample,
     },
   ].filter(Boolean);
+  const briefingActions = {
+    onNavigate: handleBriefingNavigate,
+    onOpenHistory: () => openKarteTab('activity'),
+    onAddHistory: openMeetingHistoryForm,
+    onAddEvent: () => openCalendarForCustomer('schedule'),
+    onAddTask: () => openCalendarForCustomer('task'),
+    onCreateQuote: () => onCreateQuote?.({ customerId: customer.id }),
+    onAddProject: () => openKarteTab('projects'),
+  };
 
   return (
     <main className={`page karte-page karte-tab-${karteTab}`}>
@@ -1797,6 +1851,8 @@ export default function CustomerKarte({
           onPrint={handlePrintSummary}
         />
       )}
+
+      <CustomerBriefing briefing={briefing} actions={briefingActions} />
 
       <section className="karte-kpi-strip" aria-label="顧客カルテKPI">
         {kpiItems.map((item) => (

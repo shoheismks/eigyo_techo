@@ -229,8 +229,8 @@ export default function AppRouter({
   const createDeliveryNoteFromShipment = onCreateDeliveryNoteFromShipment;
   const [homeCalendarQuickAction, setHomeCalendarQuickAction] = useState(null);
 
-  function openCalendarQuickAction(type) {
-    setHomeCalendarQuickAction({ type, token: Date.now() });
+  function openCalendarQuickAction(type, options = {}) {
+    setHomeCalendarQuickAction({ type, ...options, token: Date.now() });
     setActivePage('Calendar');
   }
 
@@ -345,6 +345,7 @@ export default function AppRouter({
           setActivePage={setActivePage}
           onOpenKarte={openCustomerKarte}
           onCreateQuote={onCreateQuote}
+          onCalendarQuickAction={openCalendarQuickAction}
           user={user}
         />
       </Suspense>

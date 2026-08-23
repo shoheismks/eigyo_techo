@@ -158,6 +158,10 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
           return;
         }
 
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+          return;
+        }
+
         if (focusReloadTimerRef.current) {
           return;
         }
@@ -176,10 +180,14 @@ export function createRecordHook({ tableName, storageKey, normalize, toRow, from
       }
 
       window.addEventListener('focus', scheduleFocusReload);
+      window.addEventListener('pageshow', scheduleFocusReload);
+      window.addEventListener('pointerdown', scheduleFocusReload, { capture: true });
       document.addEventListener('visibilitychange', scheduleFocusReload);
 
       return () => {
         window.removeEventListener('focus', scheduleFocusReload);
+        window.removeEventListener('pageshow', scheduleFocusReload);
+        window.removeEventListener('pointerdown', scheduleFocusReload, { capture: true });
         document.removeEventListener('visibilitychange', scheduleFocusReload);
         clearScheduledReload();
       };
