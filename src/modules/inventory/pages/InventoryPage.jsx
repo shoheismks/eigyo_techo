@@ -1493,6 +1493,7 @@ function InboundAnalysisDashboard({ analysis, filters, onFilterChange, onResetFi
                     <div><dt>予定重量</dt><dd>{formatPlannedQuantity(row.plannedWeight, 'kg')}</dd></div>
                     <div><dt>実入荷重量</dt><dd>{formatPlannedQuantity(row.actualWeight, 'kg')}</dd></div>
                     <div><dt>重量差異</dt><dd>{formatPlannedQuantity(row.weightVariance, 'kg')}</dd></div>
+                    <div><dt>変更回数</dt><dd>{row.scheduleChangeCount}</dd></div>
                     <div><dt>部分入荷回数</dt><dd>{row.receiptCount}</dd></div>
                     <div><dt>遅延理由</dt><dd>{row.scheduleReasons.join(' / ') || '-'}</dd></div>
                   </dl>
