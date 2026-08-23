@@ -82,6 +82,7 @@ export default function AppRouter({
   inboundShipmentLines,
   inboundReceipts,
   inboundReceiptLines,
+  inboundScheduleChanges,
   supplierProductAliases,
   saveInboundShipmentPreview,
   addInboundShipment,
@@ -90,7 +91,9 @@ export default function AppRouter({
   updateInboundShipmentLine,
   addInboundReceipt,
   addInboundReceiptLine,
+  addInboundScheduleChange,
   addSupplierProductAlias,
+  updateInboundSchedule,
   confirmInboundReceipt,
   reverseInboundReceipt,
   inboundShipmentSyncState,
@@ -572,12 +575,14 @@ export default function AppRouter({
         inboundShipmentLines={inboundShipmentLines}
         inboundReceipts={inboundReceipts}
         inboundReceiptLines={inboundReceiptLines}
+        inboundScheduleChanges={inboundScheduleChanges}
         supplierProductAliases={supplierProductAliases}
         saveInboundShipmentPreview={saveInboundShipmentPreview}
         updateInboundShipmentLine={updateInboundShipmentLine}
         addSupplierProductAlias={addSupplierProductAlias}
         confirmInboundReceipt={confirmInboundReceipt}
         reverseInboundReceipt={reverseInboundReceipt}
+        updateInboundSchedule={updateInboundSchedule}
         inboundShipmentSyncState={inboundShipmentSyncState}
         inboundShipmentSyncError={inboundShipmentSyncError}
         reloadInventory={reloadInventory}
@@ -790,6 +795,7 @@ export default function AppRouter({
           inboundShipmentLines,
           inboundReceipts,
           inboundReceiptLines,
+          inboundScheduleChanges,
           supplierProductAliases,
           stocktakes,
           stocktakeLines,
@@ -822,6 +828,7 @@ export default function AppRouter({
           inboundShipmentLines: { records: inboundShipmentLines, add: addInboundShipmentLine, update: updateInboundShipmentLine },
           inboundReceipts: { records: inboundReceipts, add: addInboundReceipt, update: () => {} },
           inboundReceiptLines: { records: inboundReceiptLines, add: addInboundReceiptLine, update: () => {} },
+          inboundScheduleChanges: { records: inboundScheduleChanges, add: addInboundScheduleChange, update: () => {} },
           supplierProductAliases: { records: supplierProductAliases, add: addSupplierProductAlias, update: () => {} },
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },

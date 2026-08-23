@@ -30,6 +30,8 @@ const TABS = [
 
 const ALL = 'all';
 const ADJUSTMENT_REASONS = ['棚卸差異', '破損', '廃棄', 'サンプル使用', '入力ミス修正', 'その他'];
+const SCHEDULE_CHANGE_REASONS = ['通関遅延', '船便遅延', '書類不備', '検査', '倉庫都合', '仕入先都合', 'その他'];
+const SCHEDULE_CHANGE_ALLOWED_STATUSES = new Set(['pending', 'partially_received']);
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -80,6 +82,56 @@ function canReceiveInboundLine(line) {
     ['matched', 'manual'].includes(line.matchStatus) &&
     !['excluded', 'skipped', 'cancelled', 'deleted', 'received'].includes(line.status),
   );
+}
+
+function canChangeInboundSchedule(line) {
+  return Boolean(
+    line &&
+    SCHEDULE_CHANGE_ALLOWED_STATUSES.has(line.status || 'pending') &&
+    !line.cancelledAt &&
+    !line.deletedAt,
+  );
+}
+
+function dateDiffDays(fromDate, toDate) {
+  if (!fromDate || !toDate) return 0;
+  const from = new Date(`${fromDate}T00:00:00Z`);
+  const to = new Date(`${toDate}T00:00:00Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+function scheduleOriginalDate(line) {
+  return line?.originalCustomsClearancePlannedDate || line?.customsClearancePlannedDate || '';
+}
+
+function scheduleCurrentDate(line) {
+  return line?.customsClearancePlannedDate || '';
+}
+
+function scheduleDelayDays(line) {
+  return dateDiffDays(scheduleOriginalDate(line), scheduleCurrentDate(line));
+}
+
+function scheduleDelayLabel(days) {
+  if (days > 0) return `${days}日遅延`;
+  if (days < 0) return `${Math.abs(days)}日前倒し`;
+  return '予定通り';
+}
+
+function scheduleDelayBadgeClass(days) {
+  if (days > 0) return 'warning';
+  if (days < 0) return 'ready';
+  return 'muted';
+}
+
+function buildScheduleForm(line) {
+  return {
+    inboundShipmentLineId: line?.id || '',
+    newDate: scheduleCurrentDate(line),
+    reason: SCHEDULE_CHANGE_REASONS[0],
+    memo: '',
+  };
 }
 
 function defaultReceiptLine(line) {
@@ -210,12 +262,14 @@ export default function InventoryPage({
   inboundShipments = [],
   inboundReceipts = [],
   inboundReceiptLines = [],
+  inboundScheduleChanges = [],
   supplierProductAliases = [],
   saveInboundShipmentPreview,
   updateInboundShipmentLine,
   addSupplierProductAlias,
   confirmInboundReceipt,
   reverseInboundReceipt,
+  updateInboundSchedule,
   inboundShipmentSyncState = '',
   inboundShipmentSyncError = '',
   reloadInventory,
@@ -246,6 +300,9 @@ export default function InventoryPage({
   const [reverseReceiptId, setReverseReceiptId] = useState('');
   const [reverseReason, setReverseReason] = useState('');
   const [reverseSaving, setReverseSaving] = useState(false);
+  const [scheduleLineId, setScheduleLineId] = useState('');
+  const [scheduleForm, setScheduleForm] = useState(() => buildScheduleForm(null));
+  const [scheduleSaving, setScheduleSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -275,6 +332,7 @@ export default function InventoryPage({
   const receiptShipment = inboundShipments.find((shipment) => shipment.id === receiptShipmentId);
   const reverseReceipt = inboundReceipts.find((receipt) => receipt.id === reverseReceiptId);
   const reverseReceiptLines = inboundReceiptLines.filter((line) => line.inboundReceiptId === reverseReceiptId);
+  const scheduleLine = (selectedInboundShipment?.lines || []).find((line) => line.id === scheduleLineId);
   const historyRows = useMemo(
     () => buildHistory(inventories, products, suppliers),
     [inventories, products, suppliers],
@@ -656,6 +714,25 @@ export default function InventoryPage({
     setReverseReason('');
   }
 
+  function openScheduleChangeDialog(line) {
+    setError('');
+    setToast('');
+    setScheduleLineId(line?.id || '');
+    setScheduleForm(buildScheduleForm(line));
+  }
+
+  function closeScheduleChangeDialog() {
+    if (scheduleSaving) return;
+    setScheduleLineId('');
+    setScheduleForm(buildScheduleForm(null));
+  }
+
+  function setScheduleField(field, value) {
+    setError('');
+    setToast('');
+    setScheduleForm((current) => ({ ...current, [field]: value }));
+  }
+
   function setReceiptField(field, value) {
     setError('');
     setToast('');
@@ -762,6 +839,44 @@ export default function InventoryPage({
       setError(reverseError.message || '入荷取消に失敗しました。');
     } finally {
       setReverseSaving(false);
+    }
+  }
+
+  async function handleUpdateInboundSchedule(event) {
+    event.preventDefault();
+    if (!scheduleLine) {
+      setError('予定変更する入荷予定明細が見つかりません。');
+      return;
+    }
+    if (!canChangeInboundSchedule(scheduleLine)) {
+      setError('この明細は予定変更できません。');
+      return;
+    }
+    if (!scheduleForm.newDate) {
+      setError('新しい通関予定日を入力してください。');
+      return;
+    }
+    if (!String(scheduleForm.reason || '').trim()) {
+      setError('予定変更理由を入力してください。');
+      return;
+    }
+
+    setScheduleSaving(true);
+    setError('');
+    setToast('');
+    try {
+      const result = await updateInboundSchedule?.({
+        inboundShipmentLineId: scheduleLine.id,
+        newDate: scheduleForm.newDate,
+        reason: scheduleForm.reason,
+        memo: scheduleForm.memo,
+      });
+      setToast(result?.status === 'unchanged' ? '通関予定は変更されていません。' : '通関予定を変更しました。');
+      closeScheduleChangeDialog();
+    } catch (scheduleError) {
+      setError(scheduleError.message || '通関予定の変更に失敗しました。');
+    } finally {
+      setScheduleSaving(false);
     }
   }
 
@@ -992,6 +1107,7 @@ export default function InventoryPage({
           inboundShipments={inboundShipments}
           inboundReceipts={inboundReceipts}
           inboundReceiptLines={inboundReceiptLines}
+          inboundScheduleChanges={inboundScheduleChanges}
           selectedInboundShipment={selectedInboundShipment}
           onSelectInboundShipment={setSelectedInboundShipmentId}
           products={products}
@@ -1000,6 +1116,7 @@ export default function InventoryPage({
           onSaveAlias={handleSaveInboundAlias}
           onOpenReceipt={openInboundReceiptDialog}
           onOpenReverseReceipt={openReverseReceiptDialog}
+          onOpenScheduleChange={openScheduleChangeDialog}
           syncState={inboundShipmentSyncState}
           syncError={inboundShipmentSyncError}
         />
@@ -1095,6 +1212,17 @@ export default function InventoryPage({
           onReasonChange={setReverseReason}
           onClose={closeReverseReceiptDialog}
           onSubmit={handleReverseInboundReceipt}
+        />
+      )}
+
+      {scheduleLine && (
+        <InboundScheduleChangeDialog
+          line={scheduleLine}
+          form={scheduleForm}
+          saving={scheduleSaving}
+          onChange={setScheduleField}
+          onClose={closeScheduleChangeDialog}
+          onSubmit={handleUpdateInboundSchedule}
         />
       )}
     </main>
@@ -1266,10 +1394,12 @@ function DeliveryNoticeImportPanel({
   inboundShipments = [],
   inboundReceipts = [],
   inboundReceiptLines = [],
+  inboundScheduleChanges = [],
   selectedInboundShipment = null,
   products = [],
   onOpenReceipt,
   onOpenReverseReceipt,
+  onOpenScheduleChange,
   syncState = '',
   syncError = '',
 }) {
@@ -1343,6 +1473,32 @@ function DeliveryNoticeImportPanel({
     },
     { key: 'receivedWeight', label: '入荷済重量', width: '110px', render: (line) => formatQuantity(line.receivedWeightTotal, line.unit) },
     { key: 'remainingWeight', label: '残重量', width: '100px', render: (line) => formatQuantity(lineRemainingWeight(line), line.unit) },
+    { key: 'originalCustoms', label: '当初通関予定', minWidth: '120px', render: (line) => scheduleOriginalDate(line) || '-' },
+    { key: 'currentCustoms', label: '現在通関予定', minWidth: '120px', render: (line) => scheduleCurrentDate(line) || '-' },
+    {
+      key: 'scheduleDelay',
+      label: '差分',
+      minWidth: '110px',
+      render: (line) => {
+        const days = scheduleDelayDays(line);
+        return <span className={`info-badge ${scheduleDelayBadgeClass(days)}`}>{scheduleDelayLabel(days)}</span>;
+      },
+    },
+    {
+      key: 'scheduleAction',
+      label: '予定変更',
+      width: '110px',
+      render: (line) => (
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={!canChangeInboundSchedule(line)}
+          onClick={() => onOpenScheduleChange?.(line)}
+        >
+          変更
+        </button>
+      ),
+    },
     {
       key: 'unitPrice',
       label: '単価',
@@ -1392,6 +1548,15 @@ function DeliveryNoticeImportPanel({
       ...receipt,
       lines: inboundReceiptLines.filter((line) => line.inboundReceiptId === receipt.id),
     }));
+
+  const scheduleChangeRows = (selectedInboundShipment?.lines || [])
+    .flatMap((line) => {
+      const lineChanges = line.scheduleChanges?.length
+        ? line.scheduleChanges
+        : inboundScheduleChanges.filter((change) => change.inboundShipmentLineId === line.id);
+      return lineChanges.map((change) => ({ ...change, line }));
+    })
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 
   const hasReceivableLines = (selectedInboundShipment?.lines || []).some(canReceiveInboundLine);
 
@@ -1606,7 +1771,12 @@ function DeliveryNoticeImportPanel({
                   <div><dt>入荷済重量</dt><dd>{formatQuantity(line.receivedWeightTotal, line.unit)}</dd></div>
                   <div><dt>残重量</dt><dd>{formatQuantity(lineRemainingWeight(line), line.unit)}</dd></div>
                   <div><dt>単価</dt><dd>{line.unitPrice !== null ? `${formatPrice(line.unitPrice)} ${line.currency || ''}` : '-'}</dd></div>
-                  <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>
+                  <div><dt>当初通関予定</dt><dd>{scheduleOriginalDate(line) || '-'}</dd></div>
+                  <div><dt>現在通関予定</dt><dd>{scheduleCurrentDate(line) || '-'}</dd></div>
+                  <div>
+                    <dt>差分</dt>
+                    <dd><span className={`info-badge ${scheduleDelayBadgeClass(scheduleDelayDays(line))}`}>{scheduleDelayLabel(scheduleDelayDays(line))}</span></dd>
+                  </div>
                   <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
                 </dl>
                 <div className="inventory-form-grid compact-grid">
@@ -1620,12 +1790,39 @@ function DeliveryNoticeImportPanel({
                     {line.status === 'excluded' ? '除外を戻す' : '明細除外'}
                   </button>
                   <button type="button" className="ghost-button" onClick={() => onSaveAlias?.(line)}>別名保存</button>
+                  <button type="button" className="ghost-button" disabled={!canChangeInboundSchedule(line)} onClick={() => onOpenScheduleChange?.(line)}>
+                    予定変更
+                  </button>
                 </div>
                 {line.warnings?.length > 0 && (
                   <div className="delivery-notice-line-warnings">
                     {line.warnings.map((warning) => <span className="info-badge muted" key={warning}>{warning}</span>)}
                   </div>
                 )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedInboundShipment && scheduleChangeRows.length > 0 && (
+        <div className="delivery-notice-schedule-history">
+          <div className="section-heading">
+            <h3>予定変更履歴</h3>
+            <span className="info-badge muted">{scheduleChangeRows.length}件</span>
+          </div>
+          <div className="delivery-schedule-change-list">
+            {scheduleChangeRows.map((change) => (
+              <article className="delivery-schedule-change-card" key={change.id}>
+                <div>
+                  <strong>{change.oldDate || '-'} → {change.newDate || '-'}</strong>
+                  <p>{change.line?.contractNo || '契約No未取得'} / {change.line?.productNameRaw || '商品名未取得'}</p>
+                  <p>理由: {change.reason || '-'}{change.memo ? ` / ${change.memo}` : ''}</p>
+                  <p>変更日時: {String(change.createdAt || '').replace('T', ' ').slice(0, 16) || '-'}</p>
+                </div>
+                <span className={`info-badge ${scheduleDelayBadgeClass(change.delayDays)}`}>
+                  {scheduleDelayLabel(change.delayDays)}
+                </span>
               </article>
             ))}
           </div>
@@ -1665,6 +1862,87 @@ function DeliveryNoticeImportPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function InboundScheduleChangeDialog({ line, form, saving, onChange, onClose, onSubmit }) {
+  const originalDate = scheduleOriginalDate(line);
+  const currentDate = scheduleCurrentDate(line);
+  const nextDelay = dateDiffDays(originalDate, form.newDate);
+  const currentDelay = scheduleDelayDays(line);
+
+  return (
+    <div className="modal-backdrop inbound-receipt-backdrop" role="presentation" onMouseDown={onClose}>
+      <form
+        className="modal-panel inbound-receipt-dialog inbound-schedule-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inbound-schedule-change-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={onSubmit}
+      >
+        <div className="section-heading inbound-receipt-dialog-header">
+          <div>
+            <p className="eyebrow">Customs schedule</p>
+            <h2 id="inbound-schedule-change-title">通関予定変更</h2>
+            <p className="inline-helper">{line.contractNo || '契約No未取得'} / {line.productNameRaw || '商品名未取得'}</p>
+          </div>
+          <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>閉じる</button>
+        </div>
+
+        <div className="dashboard-metrics inbound-receipt-summary">
+          <div className="summary-card"><span>当初予定</span><strong>{originalDate || '-'}</strong></div>
+          <div className="summary-card"><span>現在予定</span><strong>{currentDate || '-'}</strong></div>
+          <div className="summary-card">
+            <span>現在差分</span>
+            <strong className={`schedule-delay-text ${scheduleDelayBadgeClass(currentDelay)}`}>{scheduleDelayLabel(currentDelay)}</strong>
+          </div>
+          <div className="summary-card">
+            <span>変更後差分</span>
+            <strong className={`schedule-delay-text ${scheduleDelayBadgeClass(nextDelay)}`}>{scheduleDelayLabel(nextDelay)}</strong>
+          </div>
+        </div>
+
+        <div className="inventory-form-grid inbound-receipt-meta">
+          <label className="field-label">
+            新しい通関予定日
+            <input
+              type="date"
+              value={form.newDate || ''}
+              onChange={(event) => onChange('newDate', event.target.value)}
+              required
+            />
+          </label>
+          <label className="field-label">
+            理由
+            <select value={form.reason || ''} onChange={(event) => onChange('reason', event.target.value)} required>
+              {SCHEDULE_CHANGE_REASONS.map((reason) => <option value={reason} key={reason}>{reason}</option>)}
+            </select>
+          </label>
+          <label className="field-label full-width">
+            メモ
+            <textarea
+              value={form.memo || ''}
+              onChange={(event) => onChange('memo', event.target.value)}
+              rows={4}
+              placeholder={form.reason === 'その他' ? 'その他の理由を入力してください。' : '補足があれば入力してください。'}
+            />
+          </label>
+        </div>
+
+        <p className="inline-helper">
+          履歴は削除せず保存します。予定変更は通関予定日だけを更新し、在庫数量・入荷実績・在庫履歴には影響しません。
+        </p>
+
+        <div className="modal-actions inbound-receipt-dialog-actions">
+          <span className="inline-helper">pending / 一部入荷の明細のみ変更できます。</span>
+          <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button>
+          <button type="submit" className="primary-button" disabled={saving}>
+            {saving ? '更新中...' : '更新'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

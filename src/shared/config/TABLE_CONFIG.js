@@ -150,6 +150,15 @@ export const TABLE_CONFIG = {
     defaultSort: { key: 'lineNo', direction: 'asc' },
     displayName: '\u5165\u8377\u4e88\u5b9a\u660e\u7d30',
   },
+  inbound_schedule_changes: {
+    orderColumn: 'created_at',
+    realtime: true,
+    audit: true,
+    softDelete: false,
+    searchable: ['reason', 'memo'],
+    defaultSort: { key: 'createdAt', direction: 'desc' },
+    displayName: '\u901a\u95a2\u4e88\u5b9a\u5909\u66f4\u5c65\u6b74',
+  },
   supplier_product_aliases: {
     orderColumn: 'updated_at',
     realtime: true,

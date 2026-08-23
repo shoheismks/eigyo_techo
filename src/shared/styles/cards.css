@@ -3157,6 +3157,41 @@
   align-items: flex-start;
 }
 
+.delivery-schedule-change-list {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-schedule-change-card {
+  align-items: flex-start;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.delivery-schedule-change-card p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  margin: 4px 0 0;
+}
+
+.schedule-delay-text.warning {
+  color: #f59e0b;
+}
+
+.schedule-delay-text.ready {
+  color: #22c55e;
+}
+
+.schedule-delay-text.muted {
+  color: var(--muted);
+}
+
 .inbound-receipt-dialog {
   max-height: min(88vh, 900px);
   overflow: auto;
@@ -3310,6 +3345,10 @@
 
   .delivery-receipt-card {
     align-items: stretch;
+    display: grid;
+  }
+
+  .delivery-schedule-change-card {
     display: grid;
   }
 

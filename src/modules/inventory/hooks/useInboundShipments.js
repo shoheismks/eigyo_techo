@@ -8,6 +8,7 @@ const LINES_TABLE = 'inbound_shipment_lines';
 const ALIASES_TABLE = 'supplier_product_aliases';
 const RECEIPTS_TABLE = 'inbound_receipts';
 const RECEIPT_LINES_TABLE = 'inbound_receipt_lines';
+const SCHEDULE_CHANGES_TABLE = 'inbound_schedule_changes';
 const PARSER_VERSION = 'nippon-steel-delivery-notice-v1';
 
 function nowIso() {
@@ -132,7 +133,10 @@ export function normalizeInboundShipmentLine(line = {}, userId = '') {
     currency: line.currency ?? 'JPY',
     originCountry: line.originCountry ?? line.origin_country ?? '',
     factoryNo: line.factoryNo ?? line.factory_no ?? '',
+    originalCustomsClearancePlannedDate: line.originalCustomsClearancePlannedDate ?? line.original_customs_clearance_planned_date ?? line.customsClearancePlannedDate ?? line.customs_clearance_planned_date ?? '',
     customsClearancePlannedDate: line.customsClearancePlannedDate ?? line.customs_clearance_planned_date ?? '',
+    scheduleUpdatedAt: line.scheduleUpdatedAt ?? line.schedule_updated_at ?? '',
+    scheduleUpdatedBy: line.scheduleUpdatedBy ?? line.schedule_updated_by ?? '',
     packingFrom: line.packingFrom ?? line.packing_from ?? '',
     packingTo: line.packingTo ?? line.packing_to ?? '',
     expiryDate: line.expiryDate ?? line.expiry_date ?? '',
@@ -227,7 +231,10 @@ export function inboundShipmentLineToRow(line) {
     currency: line.currency,
     origin_country: line.originCountry,
     factory_no: line.factoryNo,
+    original_customs_clearance_planned_date: toDateValue(line.originalCustomsClearancePlannedDate) || toDateValue(line.customsClearancePlannedDate) || null,
     customs_clearance_planned_date: toDateValue(line.customsClearancePlannedDate) || null,
+    schedule_updated_at: line.scheduleUpdatedAt || null,
+    schedule_updated_by: line.scheduleUpdatedBy || null,
     packing_from: toDateValue(line.packingFrom) || null,
     packing_to: toDateValue(line.packingTo) || null,
     expiry_date: toDateValue(line.expiryDate) || null,
@@ -272,7 +279,10 @@ export function inboundShipmentLineFromRow(row) {
     currency: row.currency,
     originCountry: row.origin_country,
     factoryNo: row.factory_no,
+    originalCustomsClearancePlannedDate: row.original_customs_clearance_planned_date,
     customsClearancePlannedDate: row.customs_clearance_planned_date,
+    scheduleUpdatedAt: row.schedule_updated_at,
+    scheduleUpdatedBy: row.schedule_updated_by,
     packingFrom: row.packing_from,
     packingTo: row.packing_to,
     expiryDate: row.expiry_date,
@@ -363,6 +373,22 @@ export function normalizeInboundReceiptLine(line = {}, userId = '') {
   };
 }
 
+export function normalizeInboundScheduleChange(change = {}, userId = '') {
+  return {
+    id: change.id ?? crypto.randomUUID(),
+    userId: change.userId ?? change.user_id ?? userId,
+    inboundShipmentId: change.inboundShipmentId ?? change.inbound_shipment_id ?? '',
+    inboundShipmentLineId: change.inboundShipmentLineId ?? change.inbound_shipment_line_id ?? '',
+    oldDate: change.oldDate ?? change.old_date ?? '',
+    newDate: change.newDate ?? change.new_date ?? '',
+    delayDays: numericOrNull(change.delayDays ?? change.delay_days) ?? 0,
+    reason: change.reason ?? '',
+    memo: change.memo ?? '',
+    changedBy: change.changedBy ?? change.changed_by ?? '',
+    createdAt: change.createdAt ?? change.created_at ?? nowIso(),
+  };
+}
+
 export function inboundReceiptToRow(receipt) {
   return {
     id: receipt.id,
@@ -398,6 +424,38 @@ export function inboundReceiptLineToRow(line) {
     void_reason: line.voidReason || null,
     created_at: line.createdAt,
   };
+}
+
+export function inboundScheduleChangeToRow(change) {
+  return {
+    id: change.id,
+    user_id: change.userId,
+    inbound_shipment_id: change.inboundShipmentId,
+    inbound_shipment_line_id: change.inboundShipmentLineId,
+    old_date: toDateValue(change.oldDate) || null,
+    new_date: toDateValue(change.newDate) || null,
+    delay_days: numericOrNull(change.delayDays) ?? 0,
+    reason: change.reason || '',
+    memo: change.memo || '',
+    changed_by: change.changedBy || null,
+    created_at: change.createdAt,
+  };
+}
+
+export function inboundScheduleChangeFromRow(row) {
+  return normalizeInboundScheduleChange({
+    id: row.id,
+    userId: row.user_id,
+    inboundShipmentId: row.inbound_shipment_id,
+    inboundShipmentLineId: row.inbound_shipment_line_id,
+    oldDate: row.old_date,
+    newDate: row.new_date,
+    delayDays: row.delay_days,
+    reason: row.reason,
+    memo: row.memo,
+    changedBy: row.changed_by,
+    createdAt: row.created_at,
+  });
 }
 
 export function matchInboundLineToProduct(line, products = [], aliases = [], supplierName = '') {
@@ -464,6 +522,7 @@ export function useInboundShipments(userId = '', products = []) {
   const [aliases, setAliases] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [receiptLines, setReceiptLines] = useState([]);
+  const [scheduleChanges, setScheduleChanges] = useState([]);
   const [syncState, setSyncState] = useState(canUseCloud() ? 'syncing' : 'error');
   const [syncError, setSyncError] = useState('');
   const writeSequenceRef = useRef(0);
@@ -475,6 +534,7 @@ export function useInboundShipments(userId = '', products = []) {
       setAliases([]);
       setReceipts([]);
       setReceiptLines([]);
+      setScheduleChanges([]);
       setSyncState('error');
       setSyncError('Supabaseに接続できないため、入荷予定を取得できません。');
       return;
@@ -483,12 +543,13 @@ export function useInboundShipments(userId = '', products = []) {
     try {
       setSyncState('syncing');
       setSyncError('');
-      const [nextShipments, nextLines, nextAliases, nextReceipts, nextReceiptLines] = await Promise.all([
+      const [nextShipments, nextLines, nextAliases, nextReceipts, nextReceiptLines, nextScheduleChanges] = await Promise.all([
         fetchRecords(SHIPMENTS_TABLE, userId, inboundShipmentFromRow),
         fetchRecords(LINES_TABLE, userId, inboundShipmentLineFromRow),
         fetchRecords(ALIASES_TABLE, userId, supplierProductAliasFromRow),
         fetchRecords(RECEIPTS_TABLE, userId, normalizeInboundReceipt),
         fetchRecords(RECEIPT_LINES_TABLE, userId, normalizeInboundReceiptLine),
+        fetchRecords(SCHEDULE_CHANGES_TABLE, userId, inboundScheduleChangeFromRow),
       ]);
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
       setShipments(nextShipments.filter((shipment) => shipment.status !== 'deleted'));
@@ -496,6 +557,7 @@ export function useInboundShipments(userId = '', products = []) {
       setAliases(nextAliases.filter((alias) => alias.isActive !== false));
       setReceipts(nextReceipts);
       setReceiptLines(nextReceiptLines);
+      setScheduleChanges(nextScheduleChanges);
       setSyncState('supabase');
     } catch (error) {
       if (writeSequence !== null && writeSequence !== writeSequenceRef.current) return;
@@ -504,6 +566,7 @@ export function useInboundShipments(userId = '', products = []) {
       setAliases([]);
       setReceipts([]);
       setReceiptLines([]);
+      setScheduleChanges([]);
       setSyncState('error');
       setSyncError(error.message || '入荷予定の取得に失敗しました。');
     }
@@ -518,9 +581,15 @@ export function useInboundShipments(userId = '', products = []) {
       ...shipment,
       lines: lines
         .filter((line) => line.inboundShipmentId === shipment.id && line.status !== 'deleted')
+        .map((line) => ({
+          ...line,
+          scheduleChanges: scheduleChanges
+            .filter((change) => change.inboundShipmentLineId === line.id)
+            .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))),
+        }))
         .sort((a, b) => a.lineNo - b.lineNo),
     })),
-    [lines, shipments],
+    [lines, scheduleChanges, shipments],
   );
 
   async function saveParsedShipment(preview) {
@@ -579,6 +648,7 @@ export function useInboundShipments(userId = '', products = []) {
         currency: parsedLine.currency,
         originCountry: parsedLine.originCountry,
         factoryNo: parsedLine.factoryNo,
+        originalCustomsClearancePlannedDate: parsedLine.customsClearancePlannedDate,
         customsClearancePlannedDate: parsedLine.customsClearancePlannedDate,
         packingFrom: parsedLine.packingFrom,
         packingTo: parsedLine.packingTo,
@@ -798,6 +868,73 @@ export function useInboundShipments(userId = '', products = []) {
     }
   }
 
+  async function addInboundScheduleChange(record) {
+    const normalized = normalizeInboundScheduleChange({
+      ...record,
+      id: record.id ?? crypto.randomUUID(),
+      userId,
+      createdAt: record.createdAt ?? nowIso(),
+    }, userId);
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+    try {
+      const { error } = await supabase.from(SCHEDULE_CHANGES_TABLE).insert(inboundScheduleChangeToRow(normalized));
+      if (error) throw error;
+      await reload(writeSequence);
+      return normalized.id;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || '入荷予定変更履歴の復元に失敗しました。');
+      }
+      throw error;
+    }
+  }
+
+  async function updateInboundSchedule({ inboundShipmentLineId, newDate, reason, memo = '' } = {}) {
+    if (!canUseCloud()) {
+      const message = 'Supabaseに接続できないため、通関予定を変更できません。';
+      setSyncState('error');
+      setSyncError(message);
+      throw new Error(message);
+    }
+
+    const normalizedDate = toDateValue(newDate);
+    const normalizedReason = String(reason || '').trim();
+    if (!inboundShipmentLineId) {
+      throw new Error('予定変更する入荷予定明細が見つかりません。');
+    }
+    if (!normalizedDate) {
+      throw new Error('新しい通関予定日を入力してください。');
+    }
+    if (!normalizedReason) {
+      throw new Error('予定変更理由を入力してください。');
+    }
+
+    const writeSequence = ++writeSequenceRef.current;
+    setSyncState('syncing');
+    setSyncError('');
+    try {
+      const { data, error } = await supabase.rpc('update_inbound_schedule', {
+        p_inbound_shipment_line_id: inboundShipmentLineId,
+        p_new_date: normalizedDate,
+        p_reason: normalizedReason,
+        p_memo: memo || null,
+      });
+      if (error) throw error;
+      await reload(writeSequence);
+      return data;
+    } catch (error) {
+      if (writeSequence === writeSequenceRef.current) {
+        setSyncState('error');
+        setSyncError(error.message || '通関予定の変更に失敗しました。');
+      }
+      throw error;
+    }
+  }
+
   async function confirmInboundReceipt({ inboundShipmentId, receivedAt, warehouseName, memo, lines: receiptLinesInput = [] } = {}) {
     if (!canUseCloud()) {
       const message = 'Supabaseに接続できないため、入荷確定できません。';
@@ -886,6 +1023,7 @@ export function useInboundShipments(userId = '', products = []) {
     aliases,
     receipts,
     receiptLines,
+    scheduleChanges,
     saveParsedShipment,
     addInboundShipment,
     updateInboundShipment,
@@ -894,6 +1032,8 @@ export function useInboundShipments(userId = '', products = []) {
     addSupplierProductAlias,
     addInboundReceipt,
     addInboundReceiptLine,
+    addInboundScheduleChange,
+    updateInboundSchedule,
     confirmInboundReceipt,
     reverseInboundReceipt,
     reload,

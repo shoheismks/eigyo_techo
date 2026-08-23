@@ -11,6 +11,7 @@ const DATASET_KEYS = [
   'inventories',
   'inboundShipments',
   'inboundShipmentLines',
+  'inboundScheduleChanges',
   'supplierProductAliases',
   'inboundReceipts',
   'inboundReceiptLines',
