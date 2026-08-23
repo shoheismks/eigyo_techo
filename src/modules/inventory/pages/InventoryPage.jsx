@@ -18,10 +18,12 @@ import {
   buildPlannedInventoryRows,
   formatPlannedQuantity,
 } from '../services/plannedInventoryService.js';
+import { buildInboundAnalysis } from '../services/inboundAnalysisService.js';
 
 const TABS = [
   { key: 'list', label: '在庫一覧' },
   { key: 'arrival', label: '入荷予定' },
+  { key: 'analysis', label: '入荷分析' },
   { key: 'inbound', label: '入庫' },
   { key: 'outbound', label: '出庫' },
   { key: 'stocktake', label: '棚卸' },
@@ -32,6 +34,7 @@ const ALL = 'all';
 const ADJUSTMENT_REASONS = ['棚卸差異', '破損', '廃棄', 'サンプル使用', '入力ミス修正', 'その他'];
 const SCHEDULE_CHANGE_REASONS = ['通関遅延', '船便遅延', '書類不備', '検査', '倉庫都合', '仕入先都合', 'その他'];
 const SCHEDULE_CHANGE_ALLOWED_STATUSES = new Set(['pending', 'partially_received']);
+const INBOUND_ANALYSIS_TOLERANCE_DAYS = 1;
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -123,6 +126,29 @@ function scheduleDelayBadgeClass(days) {
   if (days > 0) return 'warning';
   if (days < 0) return 'ready';
   return 'muted';
+}
+
+function varianceDayLabel(days) {
+  if (days === null || days === undefined) return '-';
+  if (days > 0) return `+${days}日`;
+  return `${days}日`;
+}
+
+function inboundAnalysisStatusLabel(row) {
+  if (row.completed) return '入荷完了';
+  if (row.overdueDays > 0) return '遅延中';
+  return inboundLineStatusLabel(row.status);
+}
+
+function inboundAnalysisStatusClass(row) {
+  if (row.overdueDays > 0 || row.delayed) return 'danger';
+  if (row.completed && row.onTime) return 'ready';
+  if (row.completed) return 'warning';
+  return 'muted';
+}
+
+function formatPercent(value) {
+  return `${(Number(value) || 0).toLocaleString('ja-JP', { maximumFractionDigits: 1 })}%`;
 }
 
 function buildScheduleForm(line) {
@@ -303,6 +329,15 @@ export default function InventoryPage({
   const [scheduleLineId, setScheduleLineId] = useState('');
   const [scheduleForm, setScheduleForm] = useState(() => buildScheduleForm(null));
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [analysisFilters, setAnalysisFilters] = useState({
+    from: '',
+    to: '',
+    supplierName: ALL,
+    productId: ALL,
+    status: ALL,
+    completion: ALL,
+    delay: ALL,
+  });
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -394,6 +429,19 @@ export default function InventoryPage({
   const plannedInventoryByProduct = useMemo(
     () => new Map(plannedInventoryRows.map((row) => [row.productId, row])),
     [plannedInventoryRows],
+  );
+
+  const inboundAnalysis = useMemo(
+    () => buildInboundAnalysis({
+      inboundShipments,
+      inboundReceipts,
+      inboundReceiptLines,
+      inboundScheduleChanges,
+      products,
+      filters: analysisFilters,
+      toleranceDays: INBOUND_ANALYSIS_TOLERANCE_DAYS,
+    }),
+    [analysisFilters, inboundReceiptLines, inboundReceipts, inboundScheduleChanges, inboundShipments, products],
   );
 
   const filteredHistory = useMemo(() => {
@@ -731,6 +779,22 @@ export default function InventoryPage({
     setError('');
     setToast('');
     setScheduleForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function setAnalysisFilter(field, value) {
+    setAnalysisFilters((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetAnalysisFilters() {
+    setAnalysisFilters({
+      from: '',
+      to: '',
+      supplierName: ALL,
+      productId: ALL,
+      status: ALL,
+      completion: ALL,
+      delay: ALL,
+    });
   }
 
   function setReceiptField(field, value) {
@@ -1122,6 +1186,15 @@ export default function InventoryPage({
         />
       )}
 
+      {activeTab === 'analysis' && (
+        <InboundAnalysisDashboard
+          analysis={inboundAnalysis}
+          filters={analysisFilters}
+          onFilterChange={setAnalysisFilter}
+          onResetFilters={resetAnalysisFilters}
+        />
+      )}
+
       {activeTab === 'outbound' && (
         <InventoryOutboundForm
           form={form}
@@ -1311,6 +1384,305 @@ function PlannedInventoryOverview({ rows = [], onOpenProductDetail }) {
         </>
       )}
     </section>
+  );
+}
+
+function InboundAnalysisDashboard({ analysis, filters, onFilterChange, onResetFilters }) {
+  const columns = [
+    { key: 'supplier', label: '仕入先', minWidth: '150px', render: (row) => row.supplierName || '-' },
+    { key: 'product', label: '商品', minWidth: '220px', render: (row) => row.productName || '-' },
+    { key: 'contract', label: '契約No', minWidth: '120px', render: (row) => row.contractNo || '-' },
+    { key: 'original', label: '当初通関予定', minWidth: '120px', render: (row) => row.originalCustomsDate || '-' },
+    { key: 'final', label: '最終通関予定', minWidth: '120px', render: (row) => row.finalCustomsDate || '-' },
+    { key: 'actual', label: '実入荷日', minWidth: '110px', render: (row) => row.finalReceiptDate || '-' },
+    { key: 'changeDays', label: '予定変更日数', width: '110px', render: (row) => varianceDayLabel(row.scheduleChangeDays) },
+    { key: 'actualDiff', label: '実績差異日数', width: '110px', render: (row) => varianceDayLabel(row.finalVarianceDays) },
+    { key: 'plannedWeight', label: '予定重量', width: '100px', render: (row) => formatPlannedQuantity(row.plannedWeight, 'kg') },
+    { key: 'actualWeight', label: '実入荷重量', width: '110px', render: (row) => formatPlannedQuantity(row.actualWeight, 'kg') },
+    { key: 'variance', label: '重量差異', width: '100px', render: (row) => formatPlannedQuantity(row.weightVariance, 'kg') },
+    { key: 'changes', label: '変更回数', width: '90px', render: (row) => row.scheduleChangeCount },
+    { key: 'reasons', label: '遅延理由', minWidth: '150px', render: (row) => row.scheduleReasons.join(' / ') || '-' },
+    { key: 'status', label: 'Status', width: '110px', render: (row) => <span className={`info-badge ${inboundAnalysisStatusClass(row)}`}>{inboundAnalysisStatusLabel(row)}</span> },
+  ];
+
+  return (
+    <section className="result-stack inbound-analysis-dashboard">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Inbound analytics</p>
+          <h2>入荷分析</h2>
+          <p className="inline-helper">当初通関予定・最終通関予定・実入荷日を比較します。予定遵守率は最終通関予定の±{analysis.toleranceDays}日以内を予定内として計算します。</p>
+        </div>
+        <span className="info-badge muted">{analysis.rows.length}明細</span>
+      </div>
+
+      <InboundAnalysisFilters
+        analysis={analysis}
+        filters={filters}
+        onFilterChange={onFilterChange}
+        onResetFilters={onResetFilters}
+      />
+
+      <section className="dashboard-metrics inbound-analysis-kpis">
+        <div className="metric-card blue"><span>入荷予定件数</span><strong>{analysis.kpis.plannedCount}</strong></div>
+        <div className="metric-card green"><span>入荷完了件数</span><strong>{analysis.kpis.completedCount}</strong></div>
+        <div className="metric-card orange"><span>平均遅延日数</span><strong>{varianceDayLabel(analysis.kpis.averageDelayDays)}</strong></div>
+        <div className="metric-card green"><span>予定遵守率</span><strong>{formatPercent(analysis.kpis.complianceRate)}</strong></div>
+        <div className="metric-card gold"><span>平均予定変更日数</span><strong>{varianceDayLabel(analysis.kpis.averageScheduleChangeDays)}</strong></div>
+        <div className="metric-card red"><span>遅延発生件数</span><strong>{analysis.kpis.delayedCount}</strong></div>
+        <div className="metric-card purple"><span>入荷重量差異</span><strong>{formatPlannedQuantity(analysis.kpis.weightVariance, 'kg')}</strong></div>
+      </section>
+
+      <section className="analytics-chart-grid inbound-analysis-chart-grid">
+        <InboundAnalysisPanel title="月別平均遅延日数" subtitle="実入荷日 - 最終通関予定">
+          <InboundVerticalBars rows={analysis.monthly} labelKey="month" valueKey="averageDelayDays" unit="日" />
+        </InboundAnalysisPanel>
+        <InboundAnalysisPanel title="予定遵守率" subtitle={`最終通関予定の±${analysis.toleranceDays}日以内`}>
+          <InboundVerticalBars rows={analysis.monthly} labelKey="month" valueKey="complianceRate" unit="%" />
+        </InboundAnalysisPanel>
+        <InboundAnalysisPanel title="遅延理由内訳" subtitle="予定変更履歴の理由件数">
+          <InboundReasonDonut rows={analysis.byReason} />
+        </InboundAnalysisPanel>
+        <InboundAnalysisPanel title="商品別入荷重量差異" subtitle="実入荷重量 - 予定重量">
+          <InboundHorizontalBars rows={analysis.byProduct.slice(0, 10)} labelKey="productName" valueKey="weightVariance" unit="kg" />
+        </InboundAnalysisPanel>
+      </section>
+
+      <section className="analytics-chart-grid inbound-analysis-chart-grid compact">
+        <InboundAnalysisPanel title="仕入先別サマリー" subtitle="予定重量・実入荷重量・遅延件数">
+          <InboundSummaryBars rows={analysis.bySupplier.slice(0, 8)} labelKey="supplierName" />
+        </InboundAnalysisPanel>
+        <InboundAnalysisPanel title="商品別サマリー" subtitle="予定重量・実入荷重量・重量差異">
+          <InboundSummaryBars rows={analysis.byProduct.slice(0, 8)} labelKey="productName" />
+        </InboundAnalysisPanel>
+      </section>
+
+      <section className="result-stack inbound-analysis-detail">
+        <div className="section-heading">
+          <h3>入荷分析明細</h3>
+          <span>{analysis.rows.length}件</span>
+        </div>
+        {analysis.rows.length === 0 ? (
+          <div className="empty-state compact-empty">
+            <h3>分析対象がありません</h3>
+            <p>入荷予定または入荷実績が保存されると、予定差異と入荷差異を確認できます。</p>
+          </div>
+        ) : (
+          <>
+            <DesktopTable
+              className="inventory-common-table inbound-analysis-table"
+              columns={columns}
+              rows={analysis.rows}
+              getRowKey={(row) => row.id}
+              minWidth={1760}
+            />
+            <div className="card-list-mobile inbound-analysis-card-list">
+              {analysis.rows.map((row) => (
+                <article className="product-card inbound-analysis-card" key={row.id}>
+                  <div className="company-heading">
+                    <p>{row.supplierName || '仕入先未設定'} / {row.contractNo || '契約No未設定'}</p>
+                    <h3>{row.productName}</h3>
+                    <span className={`info-badge ${inboundAnalysisStatusClass(row)}`}>{inboundAnalysisStatusLabel(row)}</span>
+                  </div>
+                  <dl className="company-details">
+                    <div><dt>当初通関予定</dt><dd>{row.originalCustomsDate || '-'}</dd></div>
+                    <div><dt>最終通関予定</dt><dd>{row.finalCustomsDate || '-'}</dd></div>
+                    <div><dt>実入荷日</dt><dd>{row.finalReceiptDate || '-'}</dd></div>
+                    <div><dt>予定変更日数</dt><dd>{varianceDayLabel(row.scheduleChangeDays)}</dd></div>
+                    <div><dt>実績差異日数</dt><dd>{varianceDayLabel(row.finalVarianceDays)}</dd></div>
+                    <div><dt>予定重量</dt><dd>{formatPlannedQuantity(row.plannedWeight, 'kg')}</dd></div>
+                    <div><dt>実入荷重量</dt><dd>{formatPlannedQuantity(row.actualWeight, 'kg')}</dd></div>
+                    <div><dt>重量差異</dt><dd>{formatPlannedQuantity(row.weightVariance, 'kg')}</dd></div>
+                    <div><dt>部分入荷回数</dt><dd>{row.receiptCount}</dd></div>
+                    <div><dt>遅延理由</dt><dd>{row.scheduleReasons.join(' / ') || '-'}</dd></div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function InboundAnalysisFilters({ analysis, filters, onFilterChange, onResetFilters }) {
+  return (
+    <section className="search-panel desktop-filter-panel inbound-analysis-filters">
+      <label className="field-label">
+        期間From
+        <input type="date" value={filters.from || ''} onChange={(event) => onFilterChange('from', event.target.value)} />
+      </label>
+      <label className="field-label">
+        期間To
+        <input type="date" value={filters.to || ''} onChange={(event) => onFilterChange('to', event.target.value)} />
+      </label>
+      <label className="field-label">
+        仕入先
+        <select value={filters.supplierName || ALL} onChange={(event) => onFilterChange('supplierName', event.target.value)}>
+          <option value={ALL}>すべて</option>
+          {analysis.filterOptions.suppliers.map((supplier) => <option value={supplier} key={supplier}>{supplier}</option>)}
+        </select>
+      </label>
+      <label className="field-label">
+        商品
+        <select value={filters.productId || ALL} onChange={(event) => onFilterChange('productId', event.target.value)}>
+          <option value={ALL}>すべて</option>
+          {analysis.filterOptions.products.map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}
+        </select>
+      </label>
+      <label className="field-label">
+        Status
+        <select value={filters.status || ALL} onChange={(event) => onFilterChange('status', event.target.value)}>
+          <option value={ALL}>すべて</option>
+          {analysis.filterOptions.statuses.map((status) => <option value={status} key={status}>{inboundLineStatusLabel(status)}</option>)}
+        </select>
+      </label>
+      <label className="field-label">
+        完了
+        <select value={filters.completion || ALL} onChange={(event) => onFilterChange('completion', event.target.value)}>
+          <option value={ALL}>すべて</option>
+          <option value="completed">完了</option>
+          <option value="open">未完了</option>
+        </select>
+      </label>
+      <label className="field-label">
+        遅延
+        <select value={filters.delay || ALL} onChange={(event) => onFilterChange('delay', event.target.value)}>
+          <option value={ALL}>すべて</option>
+          <option value="delayed">遅延あり</option>
+          <option value="on-time">予定内</option>
+          <option value="overdue-open">遅延中</option>
+        </select>
+      </label>
+      <button type="button" className="ghost-button" onClick={onResetFilters}>クリア</button>
+    </section>
+  );
+}
+
+function InboundAnalysisPanel({ title, subtitle, children }) {
+  return (
+    <article className="analytics-panel inbound-analysis-panel">
+      <div className="analytics-panel-heading">
+        <div>
+          <h2>{title}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </article>
+  );
+}
+
+function InboundVerticalBars({ rows = [], labelKey, valueKey, unit }) {
+  if (rows.length === 0) return <p className="compact-empty chart-empty">表示できるデータがありません。</p>;
+  const max = Math.max(1, ...rows.map((row) => Math.abs(Number(row[valueKey]) || 0)));
+  return (
+    <div className="vertical-bar-chart inbound-analysis-bars">
+      {rows.map((row) => {
+        const value = Number(row[valueKey]) || 0;
+        return (
+          <div className="vertical-bar-group" key={row[labelKey]}>
+            <div className="vertical-bars">
+              <span
+                style={{
+                  '--bar-height': `${Math.max(4, (Math.abs(value) / max) * 100)}%`,
+                  '--bar-color': value < 0 ? '#34d399' : '#60a5fa',
+                }}
+                title={`${row[labelKey]}: ${value}${unit}`}
+              />
+            </div>
+            <small>{row[labelKey] || '-'}</small>
+            <em>{value}{unit}</em>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InboundHorizontalBars({ rows = [], labelKey, valueKey, unit }) {
+  if (rows.length === 0) return <p className="compact-empty chart-empty">表示できるデータがありません。</p>;
+  const max = Math.max(1, ...rows.map((row) => Math.abs(Number(row[valueKey]) || 0)));
+  return (
+    <div className="horizontal-bar-chart inbound-analysis-horizontal">
+      {rows.map((row) => {
+        const value = Number(row[valueKey]) || 0;
+        return (
+          <div className="horizontal-bar-row" key={row[labelKey]}>
+            <strong>{row[labelKey] || '-'}</strong>
+            <div className="horizontal-bar-lines">
+              <span>
+                <i style={{ width: `${Math.max(3, (Math.abs(value) / max) * 100)}%`, background: value < 0 ? '#fb7185' : '#34d399' }} />
+                <em>{formatPlannedQuantity(value, unit)}</em>
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InboundSummaryBars({ rows = [], labelKey }) {
+  if (rows.length === 0) return <p className="compact-empty chart-empty">表示できるデータがありません。</p>;
+  const max = Math.max(1, ...rows.flatMap((row) => [row.plannedWeight, row.actualWeight].map((value) => Math.abs(Number(value) || 0))));
+  return (
+    <div className="horizontal-bar-chart inbound-analysis-horizontal">
+      {rows.map((row) => (
+        <div className="horizontal-bar-row" key={row[labelKey]}>
+          <strong>{row[labelKey] || '-'}</strong>
+          <div className="horizontal-bar-lines">
+            <span><i style={{ width: `${Math.max(3, (Math.abs(row.plannedWeight) / max) * 100)}%`, background: '#60a5fa' }} /><em>予定 {formatPlannedQuantity(row.plannedWeight, 'kg')}</em></span>
+            <span><i style={{ width: `${Math.max(3, (Math.abs(row.actualWeight) / max) * 100)}%`, background: '#34d399' }} /><em>実績 {formatPlannedQuantity(row.actualWeight, 'kg')}</em></span>
+          </div>
+          <small className="inline-helper">遅延 {row.delayedCount}件 / 差異 {formatPlannedQuantity(row.weightVariance, 'kg')}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InboundReasonDonut({ rows = [] }) {
+  const total = rows.reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+  if (total <= 0) return <p className="compact-empty chart-empty">表示できるデータがありません。</p>;
+  const colors = ['#60a5fa', '#34d399', '#facc15', '#fb7185', '#a78bfa', '#fb923c', '#94a3b8'];
+  let offset = 25;
+  return (
+    <div className="donut-chart inbound-reason-donut">
+      <svg viewBox="0 0 42 42" className="donut-svg" role="img" aria-label="遅延理由内訳">
+        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="rgba(148, 163, 184, .18)" strokeWidth="6" />
+        {rows.map((row, index) => {
+          const value = (row.count / total) * 100;
+          const currentOffset = offset;
+          offset -= value;
+          return (
+            <circle
+              key={row.reason}
+              cx="21"
+              cy="21"
+              r="15.915"
+              fill="transparent"
+              stroke={colors[index % colors.length]}
+              strokeWidth="6"
+              strokeDasharray={`${value} ${100 - value}`}
+              strokeDashoffset={currentOffset}
+            />
+          );
+        })}
+        <text x="21" y="20" textAnchor="middle" className="donut-total">{total}</text>
+        <text x="21" y="25" textAnchor="middle" className="donut-caption">件</text>
+      </svg>
+      <div className="donut-legend">
+        {rows.map((row, index) => (
+          <div key={row.reason}>
+            <span style={{ background: colors[index % colors.length] }} />
+            <strong>{row.reason}</strong>
+            <small>{row.count}件</small>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
