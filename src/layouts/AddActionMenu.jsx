@@ -2,13 +2,13 @@ const actions = [
   { key: 'schedule', label: 'スケジュールを追加', description: '商談・打合せなどの予定を登録', tone: 'primary' },
   { key: 'task', label: 'タスクを追加', description: 'やること・ToDoを登録', tone: 'primary' },
   { key: 'business-card', label: '名刺を撮影', description: 'カメラで名刺を追加', tone: 'primary' },
-  { key: 'deal', label: '商談メモ', description: '今すぐ商談内容を記録', tone: 'primary' },
+  { key: 'deal', label: '商談記録', description: '顧客を選んでカルテから記録', tone: 'primary' },
   { key: 'quote', label: '見積作成', description: '顧客と商品を選んで見積PDFを作成', tone: 'primary' },
   { key: 'salesOrder', label: '受注作成', description: '見積・成約確認書から受注を登録', tone: 'primary' },
   { key: 'deliveryNote', label: '納品書', description: '出荷済データから納品書PDFを作成', tone: 'primary' },
   { key: 'invoice', label: '請求書作成', description: '見積・成約確認書をもとに請求書を作成', tone: 'primary' },
   { key: 'inventory', label: '在庫登録', description: '商品、ロット、賞味期限、保管場所を登録', tone: 'primary' },
-  { key: 'company', label: '会社を追加', description: '検索・補完から取引先登録' },
+  { key: 'company', label: '顧客追加', description: '検索・補完から取引先登録' },
   { key: 'complaint', label: 'クレーム記録', description: '対応内容と期限を残す' },
   { key: 'product', label: '商品追加', description: '商品マスターを登録' },
   { key: 'supplier', label: '仕入先追加', description: '仕入先情報を登録' },
@@ -41,6 +41,7 @@ export default function AddActionMenu({ open, onClose, onAction }) {
             <button
               type="button"
               key={action.key}
+              data-action-key={action.key}
               className={`add-action-button ${action.tone === 'primary' ? 'primary-action' : ''}`}
               onClick={() => onAction(action.key)}
             >

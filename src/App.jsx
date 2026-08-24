@@ -487,7 +487,7 @@ function AuthenticatedShell() {
     const nextPageByAction = {
       company: 'LeadSearch',
       'business-card': 'BusinessCards',
-      deal: 'Pipeline',
+      deal: 'Customers',
       complaint: 'Complaints',
       supplier: 'Suppliers',
       quote: null,
@@ -519,6 +519,21 @@ function AuthenticatedShell() {
 
     if (actionKey === 'inventory') {
       openInventoryPage({ tab: 'inbound' });
+      return;
+    }
+
+    if (actionKey === 'inventory-list') {
+      openInventoryPage({ tab: 'list' });
+      return;
+    }
+
+    if (actionKey === 'inventory-arrival') {
+      openInventoryPage({ tab: 'arrival' });
+      return;
+    }
+
+    if (actionKey === 'inventory-analysis') {
+      openInventoryPage({ tab: 'analysis' });
       return;
     }
 

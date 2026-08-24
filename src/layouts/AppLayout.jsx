@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { APP_VERSION_LABEL } from '../shared/constants/appMeta.js';
 import AddActionMenu from './AddActionMenu.jsx';
 import BottomNavigation from './BottomNavigation.jsx';
+import MobileMoreMenu from './MobileMoreMenu.jsx';
 import SidebarNavigation from './SidebarNavigation.jsx';
 import LegacyLocalDataPanel from '../shared/components/LegacyLocalDataPanel.jsx';
 
@@ -53,10 +54,12 @@ export default function AppLayout({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
   function handleAction(actionKey) {
     onAddAction?.(actionKey);
     setAddMenuOpen(false);
+    setMoreMenuOpen(false);
   }
 
   function handleSearchSubmit(event) {
@@ -70,6 +73,7 @@ export default function AppLayout({
   function handleNavigate(pageKey) {
     onNavigate(pageKey);
     setSidebarOpen(false);
+    setMoreMenuOpen(false);
   }
 
   return (
@@ -153,6 +157,13 @@ export default function AppLayout({
           activePage={activePage}
           onNavigate={handleNavigate}
           onAdd={() => setAddMenuOpen(true)}
+          onMore={() => setMoreMenuOpen(true)}
+        />
+        <MobileMoreMenu
+          open={moreMenuOpen}
+          onClose={() => setMoreMenuOpen(false)}
+          onNavigate={handleNavigate}
+          onAction={handleAction}
         />
         <AddActionMenu
           open={addMenuOpen}

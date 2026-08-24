@@ -765,6 +765,7 @@
 
   .app-shell:has(.sidebar-nav.mobile-open) .calendar-mobile-fab,
   .app-shell:has(.add-menu-backdrop) .calendar-mobile-fab,
+  .app-shell:has(.mobile-more-backdrop) .calendar-mobile-fab,
   .calendar-page:has(.calendar-editor-backdrop) .calendar-mobile-fab,
   .calendar-page:has(.calendar-list-popup-backdrop) .calendar-mobile-fab {
     display: none;

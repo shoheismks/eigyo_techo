@@ -7,28 +7,42 @@ const customerPages = [
   'Complaints',
   'LeadSearch',
   'CompanyEnrich',
-  'MailAI',
   'Import',
 ];
-const pipelinePages = ['Pipeline', 'SalesOrders', 'Shipments', 'DeliveryNotes', 'Invoices'];
-const productPages = ['Products', 'ProductDetail', 'Inventory', 'CustomerProductPrices'];
+const morePages = [
+  'Pipeline',
+  'Quotes',
+  'SalesOrders',
+  'Shipments',
+  'DeliveryNotes',
+  'Invoices',
+  'Products',
+  'ProductDetail',
+  'Inventory',
+  'CustomerProductPrices',
+  'Suppliers',
+  'MailAI',
+  'Analytics',
+  'Settings',
+  'Help',
+];
 
 const tabs = [
   { key: 'Home', label: 'ホーム', icon: '⌂' },
-  { key: 'Customers', label: '取引先', icon: '□' },
-  { key: 'Add', label: '追加', icon: '+' },
-  { key: 'Pipeline', label: '案件', icon: '◇' },
-  { key: 'Products', label: '商品', icon: '▣' },
+  { key: 'Customers', label: '顧客', icon: '□' },
+  { key: 'Add', label: '＋', icon: '+' },
+  { key: 'Calendar', label: 'スケジュール', icon: '予' },
+  { key: 'More', label: 'その他', icon: '☰' },
 ];
 
 function activeTabFor(page) {
   if (customerPages.includes(page)) return 'Customers';
-  if (pipelinePages.includes(page)) return 'Pipeline';
-  if (productPages.includes(page)) return 'Products';
+  if (page === 'Calendar') return 'Calendar';
+  if (morePages.includes(page)) return 'More';
   return 'Home';
 }
 
-export default function BottomNavigation({ activePage, onNavigate, onAdd }) {
+export default function BottomNavigation({ activePage, onNavigate, onAdd, onMore }) {
   const currentTab = activeTabFor(activePage);
 
   return (
@@ -42,7 +56,11 @@ export default function BottomNavigation({ activePage, onNavigate, onAdd }) {
             type="button"
             key={tab.key}
             className={`${isActive ? 'active' : ''} ${isAdd ? 'add-tab' : ''}`}
-            onClick={() => (isAdd ? onAdd() : onNavigate(tab.key))}
+            onClick={() => {
+              if (isAdd) onAdd();
+              else if (tab.key === 'More') onMore();
+              else onNavigate(tab.key);
+            }}
           >
             <span aria-hidden="true">{tab.icon}</span>
             {tab.label}
