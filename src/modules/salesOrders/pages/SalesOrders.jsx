@@ -164,6 +164,7 @@ export default function SalesOrders({
   reloadShipments,
   reloadInventory,
   initialDraft = null,
+  initialSearchQuery = '',
   onDraftHandled,
   onOpenKarte,
   onOpenProject,
@@ -210,6 +211,11 @@ export default function SalesOrders({
     setMessage('');
     onDraftHandled?.();
   }, [initialDraft, onDraftHandled, user]);
+
+  useEffect(() => {
+    if (!initialSearchQuery) return;
+    setKeyword(initialSearchQuery);
+  }, [initialSearchQuery]);
 
   const visibleOrders = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();

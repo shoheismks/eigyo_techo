@@ -33,6 +33,7 @@ export default function AppRouter({
   activePage,
   calendarQuickAction,
   importError,
+  globalInitialSearch,
   initialSearchQuery,
   inventoryAction,
   onCreateDeliveryNoteFromShipment,
@@ -228,6 +229,7 @@ export default function AppRouter({
   const openProductDetail = onOpenProductDetail;
   const createDeliveryNoteFromShipment = onCreateDeliveryNoteFromShipment;
   const [homeCalendarQuickAction, setHomeCalendarQuickAction] = useState(null);
+  const searchForPage = (pageKey) => (globalInitialSearch?.page === pageKey ? globalInitialSearch.query : '');
 
   function openCalendarQuickAction(type, options = {}) {
     setHomeCalendarQuickAction({ type, ...options, token: Date.now() });
@@ -414,6 +416,7 @@ export default function AppRouter({
         onCreateQuote={onCreateQuote}
         onCreateInvoice={onCreateInvoice}
         onCreateSalesOrder={onCreateSalesOrder}
+        initialSearchQuery={searchForPage('Pipeline')}
       />
     );
   }
@@ -449,6 +452,7 @@ export default function AppRouter({
         reloadShipments={reloadShipments}
         reloadInventory={reloadInventory}
         initialDraft={salesOrderDraft}
+        initialSearchQuery={searchForPage('SalesOrders')}
         onDraftHandled={() => setSalesOrderDraft(null)}
         onOpenKarte={openCustomerKarte}
         onOpenProject={() => setActivePage('Pipeline')}
@@ -470,6 +474,7 @@ export default function AppRouter({
         syncState={shipmentSyncState}
         syncError={shipmentSyncError}
         legacyLocalDataWarning={shipmentLegacyLocalDataWarning}
+        initialSearchQuery={searchForPage('Shipments')}
         onOpenSalesOrder={() => setActivePage('SalesOrders')}
         onOpenDeliveryNotes={() => setActivePage('DeliveryNotes')}
         onCreateDeliveryNote={createDeliveryNoteFromShipment}
@@ -552,6 +557,7 @@ export default function AppRouter({
         syncState={quoteSyncState}
         syncError={quoteSyncError}
         legacyLocalDataWarning={quoteLegacyLocalDataWarning}
+        initialSearchQuery={searchForPage('Quotes')}
         onCreateQuote={onCreateQuote}
       />
     );
@@ -697,6 +703,7 @@ export default function AppRouter({
         onCreateInvoice={onCreateInvoice}
         onCreateSalesOrder={onCreateSalesOrder}
         userId={userId}
+        initialSearchQuery={searchForPage('Suppliers')}
       />
     );
   }

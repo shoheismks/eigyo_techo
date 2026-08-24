@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
 import {
@@ -60,6 +60,7 @@ export default function Suppliers({
   onCreateInvoice,
   onCreateSalesOrder,
   userId,
+  initialSearchQuery = '',
 }) {
   const [keyword, setKeyword] = useState('');
   const [form, setForm] = useState(emptySupplier);
@@ -67,6 +68,11 @@ export default function Suppliers({
   const [historyForm, setHistoryForm] = useState(emptyHistory);
   const [uploadError, setUploadError] = useState('');
   const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    if (!initialSearchQuery) return;
+    setKeyword(initialSearchQuery);
+  }, [initialSearchQuery]);
 
   const filteredSuppliers = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();

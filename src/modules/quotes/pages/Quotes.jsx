@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ActionBar from '../../../shared/components/ActionBar.jsx';
 import DataTable from '../../../shared/components/DataTable.jsx';
 import KpiCards from '../../../shared/components/KpiCards.jsx';
@@ -40,11 +40,19 @@ export default function Quotes({
   projects = [],
   syncError = '',
   legacyLocalDataWarning = '',
+  initialSearchQuery = '',
   onCreateQuote,
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearch(initialSearchQuery);
+      setVisibleCount(PAGE_SIZE);
+    }
+  }, [initialSearchQuery]);
 
   const statuses = useMemo(() => [...new Set(quotes.map((quote) => quote.status).filter(Boolean))].sort(), [quotes]);
   const filteredQuotes = useMemo(() => {

@@ -10,6 +10,7 @@ import QuoteFormModal from './modules/quotes/components/QuoteFormModal.jsx';
 import { buildInvoiceDraftFromQuote } from './modules/invoices/services/invoicePdfService.js';
 import OnboardingTutorial from './shared/components/OnboardingTutorial.jsx';
 import { createThemeStyle, DEFAULT_THEME_COLOR } from './shared/utils/themeColor.js';
+import { buildGlobalSearchIndex } from './shared/search/globalSearchService.js';
 import Login from './pages/Login.jsx';
 
 const ISSUER_THEME_STORAGE_KEY = 'eigyo-techo-selected-issuer-id';
@@ -105,6 +106,7 @@ function AuthenticatedShell() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [calendarQuickAction, setCalendarQuickAction] = useState(null);
   const [globalCustomerSearch, setGlobalCustomerSearch] = useState('');
+  const [globalSearchTarget, setGlobalSearchTarget] = useState({ page: '', query: '', token: 0 });
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [quoteDraft, setQuoteDraft] = useState(null);
@@ -238,6 +240,32 @@ function AuthenticatedShell() {
   const themeStyle = useMemo(
     () => createThemeStyle(currentThemeIssuer?.themeColor || DEFAULT_THEME_COLOR),
     [currentThemeIssuer?.themeColor],
+  );
+  const globalSearchIndex = useMemo(
+    () => buildGlobalSearchIndex({
+      customers,
+      contacts,
+      products,
+      projects,
+      quotes,
+      salesOrders,
+      shipments,
+      suppliers,
+      inboundShipments: appData.inboundShipments,
+      inboundShipmentLines: appData.inboundShipmentLines,
+    }),
+    [
+      appData.inboundShipmentLines,
+      appData.inboundShipments,
+      contacts,
+      customers,
+      products,
+      projects,
+      quotes,
+      salesOrders,
+      shipments,
+      suppliers,
+    ],
   );
 
   useEffect(() => {
@@ -553,7 +581,37 @@ function AuthenticatedShell() {
 
   function handleGlobalSearch(query) {
     setGlobalCustomerSearch(query);
+    setGlobalSearchTarget({ page: 'Customers', query, token: Date.now() });
     setActivePage('Customers');
+  }
+
+  function handleGlobalSearchSelect(result) {
+    const routeData = result?.routeData || {};
+    const searchText = routeData.searchText || result?.title || '';
+
+    if (routeData.page === 'CustomerKarte' && routeData.customerId) {
+      openCustomerKarte(routeData.customerId);
+      return;
+    }
+
+    if (routeData.productId) {
+      openProductDetail(routeData.productId);
+      return;
+    }
+
+    if (routeData.inventoryAction) {
+      openInventoryPage(routeData.inventoryAction);
+      return;
+    }
+
+    const nextPage = routeData.page || 'Home';
+    if (searchText) {
+      setGlobalSearchTarget({ page: nextPage, query: searchText, token: Date.now() });
+      if (nextPage === 'Customers') {
+        setGlobalCustomerSearch(searchText);
+      }
+    }
+    setActivePage(nextPage);
   }
 
   function closeTutorial() {
@@ -653,6 +711,8 @@ function AuthenticatedShell() {
         onNavigate={navigate}
         onAddAction={handleAddAction}
         onGlobalSearch={handleGlobalSearch}
+        onGlobalSearchSelect={handleGlobalSearchSelect}
+        globalSearchIndex={globalSearchIndex}
         onHelp={() => setActivePage('Help')}
         onSignOut={signOut}
         addMenuOpen={addMenuOpen}
@@ -671,6 +731,7 @@ function AuthenticatedShell() {
               calendarQuickAction={calendarQuickAction}
               importError={importError}
               initialSearchQuery={globalCustomerSearch}
+              globalInitialSearch={globalSearchTarget}
               inventoryAction={inventoryAction}
               onCalendarQuickActionConsumed={() => setCalendarQuickAction(null)}
               onCreateDeliveryNoteFromShipment={handleCreateDeliveryNoteFromShipment}

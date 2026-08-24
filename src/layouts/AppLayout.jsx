@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { APP_VERSION_LABEL } from '../shared/constants/appMeta.js';
 import AddActionMenu from './AddActionMenu.jsx';
 import BottomNavigation from './BottomNavigation.jsx';
 import MobileMoreMenu from './MobileMoreMenu.jsx';
 import SidebarNavigation from './SidebarNavigation.jsx';
 import LegacyLocalDataPanel from '../shared/components/LegacyLocalDataPanel.jsx';
+import GlobalSearchPalette from '../shared/components/GlobalSearchPalette.jsx';
 
 const pageTitles = {
   Home: 'ホーム',
@@ -44,6 +45,8 @@ export default function AppLayout({
   onNavigate,
   onAddAction,
   onGlobalSearch,
+  onGlobalSearchSelect,
+  globalSearchIndex,
   onHelp,
   onSignOut,
   addMenuOpen,
@@ -55,6 +58,19 @@ export default function AppLayout({
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    function handleShortcut(event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, []);
 
   function handleAction(actionKey) {
     onAddAction?.(actionKey);
@@ -66,13 +82,19 @@ export default function AppLayout({
     event.preventDefault();
     const normalizedQuery = searchQuery.trim();
     if (normalizedQuery) {
-      onGlobalSearch?.(normalizedQuery);
+      setSearchOpen(true);
     }
   }
 
   function handleNavigate(pageKey) {
     onNavigate(pageKey);
     setSidebarOpen(false);
+    setMoreMenuOpen(false);
+  }
+
+  function handleGlobalSearchSelect(result) {
+    onGlobalSearchSelect?.(result);
+    setSearchOpen(false);
     setMoreMenuOpen(false);
   }
 
@@ -109,8 +131,12 @@ export default function AppLayout({
               <input
                 type="search"
                 value={searchQuery}
-                placeholder="会社名・商品・担当者を検索"
-                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="顧客・担当者・商品・案件・見積などを検索"
+                onFocus={() => setSearchOpen(true)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setSearchOpen(true);
+                }}
               />
             </form>
 
@@ -164,11 +190,23 @@ export default function AppLayout({
           onClose={() => setMoreMenuOpen(false)}
           onNavigate={handleNavigate}
           onAction={handleAction}
+          onSearchOpen={() => {
+            setMoreMenuOpen(false);
+            setSearchOpen(true);
+          }}
         />
         <AddActionMenu
           open={addMenuOpen}
           onClose={() => setAddMenuOpen(false)}
           onAction={handleAction}
+        />
+        <GlobalSearchPalette
+          open={searchOpen}
+          query={searchQuery}
+          index={globalSearchIndex}
+          onQueryChange={setSearchQuery}
+          onClose={() => setSearchOpen(false)}
+          onSelect={handleGlobalSearchSelect}
         />
       </div>
     </div>

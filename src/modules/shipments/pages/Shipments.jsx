@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import DesktopTable from '../../../shared/components/DesktopTable.jsx';
 import { formatPrice, productDisplayName } from '../../products/hooks/useProducts.js';
 import { SHIPMENT_STATUS_LABELS } from '../hooks/useShipments.js';
@@ -37,6 +37,7 @@ export default function Shipments({
   onCreateDeliveryNote,
   syncError = '',
   legacyLocalDataWarning = '',
+  initialSearchQuery = '',
 }) {
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -48,6 +49,11 @@ export default function Shipments({
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const lotMap = useMemo(() => new Map(inventoryLots.map((lot) => [lot.id, lot])), [inventoryLots]);
   const deliveryNoteMap = useMemo(() => new Map(deliveryNotes.filter((note) => !note.isDeleted).map((note) => [note.shipmentId, note])), [deliveryNotes]);
+
+  useEffect(() => {
+    if (!initialSearchQuery) return;
+    setKeyword(initialSearchQuery);
+  }, [initialSearchQuery]);
 
   const visibleShipments = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();

@@ -356,6 +356,9 @@ export default function InventoryPage({
   useEffect(() => {
     if (!initialAction) return;
     setActiveTab(initialAction.tab || 'inbound');
+    if (initialAction.inboundShipmentId) {
+      setSelectedInboundShipmentId(initialAction.inboundShipmentId);
+    }
     setForm(emptyMovementForm(initialAction, user));
     onInitialHandled?.();
   }, [initialAction, onInitialHandled, user]);

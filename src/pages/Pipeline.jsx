@@ -43,10 +43,16 @@ export default function Pipeline({
   onCreateQuote,
   onCreateInvoice,
   onCreateSalesOrder,
+  initialSearchQuery = '',
 }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '');
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [keyword, setKeyword] = useState('');
+
+  useEffect(() => {
+    if (!initialSearchQuery) return;
+    setKeyword(initialSearchQuery);
+  }, [initialSearchQuery]);
 
   const counts = PIPELINE_STATUSES.reduce((summary, status) => {
     summary[status] = customers.filter((customer) => customer.status === status).length;

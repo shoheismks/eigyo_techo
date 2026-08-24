@@ -41,7 +41,7 @@ const moreGroups = [
   },
 ];
 
-export default function MobileMoreMenu({ open, onClose, onNavigate, onAction }) {
+export default function MobileMoreMenu({ open, onClose, onNavigate, onAction, onSearchOpen }) {
   if (!open) return null;
 
   function handleSelect(item) {
@@ -70,6 +70,13 @@ export default function MobileMoreMenu({ open, onClose, onNavigate, onAction }) 
         </div>
 
         <div className="mobile-more-groups">
+          <section className="mobile-more-group">
+            <button type="button" className="mobile-more-search-button" onClick={onSearchOpen}>
+              <strong>検索</strong>
+              <span>顧客・商品・見積などを横断検索</span>
+            </button>
+          </section>
+
           {moreGroups.map((group) => (
             <section className="mobile-more-group" key={group.id}>
               <h3>{group.label}</h3>
