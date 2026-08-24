@@ -1,0 +1,253 @@
+.quick-record-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 8, 23, 0.76);
+  backdrop-filter: blur(10px);
+}
+
+.quick-record-modal {
+  width: min(1080px, 100%);
+}
+
+.quick-record-mobile-modal {
+  display: none;
+}
+
+.quick-record-dialog {
+  display: flex;
+  max-height: min(86vh, 860px);
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  background: rgba(9, 16, 29, 0.98);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.44);
+  color: #e5e7eb;
+}
+
+.quick-record-header,
+.quick-record-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.quick-record-footer {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  border-bottom: 0;
+  background: rgba(9, 16, 29, 0.98);
+}
+
+.quick-record-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.quick-record-body {
+  overflow: auto;
+  padding: 18px 20px;
+  scroll-padding-bottom: 96px;
+}
+
+.quick-record-desktop-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+
+.quick-record-side {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.quick-record-section,
+.quick-record-result {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.quick-record-section-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.quick-record-section-heading > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--theme-primary, #2878ff);
+  color: white;
+  font-weight: 700;
+}
+
+.quick-record-section-heading h3,
+.quick-record-result h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.quick-record-section-heading p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.quick-record-two-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quick-record-section textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.quick-record-toggle {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.quick-record-toggle input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+}
+
+.quick-record-toggle span {
+  display: grid;
+  gap: 4px;
+}
+
+.quick-record-toggle small,
+.quick-record-result-row small {
+  color: #94a3b8;
+}
+
+.quick-record-collapsible {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-record-error {
+  color: #fca5a5;
+}
+
+.quick-record-result-row {
+  display: grid;
+  grid-template-columns: 96px 64px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.quick-record-result-row.success strong {
+  color: #86efac;
+}
+
+.quick-record-result-row.failed strong {
+  color: #fca5a5;
+}
+
+.quick-record-result-row.skipped strong {
+  color: #cbd5e1;
+}
+
+@media (max-width: 767px) {
+  .quick-record-backdrop {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .quick-record-desktop-modal {
+    display: none;
+  }
+
+  .quick-record-mobile-modal {
+    display: block;
+    width: 100%;
+  }
+
+  .quick-record-dialog {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .quick-record-header {
+    padding: 12px 14px;
+  }
+
+  .quick-record-header h2 {
+    overflow: hidden;
+    max-width: 72vw;
+    font-size: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quick-record-body {
+    padding: 12px 14px 120px;
+  }
+
+  .quick-record-section,
+  .quick-record-result {
+    padding: 12px;
+  }
+
+  .quick-record-two-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-record-footer {
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .quick-record-footer .primary-button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .quick-record-result-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .quick-record-result-row small,
+  .quick-record-result-row button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 768px) {
+  .quick-record-desktop-modal {
+    display: block;
+  }
+}

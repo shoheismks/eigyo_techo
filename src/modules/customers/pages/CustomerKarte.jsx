@@ -36,6 +36,7 @@ import { SAMPLE_STATUSES, emptySample, normalizeSample } from '../../samples/hoo
 import { createDummyKarteAnalysis, getCustomerKarte } from '../services/customerKarteService.js';
 import { buildCustomerBriefing } from '../services/customerBriefingService.js';
 import CustomerBriefing from '../components/karteSummary/CustomerBriefing.jsx';
+import CustomerQuickRecord from '../components/quickRecord/CustomerQuickRecord.jsx';
 import {
   generateAiMeetingPrep,
   generateProductProposalNote,
@@ -558,6 +559,7 @@ export default function CustomerKarte({
   updateBusinessCard,
   addComplaint,
   updateComplaint,
+  addEvent,
   addTask,
   updateTask,
   removeTask,
@@ -607,6 +609,8 @@ export default function CustomerKarte({
   const [showCompletedContractBalances, setShowCompletedContractBalances] = useState(false);
   const [contractBalanceScope, setContractBalanceScope] = useState('office');
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [quickRecordOpen, setQuickRecordOpen] = useState(false);
+  const [quickRecordNotice, setQuickRecordNotice] = useState('');
 
   const karte = useMemo(
     () => getCustomerKarte({ customerId, customers, contacts, businessCards, products, inventories, complaints, events, attachments, samples, quotes, adoptions }),
@@ -738,6 +742,8 @@ export default function CustomerKarte({
     setQuotePreviewHtml('');
     setQuoteError('');
     setActionMenuOpen(false);
+    setQuickRecordOpen(false);
+    setQuickRecordNotice('');
   }, [customerId, user?.email, user?.id]);
 
   useEffect(() => {
@@ -1692,6 +1698,16 @@ export default function CustomerKarte({
     openKarteTab('activity');
   }
 
+  function openQuickRecord() {
+    setQuickRecordNotice('');
+    setQuickRecordOpen(true);
+  }
+
+  function handleQuickRecordSaved(summary) {
+    const savedItems = summary?.success?.length ? summary.success.join('、') : '商談記録';
+    setQuickRecordNotice(`${savedItems}を保存しました。`);
+  }
+
   function openCalendarForCustomer(type) {
     if (onCalendarQuickAction) {
       onCalendarQuickAction(type, { customerId: customer.id });
@@ -1810,7 +1826,7 @@ export default function CustomerKarte({
   const briefingActions = {
     onNavigate: handleBriefingNavigate,
     onOpenHistory: () => openKarteTab('activity'),
-    onAddHistory: openMeetingHistoryForm,
+    onAddHistory: openQuickRecord,
     onAddEvent: () => openCalendarForCustomer('schedule'),
     onAddTask: () => openCalendarForCustomer('task'),
     onCreateQuote: () => onCreateQuote?.({ customerId: customer.id }),
@@ -1852,7 +1868,21 @@ export default function CustomerKarte({
         />
       )}
 
+      {quickRecordNotice && <div className="extension-toast">{quickRecordNotice}</div>}
       <CustomerBriefing briefing={briefing} actions={briefingActions} />
+
+      {quickRecordOpen && (
+        <CustomerQuickRecord
+          customer={customer}
+          user={user}
+          getCurrentCustomer={() => customers.find((item) => item.id === customer.id) || customer}
+          updateCustomer={updateCustomer}
+          addEvent={addEvent}
+          addTask={addTask}
+          onClose={() => setQuickRecordOpen(false)}
+          onSaved={handleQuickRecordSaved}
+        />
+      )}
 
       <section className="karte-kpi-strip" aria-label="顧客カルテKPI">
         {kpiItems.map((item) => (

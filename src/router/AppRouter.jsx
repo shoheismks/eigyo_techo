@@ -327,6 +327,7 @@ export default function AppRouter({
           updateBusinessCard={updateBusinessCard}
           addComplaint={addComplaint}
           updateComplaint={updateComplaint}
+          addEvent={addEvent}
           addTask={addTask}
           updateTask={updateTask}
           removeTask={removeTask}
