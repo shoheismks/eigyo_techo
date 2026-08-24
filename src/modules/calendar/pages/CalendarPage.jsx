@@ -15,7 +15,6 @@ import {
   normalizeTask,
 } from '../hooks/useTasks.js';
 import { getCalendarDateMeta } from '../services/japaneseHolidayService.js';
-import CalendarLocalMigrationPanel from '../components/CalendarLocalMigrationPanel.jsx';
 import './CalendarPage.css';
 
 const VIEW_LABELS = {
@@ -1171,12 +1170,6 @@ export default function CalendarPage({
           </div>
         </div>
       </div>
-
-      <CalendarLocalMigrationPanel
-        userId={user?.id || ''}
-        reloadEvents={reloadEvents}
-        reloadTasks={reloadTasks}
-      />
 
       {(syncError || calendarError || syncState === 'error') && (
         <div className="form-error-message" role="alert">

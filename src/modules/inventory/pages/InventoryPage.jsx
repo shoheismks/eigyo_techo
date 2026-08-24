@@ -1317,7 +1317,7 @@ function PlannedInventoryOverview({ rows = [], onOpenProductDetail }) {
     { key: 'projected', label: '入荷後見込', width: '130px', render: (row) => formatPlannedQuantity(row.projectedStock, row.unit) },
     { key: 'nextCustoms', label: '次回通関予定', width: '130px', render: (row) => row.nextCustomsDate || '-' },
     { key: 'count', label: '予定件数', width: '90px', render: (row) => row.inboundCount },
-    { key: 'warning', label: 'Warning', minWidth: '200px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
+    { key: 'warning', label: '確認事項', minWidth: '200px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
   ];
 
   return (
@@ -1805,7 +1805,7 @@ function DeliveryNoticeImportPanel({
     { key: 'packing', label: 'Packing', minWidth: '210px', render: (row) => row.packingFrom || row.packingTo ? `${row.packingFrom || '-'} ～ ${row.packingTo || '-'}` : '-' },
     { key: 'expiry', label: '賞味期限', minWidth: '120px', render: (row) => row.expiryDate || '-' },
     { key: 'warehouse', label: '倉庫', minWidth: '160px', render: (row) => row.warehouse || '-' },
-    { key: 'warnings', label: 'Warning', minWidth: '180px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
+    { key: 'warnings', label: '確認事項', minWidth: '180px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
   ];
 
   const savedLineColumns = [
@@ -1915,7 +1915,7 @@ function DeliveryNoticeImportPanel({
       ),
     },
     { key: 'alias', label: '別名', width: '110px', render: (line) => <button type="button" className="ghost-button" onClick={() => onSaveAlias?.(line)}>保存</button> },
-    { key: 'warnings', label: 'Warning', minWidth: '180px', render: (line) => line.warnings?.length ? line.warnings.join(' / ') : 'なし' },
+    { key: 'warnings', label: '確認事項', minWidth: '180px', render: (line) => line.warnings?.length ? line.warnings.join(' / ') : 'なし' },
   ];
 
   const receiptRows = inboundReceipts
@@ -1942,7 +1942,7 @@ function DeliveryNoticeImportPanel({
         <div>
           <p className="eyebrow">Delivery notice PDF</p>
           <h2>入荷予定PDF取込</h2>
-          <p className="inline-helper">Phase2は入荷予定DB登録と商品照合までです。在庫登録、入庫RPC実行は行いません。</p>
+          <p className="inline-helper">この画面では入荷予定の登録と商品照合まで行います。入荷確定をするまで在庫数量は変わりません。</p>
         </div>
         <label className="primary-button delivery-notice-upload-button">
           PDFアップロード
@@ -1973,13 +1973,13 @@ function DeliveryNoticeImportPanel({
 
           <dl className="company-details delivery-notice-file-details">
             <div><dt>ファイル名</dt><dd>{preview.fileName || '-'}</dd></div>
-            <div><dt>file_hash</dt><dd>{preview.fileHash || '-'}</dd></div>
+            <div><dt>ファイル識別子</dt><dd>{preview.fileHash || '-'}</dd></div>
             <div><dt>ページ数</dt><dd>{preview.pageCount || 0}</dd></div>
           </dl>
 
           {preview.warnings.length > 0 && (
             <div className="delivery-notice-warning-box">
-              <h3>PDF全体のWarning</h3>
+              <h3>PDF全体の確認事項</h3>
               <ul>
                 {preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
               </ul>
@@ -1988,7 +1988,7 @@ function DeliveryNoticeImportPanel({
 
           <div className="section-heading">
             <h3>解析明細</h3>
-            <span className="info-badge muted">未取得項目はWarningで確認</span>
+            <span className="info-badge muted">未取得項目は確認事項で確認</span>
           </div>
 
           <div className="delivery-notice-actions">

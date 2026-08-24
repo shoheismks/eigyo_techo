@@ -199,7 +199,7 @@ export default function Suppliers({
       <section className="page-header">
         <p className="eyebrow">Suppliers</p>
         <h1>仕入先</h1>
-        <p>仕入先情報、商談メモ、相手からの見積ファイルをSupabaseで管理します。</p>
+        <p>仕入先情報、商談メモ、相手からの見積ファイルをクラウドで管理します。</p>
       </section>
 
       <section className="search-panel">

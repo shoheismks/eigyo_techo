@@ -26,7 +26,7 @@ function LegacyModal({ title, children, onClose }) {
       >
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Legacy LocalStorage</p>
+            <p className="eyebrow">旧データ</p>
             <h2>{title}</h2>
           </div>
           <button type="button" className="ghost-button" onClick={onClose}>
@@ -66,18 +66,18 @@ export default function LegacyLocalDataPanel() {
   function handleDelete() {
     const removedKeys = removeLegacyLocalDataGroups(groups);
     setIsConfirmingDelete(false);
-    setMessage(`${removedKeys.length}個のLocalStorageキーを削除しました。`);
+    setMessage(`${removedKeys.length}個の旧データを削除しました。`);
     refresh();
   }
 
   return (
-    <section className="legacy-local-data-panel" aria-label="旧LocalStorage業務データ警告">
+    <section className="legacy-local-data-panel" aria-label="旧業務データ警告">
       <div>
         <p className="eyebrow">旧ローカル業務データ</p>
-        <h2>端末内に旧LocalStorageデータがあります</h2>
+        <h2>この端末に旧データがあります</h2>
         <p>
-          Supabaseへの自動移行・自動削除は行いません。必要に応じて内容を確認し、
-          不要な場合だけ対象キーを削除してください。
+          自動移行・自動削除は行いません。必要に応じて内容を確認し、
+          不要な場合だけ対象データを削除してください。
         </p>
       </div>
       <div className="legacy-local-summary">
@@ -119,8 +119,8 @@ export default function LegacyLocalDataPanel() {
       {isConfirmingDelete && (
         <LegacyModal title="旧ローカルデータを削除" onClose={() => setIsConfirmingDelete(false)}>
           <p className="form-error-message">
-            この操作は表示中の旧業務データLocalStorageキーだけを削除します。
-            Supabaseのデータ、UI設定、商品/カレンダー/メールの個別移行対象キーは削除しません。
+            この操作は表示中の旧業務データだけを削除します。
+            クラウド上のデータ、画面設定、商品/カレンダー/メールの個別移行対象データは削除しません。
           </p>
           <div className="legacy-local-delete-list">
             {groups.flatMap((group) =>
@@ -134,7 +134,7 @@ export default function LegacyLocalDataPanel() {
               キャンセル
             </button>
             <button type="button" className="danger-button" onClick={handleDelete}>
-              対象キーだけ削除
+              対象データだけ削除
             </button>
           </div>
         </LegacyModal>

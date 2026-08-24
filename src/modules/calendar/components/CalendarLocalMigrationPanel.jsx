@@ -54,7 +54,7 @@ function ConflictSelector({ conflict, value, onChange }) {
     <label className="field-label">
       {conflict.localName}
       <small>
-        Supabase: {conflict.remoteName} / 判定: {conflict.reasons.join(', ')}
+        クラウド側: {conflict.remoteName} / 判定: {conflict.reasons.join(', ')}
       </small>
       <select value={value || 'skip'} onChange={(event) => onChange(conflict.localId, event.target.value)}>
         {ACTIONS.map((action) => (
@@ -139,11 +139,11 @@ export default function CalendarLocalMigrationPanel({
         conflictActions,
       });
       setResults(nextResults);
-      setMessage(`移行が完了しました。${resultSummary(nextResults)}。LocalStorageは削除していません。`);
+      setMessage(`移行が完了しました。${resultSummary(nextResults)}。端末内の旧データは削除していません。`);
       await Promise.all([reloadEvents?.(), reloadTasks?.()]);
       setPreview(await buildCalendarLegacyMigrationPreview(userId));
     } catch (err) {
-      setError(err.message || '移行に失敗しました。LocalStorageは削除していません。');
+      setError(err.message || '移行に失敗しました。端末内の旧データは削除していません。');
     } finally {
       setIsMigrating(false);
     }
@@ -168,7 +168,7 @@ export default function CalendarLocalMigrationPanel({
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="旧カレンダーデータ移行確認" onClick={(event) => event.stopPropagation()}>
             <div className="customer-editor-header">
               <div>
-                <p className="eyebrow">Calendar Migration</p>
+                <p className="eyebrow">予定・タスク移行</p>
                 <h2>旧予定・タスクデータの移行確認</h2>
               </div>
               <button type="button" className="ghost-button" onClick={() => setIsPreviewOpen(false)}>
@@ -177,17 +177,17 @@ export default function CalendarLocalMigrationPanel({
             </div>
 
             {isLoadingPreview ? (
-              <p className="notice-text">LocalStorageとSupabaseの件数を確認しています...</p>
+              <p className="notice-text">端末内の旧データとクラウド側の件数を確認しています...</p>
             ) : (
               <>
                 <div className="kpi-card-row">
                   <article className="kpi-card">
-                    <span>LocalStorage</span>
+                    <span>端末内の旧データ</span>
                     <strong>旧予定 {counts.localEvents}件</strong>
                     <small>旧タスク {counts.localTasks}件</small>
                   </article>
                   <article className="kpi-card">
-                    <span>Supabase</span>
+                    <span>クラウド側</span>
                     <strong>予定 {counts.remoteEvents}件</strong>
                     <small>タスク {counts.remoteTasks}件</small>
                   </article>
@@ -264,7 +264,7 @@ export default function CalendarLocalMigrationPanel({
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="旧ローカル予定タスクデータ削除" onClick={(event) => event.stopPropagation()}>
             <div className="customer-editor-header">
               <div>
-                <p className="eyebrow">LocalStorage</p>
+                <p className="eyebrow">端末内の旧データ</p>
                 <h2>旧予定・タスクのローカルデータを削除しますか？</h2>
               </div>
               <button type="button" className="ghost-button" onClick={() => setIsConfirmingDelete(false)}>
@@ -272,7 +272,7 @@ export default function CalendarLocalMigrationPanel({
               </button>
             </div>
             <p className="form-error-message">
-              この操作は端末内の `eigyo-techo-events` と `eigyo-techo-tasks` だけを削除します。Supabaseのデータは削除しません。
+              この操作は端末内の旧予定・旧タスクだけを削除します。クラウド上の予定・タスクは削除しません。
             </p>
             <div className="customer-editor-actions">
               <button type="button" className="ghost-button" onClick={() => setIsConfirmingDelete(false)}>
@@ -289,12 +289,12 @@ export default function CalendarLocalMigrationPanel({
     : null;
 
   return (
-    <section className="search-panel calendar-local-migration-panel" aria-label="旧予定タスクLocalStorageデータ移行">
+    <section className="search-panel calendar-local-migration-panel" aria-label="旧予定タスクデータ移行">
       <div className="section-heading">
         <div>
           <h2>旧ローカル予定・タスクデータがあります</h2>
           <p className="notice-text">
-            自動移行・自動削除は行いません。内容を確認し、必要なものだけSupabaseへ移行できます。
+            自動移行・自動削除は行いません。内容を確認し、必要なものだけクラウドへ移行できます。
           </p>
         </div>
       </div>
@@ -304,7 +304,7 @@ export default function CalendarLocalMigrationPanel({
           内容を確認
         </button>
         <button type="button" className="primary-button compact-button" onClick={openPreview}>
-          Supabaseへ移行
+          クラウドへ移行
         </button>
         <button type="button" className="ghost-button danger" onClick={() => setIsConfirmingDelete(true)}>
           ローカルデータを削除

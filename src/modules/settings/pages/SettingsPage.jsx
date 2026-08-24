@@ -6,7 +6,15 @@ import {
   readBackupFile,
   restoreBackupPayload,
 } from '../services/backupService.js';
+import MailDraftLocalMigrationPanel from '../../../components/MailDraftLocalMigrationPanel.jsx';
+import LegacyLocalDataPanel from '../../../shared/components/LegacyLocalDataPanel.jsx';
 import { uploadAttachment } from '../../../shared/services/storageService.js';
+import CalendarLocalMigrationPanel from '../../calendar/components/CalendarLocalMigrationPanel.jsx';
+import ProductLocalMigrationPanel from '../../products/components/ProductLocalMigrationPanel.jsx';
+import { hasCalendarLegacyLocalData } from '../../calendar/services/calendarLocalMigrationService.js';
+import { hasProductLegacyLocalData } from '../../products/services/productLocalMigrationService.js';
+import { hasLegacyMailDrafts } from '../../../services/mailDraftSyncService.js';
+import { summarizeLegacyLocalData } from '../../../shared/services/legacyLocalDataService.js';
 import { DEFAULT_ISSUER_TAX_RATE, PDF_TEMPLATE_OPTIONS, emptyIssuer } from '../hooks/useIssuers.js';
 import { DEFAULT_THEME_COLOR, isValidThemeColor, sanitizeThemeColor } from '../../../shared/utils/themeColor.js';
 import { TERMS_FIELDS } from '../../quotes/services/termsTemplateService.js';
@@ -20,8 +28,8 @@ const SETTINGS_CATEGORIES = [
   { id: 'products', label: '商品／価格設定', description: '商品、価格、税率に関する設定を確認します。' },
   { id: 'inventory', label: '在庫／物流設定', description: '在庫、出荷、納品に関する設定を確認します。' },
   { id: 'documents', label: '帳票設定', description: '見積書、成約確認書、請求書の発行元と約款を管理します。' },
-  { id: 'data', label: 'データ管理', description: 'Backup、Restore、インポート、エクスポートを実行します。' },
-  { id: 'integrations', label: '連携設定', description: 'Supabaseなど外部連携の状態を確認します。' },
+  { id: 'data', label: 'データ管理', description: 'バックアップ、復元、旧データ確認を実行します。' },
+  { id: 'integrations', label: '連携設定', description: 'クラウド連携の状態を確認します。' },
 ];
 
 export default function SettingsPage({
@@ -43,6 +51,14 @@ export default function SettingsPage({
   issuerSyncState,
   issuerSyncError,
   issuerLegacyLocalDataWarning,
+  products = [],
+  brands = [],
+  productAssets = [],
+  reloadProducts,
+  reloadBrands,
+  reloadProductAssets,
+  reloadEvents,
+  reloadTasks,
 }) {
   const fileInputRef = useRef(null);
   const [backupMessage, setBackupMessage] = useState('');
@@ -51,6 +67,29 @@ export default function SettingsPage({
   const [issuerMessage, setIssuerMessage] = useState('');
   const [issuerSaving, setIssuerSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState('basic');
+  const legacyDataSummary = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return {
+        commonCount: 0,
+        hasProduct: false,
+        hasCalendar: false,
+        hasMailDrafts: false,
+      };
+    }
+
+    return {
+      commonCount: summarizeLegacyLocalData().reduce((total, group) => total + group.count, 0),
+      hasProduct: hasProductLegacyLocalData(),
+      hasCalendar: hasCalendarLegacyLocalData(),
+      hasMailDrafts: hasLegacyMailDrafts(userId),
+    };
+  }, [userId, activeCategory]);
+
+  const hasLegacyData =
+    legacyDataSummary.commonCount > 0 ||
+    legacyDataSummary.hasProduct ||
+    legacyDataSummary.hasCalendar ||
+    legacyDataSummary.hasMailDrafts;
 
   function updateIssuerForm(field, value) {
     setIssuerForm((current) => ({ ...current, [field]: value }));
@@ -181,7 +220,7 @@ export default function SettingsPage({
     });
 
     downloadBackup(payload);
-    setBackupMessage(`JSON Export completed. ${countBackupRecords(payload)} records included.`);
+    setBackupMessage(`バックアップを作成しました。${countBackupRecords(payload)}件のデータを含みます。`);
   }
 
   async function handleImport(event) {
@@ -201,9 +240,9 @@ export default function SettingsPage({
         0,
       );
 
-      setBackupMessage(`JSON Import completed. ${importedCount} records restored.`);
+      setBackupMessage(`バックアップから復元しました。${importedCount}件を反映しました。`);
     } catch (error) {
-      setBackupMessage(`JSON Import failed. ${error.message}`);
+      setBackupMessage(`バックアップの復元に失敗しました。${error.message}`);
     } finally {
       setIsImporting(false);
       event.target.value = '';
@@ -273,10 +312,10 @@ export default function SettingsPage({
             )}
           </div>
 
-          {['company', 'documents'].includes(activeCategory) && (issuerLegacyLocalDataWarning || issuerSyncError || issuerSyncState === 'error') && (
+          {['company', 'documents'].includes(activeCategory) && (issuerSyncError || issuerSyncState === 'error') && (
             <div className="form-error-message" role="alert">
-              {issuerLegacyLocalDataWarning && <p>{issuerLegacyLocalDataWarning}</p>}
               {issuerSyncError && <p>{issuerSyncError}</p>}
+              {issuerSyncState === 'error' && !issuerSyncError && <p>発行元データをクラウドへ保存できませんでした。</p>}
             </div>
           )}
 
@@ -317,11 +356,11 @@ export default function SettingsPage({
 
               <article className={['settings-card', syncState === 'supabase' ? 'cloud' : 'local'].join(' ')}>
                 <header>
-                  <h3>保存先と同期</h3>
-                  <p>現在の保存先とクラウド同期状態を確認できます。</p>
+                  <h3>クラウド保存状態</h3>
+                  <p>現在のデータ保存状態を確認できます。</p>
                 </header>
                 <dl className="settings-definition-list">
-                  <div><dt>保存先</dt><dd>{syncState === 'supabase' ? 'Supabase' : syncState === 'syncing' ? '同期中...' : 'LocalStorage'}</dd></div>
+                  <div><dt>状態</dt><dd>{syncState === 'supabase' ? 'クラウド保存中' : syncState === 'syncing' ? '確認中...' : '確認が必要'}</dd></div>
                   <div><dt>ログイン</dt><dd>{user?.email || '-'}</dd></div>
                   {syncError && <div><dt>警告</dt><dd>{syncError}</dd></div>}
                 </dl>
@@ -593,22 +632,22 @@ export default function SettingsPage({
             <div className="settings-card-grid">
               <article className="settings-card">
                 <header>
-                  <h3>Backup</h3>
-                  <p>現在のデータをJSONとして保存します。Storage本体ではなくURLとメタ情報を出力します。</p>
+                  <h3>バックアップ作成</h3>
+                  <p>現在のデータをバックアップファイルとして保存します。添付ファイル本体は含まず、参照情報だけを記録します。</p>
                 </header>
                 <footer>
-                  <button type="button" className="primary-button" onClick={handleExport}>JSON Export</button>
+                  <button type="button" className="primary-button" onClick={handleExport}>バックアップをダウンロード</button>
                 </footer>
               </article>
 
               <article className="settings-card">
                 <header>
-                  <h3>Restore</h3>
-                  <p>JSONバックアップからデータを復元します。既存形式との互換性を維持します。</p>
+                  <h3>バックアップ復元</h3>
+                  <p>保存済みのバックアップファイルからデータを復元します。復元前に対象ファイルを確認してください。</p>
                 </header>
                 <footer>
                   <button type="button" className="ghost-button" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-                    {isImporting ? 'Import中...' : 'JSON Import'}
+                    {isImporting ? '復元中...' : 'バックアップを読み込む'}
                   </button>
                   <input ref={fileInputRef} type="file" accept="application/json,.json" className="backup-file-input" onChange={handleImport} />
                 </footer>
@@ -628,10 +667,38 @@ export default function SettingsPage({
                 </header>
               </article>
 
+              <article className="settings-card wide-card legacy-data-management-card">
+                <header>
+                  <h3>旧データ確認</h3>
+                  <p>以前のバージョンで端末内に残った業務データを確認できます。自動移行・自動削除は行いません。</p>
+                </header>
+                {!hasLegacyData && (
+                  <p className="notice-text">この端末に確認が必要な旧データはありません。</p>
+                )}
+                <div className="legacy-data-panel-stack">
+                  <ProductLocalMigrationPanel
+                    userId={userId}
+                    products={products}
+                    brands={brands}
+                    productAssets={productAssets}
+                    reloadProducts={reloadProducts}
+                    reloadBrands={reloadBrands}
+                    reloadProductAssets={reloadProductAssets}
+                  />
+                  <CalendarLocalMigrationPanel
+                    userId={userId}
+                    reloadEvents={reloadEvents}
+                    reloadTasks={reloadTasks}
+                  />
+                  <MailDraftLocalMigrationPanel userId={userId} />
+                  <LegacyLocalDataPanel />
+                </div>
+              </article>
+
               <article className="settings-card danger-card wide-card">
                 <header>
                   <h3>危険な操作</h3>
-                  <p>データ初期化や全消去は現在この画面から実行できません。必要な場合はBackup取得後に管理者が実施してください。</p>
+                  <p>データ初期化や全消去は現在この画面から実行できません。必要な場合はバックアップ取得後に管理者が実施してください。</p>
                 </header>
               </article>
               {backupMessage && <p className="settings-message wide-message">{backupMessage}</p>}
@@ -642,11 +709,11 @@ export default function SettingsPage({
             <div className="settings-card-grid">
               <article className={['settings-card', syncState === 'supabase' ? 'cloud' : 'local'].join(' ')}>
                 <header>
-                  <h3>Supabase接続</h3>
-                  <p>クラウド同期の接続状態を表示します。</p>
+                  <h3>クラウド接続</h3>
+                  <p>クラウド保存の接続状態を表示します。</p>
                 </header>
                 <dl className="settings-definition-list">
-                  <div><dt>状態</dt><dd>{syncState === 'supabase' ? '接続中' : syncState === 'syncing' ? '同期中' : 'LocalStorage'}</dd></div>
+                  <div><dt>状態</dt><dd>{syncState === 'supabase' ? '接続中' : syncState === 'syncing' ? '確認中' : '確認が必要'}</dd></div>
                   {syncError && <div><dt>エラー</dt><dd>{syncError}</dd></div>}
                 </dl>
                 <footer>

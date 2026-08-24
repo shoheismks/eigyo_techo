@@ -118,7 +118,6 @@ export default function ProductDetail({
   updateProductAsset,
   removeProductAsset,
   syncError = '',
-  legacyLocalDataWarning = '',
   addInventory,
   updateInventory,
   removeInventory,
@@ -686,10 +685,9 @@ export default function ProductDetail({
       <section className="page-header">
         <p className="eyebrow">Product detail</p>
         <h1>{isNew ? '商品追加' : '商品詳細'}</h1>
-        <p>商品情報、価格、添付ファイルをSupabaseに同期して管理します。</p>
+        <p>商品情報、価格、添付ファイルをクラウドで管理します。</p>
       </section>
 
-      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
       {syncError && <p className="form-error-message">{syncError}</p>}
 
       {!isNew && (

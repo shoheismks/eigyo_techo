@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import DataTable from '../../../shared/components/DataTable.jsx';
-import ProductLocalMigrationPanel from '../components/ProductLocalMigrationPanel.jsx';
 import {
   PRODUCT_CATEGORIES,
   TEMPERATURE_ZONES,
@@ -52,7 +51,6 @@ export default function Products({
   onOpenInventory,
   syncState = '',
   syncError = '',
-  legacyLocalDataWarning = '',
 }) {
   const [keyword, setKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(ALL);
@@ -211,18 +209,6 @@ export default function Products({
         </div>
       </section>
 
-      {legacyLocalDataWarning && <p className="form-error-message">{legacyLocalDataWarning}</p>}
-      {legacyLocalDataWarning && (
-        <ProductLocalMigrationPanel
-          userId={userId}
-          products={products}
-          brands={brands}
-          productAssets={safeProductAssets}
-          reloadProducts={reloadProducts}
-          reloadBrands={reloadBrands}
-          reloadProductAssets={reloadProductAssets}
-        />
-      )}
       {syncError && syncState === 'error' && <p className="form-error-message">{syncError}</p>}
 
       <section className="search-panel desktop-filter-panel">

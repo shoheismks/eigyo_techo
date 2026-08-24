@@ -272,6 +272,20 @@
   color: var(--muted);
 }
 
+.legacy-data-management-card {
+  gap: 14px;
+}
+
+.legacy-data-panel-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.legacy-data-panel-stack .search-panel,
+.legacy-data-panel-stack .legacy-local-data-panel {
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   .settings-shell,
   .settings-document-layout {

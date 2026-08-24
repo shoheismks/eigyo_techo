@@ -215,7 +215,7 @@ export default function CustomerProductPrices({
         setMessage('登録しました。');
       }
     } catch (error) {
-      setMessage(error.message || '保存に失敗しました。Supabaseの接続と権限を確認してください。');
+      setMessage(error.message || '保存に失敗しました。クラウド接続と権限を確認してください。');
     } finally {
       setIsSaving(false);
     }

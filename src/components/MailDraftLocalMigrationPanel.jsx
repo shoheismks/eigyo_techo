@@ -118,11 +118,11 @@ export default function MailDraftLocalMigrationPanel({
         conflictActions,
       });
       setResults(nextResults);
-      setMessage(`移行が完了しました。${resultSummary(nextResults)}。LocalStorageは削除していません。`);
+      setMessage(`移行が完了しました。${resultSummary(nextResults)}。端末内の旧データは削除していません。`);
       await reloadDrafts?.();
       setPreview(await buildMailDraftLegacyMigrationPreview(userId));
     } catch (err) {
-      setError(err.message || '移行に失敗しました。LocalStorageは削除していません。');
+      setError(err.message || '移行に失敗しました。端末内の旧データは削除していません。');
     } finally {
       setIsMigrating(false);
     }
@@ -147,7 +147,7 @@ export default function MailDraftLocalMigrationPanel({
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="旧メール下書きデータ移行確認" onClick={(event) => event.stopPropagation()}>
             <div className="customer-editor-header">
               <div>
-                <p className="eyebrow">Mail Draft Migration</p>
+                <p className="eyebrow">メール下書き移行</p>
                 <h2>旧メール下書きデータの移行確認</h2>
               </div>
               <button type="button" className="ghost-button" onClick={() => setIsPreviewOpen(false)}>
@@ -156,17 +156,17 @@ export default function MailDraftLocalMigrationPanel({
             </div>
 
             {isLoadingPreview ? (
-              <p className="notice-text">LocalStorageとSupabaseの件数を確認しています...</p>
+              <p className="notice-text">端末内の旧データとクラウド側の件数を確認しています...</p>
             ) : (
               <>
                 <div className="kpi-card-row">
                   <article className="kpi-card">
-                    <span>LocalStorage</span>
+                    <span>端末内の旧データ</span>
                     <strong>{counts.localDrafts}件</strong>
                     <small>旧メール下書き</small>
                   </article>
                   <article className="kpi-card">
-                    <span>Supabase</span>
+                    <span>クラウド側</span>
                     <strong>{counts.remoteDrafts}件</strong>
                     <small>現在のメール下書き</small>
                   </article>
@@ -190,7 +190,7 @@ export default function MailDraftLocalMigrationPanel({
                       <label className="field-label" key={conflict.localId}>
                         {conflict.localName}
                         <small>
-                          Supabase: {conflict.remoteName} / 判定: {conflict.reasons.join(', ')}
+                          クラウド側: {conflict.remoteName} / 判定: {conflict.reasons.join(', ')}
                         </small>
                         <select
                           value={conflictActions[conflict.localId] || 'skip'}
@@ -231,7 +231,7 @@ export default function MailDraftLocalMigrationPanel({
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="旧メール下書きローカルデータ削除" onClick={(event) => event.stopPropagation()}>
             <div className="customer-editor-header">
               <div>
-                <p className="eyebrow">LocalStorage</p>
+                <p className="eyebrow">端末内の旧データ</p>
                 <h2>旧メール下書きのローカルデータを削除しますか？</h2>
               </div>
               <button type="button" className="ghost-button" onClick={() => setIsConfirmingDelete(false)}>
@@ -239,7 +239,7 @@ export default function MailDraftLocalMigrationPanel({
               </button>
             </div>
             <p className="form-error-message">
-              この操作は端末内の `eigyo-techo-mail-drafts` だけを削除します。Supabaseのメール下書きは削除しません。
+              この操作は端末内の旧メール下書きだけを削除します。クラウド上のメール下書きは削除しません。
             </p>
             <div className="customer-editor-actions">
               <button type="button" className="ghost-button" onClick={() => setIsConfirmingDelete(false)}>
@@ -256,12 +256,12 @@ export default function MailDraftLocalMigrationPanel({
     : null;
 
   return (
-    <section className="search-panel" aria-label="旧メール下書きLocalStorageデータ移行">
+    <section className="search-panel" aria-label="旧メール下書きデータ移行">
       <div className="section-heading">
         <div>
           <h2>旧ローカルメール下書きデータがあります</h2>
           <p className="notice-text">
-            自動移行・自動削除は行いません。内容を確認し、必要な下書きだけSupabaseへ移行できます。
+            自動移行・自動削除は行いません。内容を確認し、必要な下書きだけクラウドへ移行できます。
           </p>
         </div>
       </div>
@@ -271,7 +271,7 @@ export default function MailDraftLocalMigrationPanel({
           内容を確認
         </button>
         <button type="button" className="primary-button compact-button" onClick={openPreview}>
-          Supabaseへ移行
+          クラウドへ移行
         </button>
         <button type="button" className="ghost-button danger" onClick={() => setIsConfirmingDelete(true)}>
           ローカルデータを削除

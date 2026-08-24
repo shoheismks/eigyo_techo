@@ -4,7 +4,6 @@ import AddActionMenu from './AddActionMenu.jsx';
 import BottomNavigation from './BottomNavigation.jsx';
 import MobileMoreMenu from './MobileMoreMenu.jsx';
 import SidebarNavigation from './SidebarNavigation.jsx';
-import LegacyLocalDataPanel from '../shared/components/LegacyLocalDataPanel.jsx';
 import GlobalSearchPalette from '../shared/components/GlobalSearchPalette.jsx';
 
 const pageTitles = {
@@ -169,7 +168,6 @@ export default function AppLayout({
           {notice && <div className="extension-toast">{notice}</div>}
 
           <div className="main-content">
-            <LegacyLocalDataPanel />
             {children}
           </div>
           {activePage !== 'Help' && (

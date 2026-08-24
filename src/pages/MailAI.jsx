@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import MailDraftLocalMigrationPanel from '../components/MailDraftLocalMigrationPanel.jsx';
 import { SALES_PURPOSES, createMailDrafts } from '../services/mailDraftService.js';
 import { createGmailDraft } from '../services/gmailService.js';
 import { createOutlookDraft } from '../services/outlookService.js';
@@ -84,7 +83,7 @@ export default function MailAI({ customers, products = [], userId = '' }) {
       } catch (err) {
         if (!ignore) {
           setDrafts([]);
-          setDraftSyncNotice(err.message || 'メール下書きをSupabaseから読み込めませんでした。');
+          setDraftSyncNotice(err.message || 'メール下書きをクラウドから読み込めませんでした。');
         }
       }
     }
@@ -352,8 +351,6 @@ export default function MailAI({ customers, products = [], userId = '' }) {
           </div>
         )}
       </section>
-
-      <MailDraftLocalMigrationPanel userId={userId} reloadDrafts={reloadDrafts} />
 
       {aiMailNote && (
         <section className="mail-context">

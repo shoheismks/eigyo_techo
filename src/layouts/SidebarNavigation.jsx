@@ -120,7 +120,7 @@ const navGroups = [
     icon: '設',
     pages: ['Settings', 'Help'],
     items: [
-      { key: 'Settings', label: '設定', helper: '会社情報・Backup' },
+      { key: 'Settings', label: '設定', helper: '会社情報・バックアップ' },
       { key: 'Help', label: 'ヘルプ', helper: '操作マニュアル' },
     ],
   },

@@ -277,7 +277,7 @@ export async function buildProductLegacyMigrationPreview(userId = '') {
       productId: asset.productId,
       fileName: asset.fileName || asset.name || '(file name missing)',
       assetKind: asset.assetKind,
-      reason: 'Storage実体なし：移行対象外',
+      reason: '添付ファイル本体なし：移行対象外',
     }));
 
   return {
@@ -347,7 +347,7 @@ export async function migrateProductLegacyLocalData({ userId = '', preview, conf
 
     if (duplicate) {
       brandIdMap.set(normalizedBrand.id, duplicate.id);
-      results.brands.push(resultRecord('ブランド', normalizedBrand.name, 'skipped', '同名ブランドがSupabaseにあるため既存ブランドへ紐付けました。'));
+      results.brands.push(resultRecord('ブランド', normalizedBrand.name, 'skipped', '同名ブランドがクラウド側にあるため既存ブランドへ紐付けました。'));
       continue;
     }
 
@@ -412,7 +412,7 @@ export async function migrateProductLegacyLocalData({ userId = '', preview, conf
 
   for (const asset of local.productAssets) {
     if (!hasUsableAssetStorage(asset)) {
-      results.productAssets.push(resultRecord('商品アセット', asset.fileName, 'warning', 'Storage実体なし：移行対象外'));
+      results.productAssets.push(resultRecord('商品アセット', asset.fileName, 'warning', '添付ファイル本体なし：移行対象外'));
       continue;
     }
 
@@ -426,7 +426,7 @@ export async function migrateProductLegacyLocalData({ userId = '', preview, conf
 
     const duplicate = findAssetDuplicate(asset, remoteAssets);
     if (duplicate) {
-      results.productAssets.push(resultRecord('商品アセット', asset.fileName, 'skipped', '同じファイル候補がSupabaseにあるためスキップしました。'));
+      results.productAssets.push(resultRecord('商品アセット', asset.fileName, 'skipped', '同じファイル候補がクラウド側にあるためスキップしました。'));
       continue;
     }
 

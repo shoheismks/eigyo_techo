@@ -139,7 +139,7 @@ export default function ProductLocalMigrationPanel({
         conflictActions,
       });
       setResults(nextResults);
-      setMessage(`移行が完了しました。${resultSummary(nextResults)}。LocalStorageは削除していません。`);
+      setMessage(`移行が完了しました。${resultSummary(nextResults)}。端末内の旧データは削除していません。`);
       await Promise.all([
         reloadProducts?.(),
         reloadBrands?.(),
@@ -147,7 +147,7 @@ export default function ProductLocalMigrationPanel({
       ]);
       setPreview(await buildProductLegacyMigrationPreview(userId));
     } catch (err) {
-      setError(err.message || '移行に失敗しました。LocalStorageは削除していません。');
+      setError(err.message || '移行に失敗しました。端末内の旧データは削除していません。');
     } finally {
       setIsMigrating(false);
     }
@@ -172,7 +172,7 @@ export default function ProductLocalMigrationPanel({
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="旧商品データ移行確認" onClick={(event) => event.stopPropagation()}>
             <div className="customer-editor-header">
               <div>
-                <p className="eyebrow">Product Migration</p>
+                <p className="eyebrow">商品データ移行</p>
                 <h2>旧商品データの移行確認</h2>
               </div>
               <button type="button" className="ghost-button" onClick={() => setIsPreviewOpen(false)}>
@@ -181,17 +181,17 @@ export default function ProductLocalMigrationPanel({
             </div>
 
             {isLoadingPreview ? (
-              <p className="notice-text">LocalStorageとSupabaseの件数を確認しています...</p>
+              <p className="notice-text">端末内の旧データとクラウド側の件数を確認しています...</p>
             ) : (
               <>
                 <div className="kpi-card-row">
                   <article className="kpi-card">
-                    <span>LocalStorage</span>
+                    <span>端末内の旧データ</span>
                     <strong>{localCounts.localProducts} 商品</strong>
                     <small>ブランド {localCounts.localBrands} / アセット {localCounts.localProductAssets}</small>
                   </article>
                   <article className="kpi-card">
-                    <span>Supabase</span>
+                    <span>クラウド側</span>
                     <strong>{localCounts.remoteProducts} 商品</strong>
                     <small>ブランド {localCounts.remoteBrands} / アセット {localCounts.remoteProductAssets}</small>
                   </article>
@@ -204,8 +204,8 @@ export default function ProductLocalMigrationPanel({
 
                 {localCounts.storageMissingProductAssets > 0 && (
                   <section className="customer-editor-section">
-                    <h3>Storage実体なし：移行対象外</h3>
-                    <p className="notice-text">{localCounts.storageMissingProductAssets}件の旧アセットはstoragePath / publicUrlがないため移行しません。</p>
+                    <h3>添付ファイル本体なし：移行対象外</h3>
+                    <p className="notice-text">{localCounts.storageMissingProductAssets}件の旧添付ファイルは保存先情報がないため移行しません。</p>
                     {(preview?.storageMissingProductAssets || []).map((asset) => (
                       <p className="notice-text" key={asset.id}>
                         {asset.fileName} / {asset.reason}
@@ -229,7 +229,7 @@ export default function ProductLocalMigrationPanel({
                       <label className="field-label" key={conflict.localId}>
                         {conflict.localName}
                         <small>
-                          Local: {conflict.localCode || '-'} / Supabase: {conflict.remoteName} {conflict.remoteCode || '-'} / 判定: {conflict.reasons.join(', ')}
+                          端末内: {conflict.localCode || '-'} / クラウド側: {conflict.remoteName} {conflict.remoteCode || '-'} / 判定: {conflict.reasons.join(', ')}
                         </small>
                         <select
                           value={conflictActions[conflict.localId] || 'skip'}
@@ -250,9 +250,9 @@ export default function ProductLocalMigrationPanel({
                   <section className="customer-editor-section">
                     <h3>移行結果</h3>
                     <p className="notice-text">{resultSummary(results)}</p>
-                    <ResultGroup title="Brands" records={results.brands} />
-                    <ResultGroup title="Products" records={results.products} />
-                    <ResultGroup title="Product assets" records={results.productAssets} />
+                    <ResultGroup title="ブランド" records={results.brands} />
+                    <ResultGroup title="商品" records={results.products} />
+                    <ResultGroup title="商品添付" records={results.productAssets} />
                   </section>
                 )}
 
@@ -278,7 +278,7 @@ export default function ProductLocalMigrationPanel({
           <div className="modal-panel" role="dialog" aria-modal="true" aria-label="旧ローカル商品データ削除" onClick={(event) => event.stopPropagation()}>
             <div className="customer-editor-header">
               <div>
-                <p className="eyebrow">LocalStorage</p>
+                <p className="eyebrow">端末内の旧データ</p>
                 <h2>ローカルデータを削除しますか？</h2>
               </div>
               <button type="button" className="ghost-button" onClick={() => setIsConfirmingDelete(false)}>
@@ -286,7 +286,7 @@ export default function ProductLocalMigrationPanel({
               </button>
             </div>
             <p className="form-error-message">
-              この操作は端末内の旧LocalStorageデータだけを削除します。Supabaseのデータは削除しません。
+              この操作は端末内の旧商品データだけを削除します。クラウド上の商品データは削除しません。
             </p>
             <div className="customer-editor-actions">
               <button type="button" className="ghost-button" onClick={() => setIsConfirmingDelete(false)}>
@@ -303,12 +303,12 @@ export default function ProductLocalMigrationPanel({
     : null;
 
   return (
-    <section className="search-panel" aria-label="旧商品LocalStorageデータ移行">
+    <section className="search-panel" aria-label="旧商品データ移行">
       <div className="section-heading">
         <div>
           <h2>旧ローカル商品データがあります</h2>
           <p className="notice-text">
-            自動移行・自動削除は行いません。内容を確認し、必要なものだけSupabaseへ移行できます。
+            自動移行・自動削除は行いません。内容を確認し、必要なものだけクラウドへ移行できます。
           </p>
         </div>
       </div>
@@ -318,7 +318,7 @@ export default function ProductLocalMigrationPanel({
           内容を確認
         </button>
         <button type="button" className="primary-button compact-button" onClick={openPreview}>
-          Supabaseへ移行
+          クラウドへ移行
         </button>
         <button type="button" className="ghost-button danger" onClick={() => setIsConfirmingDelete(true)}>
           ローカルデータを削除

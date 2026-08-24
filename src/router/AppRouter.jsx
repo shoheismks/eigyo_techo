@@ -290,7 +290,6 @@ export default function AppRouter({
         onCreateMail={() => setActivePage('MailAI')}
         syncState={syncState}
         syncError={syncError}
-        legacyLocalDataWarning={legacyLocalDataWarning}
       />
     );
   }
@@ -431,7 +430,6 @@ export default function AppRouter({
         removeSalesOrder={removeSalesOrder}
         syncState={salesOrderSyncState}
         syncError={salesOrderSyncError}
-        legacyLocalDataWarning={salesOrderLegacyLocalDataWarning}
         customers={customers}
         contacts={contacts}
         projects={projects}
@@ -473,7 +471,6 @@ export default function AppRouter({
         updateShipmentStatus={updateShipmentStatus}
         syncState={shipmentSyncState}
         syncError={shipmentSyncError}
-        legacyLocalDataWarning={shipmentLegacyLocalDataWarning}
         initialSearchQuery={searchForPage('Shipments')}
         onOpenSalesOrder={() => setActivePage('SalesOrders')}
         onOpenDeliveryNotes={() => setActivePage('DeliveryNotes')}
@@ -496,7 +493,6 @@ export default function AppRouter({
         removeDeliveryNote={removeDeliveryNote}
         syncState={deliveryNoteSyncState}
         syncError={deliveryNoteSyncError}
-        legacyLocalDataWarning={deliveryNoteLegacyLocalDataWarning}
         user={user}
       />
     );
@@ -538,11 +534,6 @@ export default function AppRouter({
         onOpenInventory={openInventoryPage}
         syncState={productSyncState}
         syncError={productSyncError || brandSyncError || productAssetSyncError}
-        legacyLocalDataWarning={[
-          productLegacyLocalDataWarning,
-          brandLegacyLocalDataWarning,
-          productAssetLegacyLocalDataWarning,
-        ].filter(Boolean).join(' / ')}
       />
     );
   }
@@ -556,7 +547,6 @@ export default function AppRouter({
         projects={projects}
         syncState={quoteSyncState}
         syncError={quoteSyncError}
-        legacyLocalDataWarning={quoteLegacyLocalDataWarning}
         initialSearchQuery={searchForPage('Quotes')}
         onCreateQuote={onCreateQuote}
       />
@@ -577,7 +567,6 @@ export default function AppRouter({
         deactivatePrice={deactivateCustomerProductPrice}
         syncState={customerProductPriceSyncState}
         syncError={customerProductPriceSyncError}
-        legacyLocalDataWarning={customerProductPriceLegacyLocalDataWarning}
         userId={userId}
       />
     );
@@ -646,11 +635,6 @@ export default function AppRouter({
         updateProductAsset={updateProductAsset}
         removeProductAsset={removeProductAsset}
         syncError={productSyncError || brandSyncError || productAssetSyncError}
-        legacyLocalDataWarning={[
-          productLegacyLocalDataWarning,
-          brandLegacyLocalDataWarning,
-          productAssetLegacyLocalDataWarning,
-        ].filter(Boolean).join(' / ')}
         addInventory={addInventory}
         updateInventory={updateInventory}
         removeInventory={removeInventory}
@@ -805,6 +789,14 @@ export default function AppRouter({
         issuerSyncState={issuerSyncState}
         issuerSyncError={issuerSyncError}
         issuerLegacyLocalDataWarning={issuerLegacyLocalDataWarning}
+        products={products}
+        brands={brands}
+        productAssets={productAssets}
+        reloadProducts={reloadProducts}
+        reloadBrands={reloadBrands}
+        reloadProductAssets={reloadProductAssets}
+        reloadEvents={reloadEvents}
+        reloadTasks={reloadTasks}
         backupDatasets={{
           customers,
           products,
