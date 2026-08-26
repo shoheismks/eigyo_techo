@@ -3295,6 +3295,13 @@
   position: relative;
 }
 
+.delivery-notice-upload-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .delivery-notice-upload-button input {
   height: 1px;
   opacity: 0;
@@ -3736,6 +3743,11 @@
 
   .delivery-notice-upload-button {
     justify-content: center;
+    width: 100%;
+  }
+
+  .delivery-notice-upload-actions {
+    display: grid;
     width: 100%;
   }
 

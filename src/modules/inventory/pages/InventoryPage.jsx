@@ -686,6 +686,35 @@ export default function InventoryPage({
     }
   }
 
+  async function handleStandardExcelUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!/\.xlsx$/i.test(file.name || '')) {
+      setDeliveryNoticeError('.xlsxファイルを選択してください。');
+      setDeliveryNoticePreview(null);
+      return;
+    }
+
+    setDeliveryNoticeParsing(true);
+    setDeliveryNoticeError('');
+    setToast('');
+    setError('');
+
+    try {
+      const { parseStandardInboundExcelFile } = await import('../services/inboundDocuments/standardInboundExcelParser.js');
+      const result = await parseStandardInboundExcelFile(file);
+      setDeliveryNoticePreview(result.preview);
+      setToast('標準Excelを解析しました。在庫にはまだ反映していません。');
+    } catch (parseError) {
+      setDeliveryNoticePreview(null);
+      setDeliveryNoticeError(parseError.message || '標準Excelの解析に失敗しました。');
+    } finally {
+      setDeliveryNoticeParsing(false);
+    }
+  }
+
   async function handleSaveDeliveryNoticePreview() {
     if (!deliveryNoticePreview) return;
     setDeliveryNoticeSaving(true);
@@ -1166,6 +1195,7 @@ export default function InventoryPage({
       {activeTab === 'arrival' && (
         <DeliveryNoticeImportPanel
           onUpload={handleDeliveryNoticeUpload}
+          onExcelUpload={handleStandardExcelUpload}
           onSavePreview={handleSaveDeliveryNoticePreview}
           saving={deliveryNoticeSaving}
           parsing={deliveryNoticeParsing}
@@ -1759,6 +1789,7 @@ function matchBadgeClass(status) {
 
 function DeliveryNoticeImportPanel({
   onUpload,
+  onExcelUpload,
   onSavePreview,
   onLineChange,
   onSaveAlias,
@@ -1796,9 +1827,10 @@ function DeliveryNoticeImportPanel({
     { key: 'contractNo', label: '契約No', minWidth: '110px', render: (row) => row.contractNo || '-' },
     { key: 'brand', label: 'ブランド', minWidth: '120px', render: (row) => row.brand || '-' },
     { key: 'productName', label: '商品名', minWidth: '240px', render: (row) => row.productName || '-' },
+    { key: 'productType', label: '種別', minWidth: '120px', render: (row) => row.productType || '-' },
     { key: 'pieces', label: '個数', width: '80px', render: (row) => formatPrice(row.pieceCount) || '-' },
     { key: 'weight', label: '重量', width: '100px', render: (row) => row.weight !== '' ? `${formatPrice(row.weight)} ${row.unit || ''}` : '-' },
-    { key: 'unitPrice', label: '単価', width: '110px', render: (row) => row.unitPrice !== '' ? `${formatPrice(row.unitPrice)} ${row.currency || ''}` : '-' },
+    { key: 'unitPrice', label: '単価', width: '130px', render: (row) => row.unitPrice !== '' ? `${formatPrice(row.unitPrice)} ${row.currency || ''}${row.priceUnit ? `/${row.priceUnit}` : ''}` : '-' },
     { key: 'origin', label: '原産国', minWidth: '120px', render: (row) => row.originCountry || '-' },
     { key: 'factory', label: '工場No', width: '90px', render: (row) => row.factoryNo || '-' },
     { key: 'customs', label: '通関予定', minWidth: '120px', render: (row) => row.customsClearancePlannedDate || '-' },
@@ -1944,21 +1976,31 @@ function DeliveryNoticeImportPanel({
           <h2>入荷予定PDF取込</h2>
           <p className="inline-helper">この画面では入荷予定の登録と商品照合まで行います。入荷確定をするまで在庫数量は変わりません。</p>
         </div>
-        <label className="primary-button delivery-notice-upload-button">
-          PDFアップロード
-          <input type="file" accept="application/pdf,.pdf" onChange={onUpload} />
-        </label>
+        <div className="delivery-notice-upload-actions">
+          <label className="primary-button delivery-notice-upload-button">
+            PDFアップロード
+            <input type="file" accept="application/pdf,.pdf" onChange={onUpload} />
+          </label>
+          <label className="secondary-button delivery-notice-upload-button standard-excel-upload-button">
+            標準Excel取込
+            <input
+              type="file"
+              accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
+              onChange={onExcelUpload}
+            />
+          </label>
+        </div>
       </div>
 
-      {parsing && <p className="notice-text">PDFを解析しています...</p>}
+      {parsing && <p className="notice-text">ファイルを解析しています...</p>}
       {saving && <p className="notice-text">入荷予定として保存しています...</p>}
       {error && <p className="error-text">{error}</p>}
       {syncError && <p className="error-text">{syncError}</p>}
 
       {!preview && !parsing && inboundShipments.length === 0 && (
         <div className="empty-state delivery-notice-empty">
-          <h3>デリバリー予定案内PDFを選択してください</h3>
-          <p>日鉄物産の帳票を解析し、契約No、ブランド、商品名、重量、単価、通関予定日などを確認できます。</p>
+          <h3>PDFまたは標準Excelを選択してください</h3>
+          <p>入荷関連PDF、またはIMPORT_TEMPLATEシートを持つ標準Excelを解析し、保存前に明細を確認できます。</p>
         </div>
       )}
 
@@ -1979,7 +2021,7 @@ function DeliveryNoticeImportPanel({
 
           {preview.warnings.length > 0 && (
             <div className="delivery-notice-warning-box">
-              <h3>PDF全体の確認事項</h3>
+              <h3>ファイル全体の確認事項</h3>
               <ul>
                 {preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
               </ul>
@@ -2015,9 +2057,10 @@ function DeliveryNoticeImportPanel({
                 </div>
                 <dl className="company-details">
                   <div><dt>行番号</dt><dd>{line.lineNumber || '-'}</dd></div>
+                  <div><dt>種別</dt><dd>{line.productType || '-'}</dd></div>
                   <div><dt>個数</dt><dd>{formatPrice(line.pieceCount) || '-'}</dd></div>
                   <div><dt>重量</dt><dd>{line.weight !== '' ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
-                  <div><dt>単価</dt><dd>{line.unitPrice !== '' ? `${formatPrice(line.unitPrice)} ${line.currency || ''}` : '-'}</dd></div>
+                  <div><dt>単価</dt><dd>{line.unitPrice !== '' ? `${formatPrice(line.unitPrice)} ${line.currency || ''}${line.priceUnit ? `/${line.priceUnit}` : ''}` : '-'}</dd></div>
                   <div><dt>原産国</dt><dd>{line.originCountry || '-'}</dd></div>
                   <div><dt>工場No</dt><dd>{line.factoryNo || '-'}</dd></div>
                   <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>

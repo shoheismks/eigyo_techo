@@ -7,10 +7,11 @@
   "dependencies": {
     "@supabase/supabase-js": "latest",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "^6.2.108",
     "react": "latest",
     "react-dom": "latest",
-    "pdfjs-dist": "^6.2.108"
-  },
-  "devDependencies": {}
+    "vite": "latest"
+  }
 }
