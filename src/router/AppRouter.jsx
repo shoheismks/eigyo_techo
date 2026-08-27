@@ -593,6 +593,7 @@ export default function AppRouter({
         confirmInboundReceipt={confirmInboundReceipt}
         reverseInboundReceipt={reverseInboundReceipt}
         updateInboundSchedule={updateInboundSchedule}
+        addProduct={addProduct}
         inboundShipmentSyncState={inboundShipmentSyncState}
         inboundShipmentSyncError={inboundShipmentSyncError}
         reloadInventory={reloadInventory}

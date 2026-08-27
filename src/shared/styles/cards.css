@@ -3302,6 +3302,59 @@
   gap: 10px;
 }
 
+.inbound-product-match {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inbound-product-match-name,
+.inbound-product-difference {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.inbound-product-match-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.inbound-product-difference {
+  color: #f6c453;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.inbound-product-create-modal {
+  width: min(760px, 100%);
+}
+
+.inbound-product-create-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inbound-product-create-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inbound-product-create-wide {
+  grid-column: 1 / -1;
+}
+
+.inbound-product-create-actions {
+  position: sticky;
+  bottom: -18px;
+  margin: 0 -18px -18px;
+  border-top: 1px solid var(--line);
+  background: #0d1424;
+  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+}
+
 .delivery-notice-upload-button input {
   height: 1px;
   opacity: 0;
@@ -3735,6 +3788,14 @@
 }
 
 @media (max-width: 767px) {
+  .inbound-product-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .inbound-product-create-wide {
+    grid-column: auto;
+  }
+
   .delivery-notice-import-panel > .section-heading {
     align-items: stretch;
     display: grid;

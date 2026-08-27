@@ -19,6 +19,8 @@ import {
   formatPlannedQuantity,
 } from '../services/plannedInventoryService.js';
 import { buildInboundAnalysis } from '../services/inboundAnalysisService.js';
+import { matchInboundPreview, productMatchStatusLabel } from '../services/inboundProductMatcher.js';
+import InboundProductCreateDialog from '../components/InboundProductCreateDialog.jsx';
 
 const TABS = [
   { key: 'list', label: '在庫一覧' },
@@ -296,6 +298,7 @@ export default function InventoryPage({
   confirmInboundReceipt,
   reverseInboundReceipt,
   updateInboundSchedule,
+  addProduct,
   inboundShipmentSyncState = '',
   inboundShipmentSyncError = '',
   reloadInventory,
@@ -319,6 +322,8 @@ export default function InventoryPage({
   const [deliveryNoticeParsing, setDeliveryNoticeParsing] = useState(false);
   const [deliveryNoticeSaving, setDeliveryNoticeSaving] = useState(false);
   const [deliveryNoticeError, setDeliveryNoticeError] = useState('');
+  const [inboundProductLine, setInboundProductLine] = useState(null);
+  const [previewAddedProducts, setPreviewAddedProducts] = useState([]);
   const [selectedInboundShipmentId, setSelectedInboundShipmentId] = useState('');
   const [receiptShipmentId, setReceiptShipmentId] = useState('');
   const [receiptForm, setReceiptForm] = useState(() => buildReceiptForm(null));
@@ -352,6 +357,16 @@ export default function InventoryPage({
   useEffect(() => {
     localStorage.setItem('eigyo-techo-inventory-filter', filter);
   }, [filter]);
+
+  const previewProducts = useMemo(() => {
+    const productIds = new Set(products.map((product) => product.id));
+    return [...products, ...previewAddedProducts.filter((product) => !productIds.has(product.id))];
+  }, [previewAddedProducts, products]);
+
+  const matchedDeliveryNoticePreview = useMemo(
+    () => matchInboundPreview(deliveryNoticePreview, previewProducts),
+    [deliveryNoticePreview, previewProducts],
+  );
 
   useEffect(() => {
     if (!initialAction) return;
@@ -716,14 +731,14 @@ export default function InventoryPage({
   }
 
   async function handleSaveDeliveryNoticePreview() {
-    if (!deliveryNoticePreview) return;
+    if (!matchedDeliveryNoticePreview) return;
     setDeliveryNoticeSaving(true);
     setDeliveryNoticeError('');
     setToast('');
     setError('');
 
     try {
-      const result = await saveInboundShipmentPreview?.(deliveryNoticePreview);
+      const result = await saveInboundShipmentPreview?.(matchedDeliveryNoticePreview);
       if (result?.status === 'duplicate') {
         setSelectedInboundShipmentId(result.shipmentId);
         setToast('このPDFはすでに取り込み済みです。既存の入荷予定を表示しました。');
@@ -736,6 +751,12 @@ export default function InventoryPage({
     } finally {
       setDeliveryNoticeSaving(false);
     }
+  }
+
+  async function handleInboundProductCreated(createdProduct) {
+    setPreviewAddedProducts((current) => [...current.filter((product) => product.id !== createdProduct.id), createdProduct]);
+    setInboundProductLine(null);
+    setToast('商品マスタへ登録し、取込明細を再照合しました。');
   }
 
   async function handleInboundLineChange(line, updates) {
@@ -1199,7 +1220,7 @@ export default function InventoryPage({
           onSavePreview={handleSaveDeliveryNoticePreview}
           saving={deliveryNoticeSaving}
           parsing={deliveryNoticeParsing}
-          preview={deliveryNoticePreview}
+          preview={matchedDeliveryNoticePreview}
           error={deliveryNoticeError}
           inboundShipments={inboundShipments}
           inboundReceipts={inboundReceipts}
@@ -1207,10 +1228,11 @@ export default function InventoryPage({
           inboundScheduleChanges={inboundScheduleChanges}
           selectedInboundShipment={selectedInboundShipment}
           onSelectInboundShipment={setSelectedInboundShipmentId}
-          products={products}
+          products={previewProducts}
           aliases={supplierProductAliases}
           onLineChange={handleInboundLineChange}
           onSaveAlias={handleSaveInboundAlias}
+          onAddProduct={setInboundProductLine}
           onOpenReceipt={openInboundReceiptDialog}
           onOpenReverseReceipt={openReverseReceiptDialog}
           onOpenScheduleChange={openScheduleChangeDialog}
@@ -1329,6 +1351,17 @@ export default function InventoryPage({
           onChange={setScheduleField}
           onClose={closeScheduleChangeDialog}
           onSubmit={handleUpdateInboundSchedule}
+        />
+      )}
+
+      {inboundProductLine && (
+        <InboundProductCreateDialog
+          line={inboundProductLine}
+          products={previewProducts}
+          addProduct={addProduct}
+          userId={userId}
+          onClose={() => setInboundProductLine(null)}
+          onCreated={handleInboundProductCreated}
         />
       )}
     </main>
@@ -1787,12 +1820,45 @@ function matchBadgeClass(status) {
   return 'danger';
 }
 
+function previewProductMatchBadgeClass(status) {
+  if (status === 'matched') return 'ready';
+  if (status === 'unmatched') return 'danger';
+  return 'warning';
+}
+
+function PreviewProductMatch({ line, onAddProduct }) {
+  return (
+    <div className="inbound-product-match">
+      <span className={`info-badge ${previewProductMatchBadgeClass(line.productMatchStatus)}`}>
+        {productMatchStatusLabel(line.productMatchStatus)}
+      </span>
+      {line.matchedProduct && (
+        <span className="inbound-product-match-name">
+          {line.matchedProduct.productCode || line.productCode} / {line.matchedProduct.name || '商品名未設定'}
+        </span>
+      )}
+      {line.productMatchMessage && <span className="inline-helper">{line.productMatchMessage}</span>}
+      {line.productMatchDifferences?.map((difference) => (
+        <span className="inbound-product-difference" key={difference.label}>
+          {difference.label}: 帳票「{difference.imported}」 / マスタ「{difference.registered}」
+        </span>
+      ))}
+      {line.productMatchStatus === 'unmatched' && (
+        <button type="button" className="ghost-button compact-button" onClick={() => onAddProduct?.(line)}>
+          商品マスタへ追加
+        </button>
+      )}
+    </div>
+  );
+}
+
 function DeliveryNoticeImportPanel({
   onUpload,
   onExcelUpload,
   onSavePreview,
   onLineChange,
   onSaveAlias,
+  onAddProduct,
   onSelectInboundShipment,
   parsing,
   saving,
@@ -1826,7 +1892,9 @@ function DeliveryNoticeImportPanel({
     { key: 'lineNumber', label: '行', width: '64px', render: (row) => row.lineNumber || '-' },
     { key: 'contractNo', label: '契約No', minWidth: '110px', render: (row) => row.contractNo || '-' },
     { key: 'brand', label: 'ブランド', minWidth: '120px', render: (row) => row.brand || '-' },
+    { key: 'productCode', label: '商品コード', minWidth: '120px', render: (row) => row.productCode || '-' },
     { key: 'productName', label: '商品名', minWidth: '240px', render: (row) => row.productName || '-' },
+    { key: 'productMatch', label: '商品照合', minWidth: '260px', render: (row) => <PreviewProductMatch line={row} onAddProduct={onAddProduct} /> },
     { key: 'productType', label: '種別', minWidth: '120px', render: (row) => row.productType || '-' },
     { key: 'pieces', label: '個数', width: '80px', render: (row) => formatPrice(row.pieceCount) || '-' },
     { key: 'weight', label: '重量', width: '100px', render: (row) => row.weight !== '' ? `${formatPrice(row.weight)} ${row.unit || ''}` : '-' },
@@ -2045,7 +2113,7 @@ function DeliveryNoticeImportPanel({
             columns={detailColumns}
             rows={preview.lines}
             getRowKey={(row) => row.id}
-            minWidth={1780}
+            minWidth={2160}
           />
 
           <div className="card-list-mobile delivery-notice-card-list">
@@ -2057,6 +2125,8 @@ function DeliveryNoticeImportPanel({
                 </div>
                 <dl className="company-details">
                   <div><dt>行番号</dt><dd>{line.lineNumber || '-'}</dd></div>
+                  <div><dt>商品コード</dt><dd>{line.productCode || '-'}</dd></div>
+                  <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} /></dd></div>
                   <div><dt>種別</dt><dd>{line.productType || '-'}</dd></div>
                   <div><dt>個数</dt><dd>{formatPrice(line.pieceCount) || '-'}</dd></div>
                   <div><dt>重量</dt><dd>{line.weight !== '' ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>

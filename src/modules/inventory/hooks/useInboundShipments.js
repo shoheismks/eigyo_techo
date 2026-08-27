@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase.js';
 import { canUseCloud, fetchRecords, upsertRecords } from '../../../shared/services/recordSyncService.js';
-import { normalizeProductCode } from '../../products/hooks/useProducts.js';
+import { matchInboundProduct } from '../services/inboundProductMatcher.js';
 
 const SHIPMENTS_TABLE = 'inbound_shipments';
 const LINES_TABLE = 'inbound_shipment_lines';
@@ -459,61 +459,16 @@ export function inboundScheduleChangeFromRow(row) {
 }
 
 export function matchInboundLineToProduct(line, products = [], aliases = [], supplierName = '') {
-  const activeProducts = products.filter((product) => !product.deletedAt);
-  const productNameKey = normalizeInboundText(line.productNameRaw ?? line.productName);
-  const brandKey = normalizeInboundText(line.brandNameRaw ?? line.brand);
-  const supplierKey = normalizeInboundText(supplierName);
-  const factoryKey = normalizeInboundText(line.factoryNo);
-  const originKey = normalizeInboundText(line.originCountry);
-
-  const exactAliasMatches = aliases.filter((alias) => {
-    if (!alias.isActive) return false;
-    if (normalizeInboundText(alias.supplierName) !== supplierKey) return false;
-    if (alias.normalizedAliasName !== productNameKey) return false;
-    if (alias.brandName && normalizeInboundText(alias.brandName) !== brandKey) return false;
-    if (alias.factoryNo && normalizeInboundText(alias.factoryNo) !== factoryKey) return false;
-    if (alias.originCountry && normalizeInboundText(alias.originCountry) !== originKey) return false;
-    return true;
-  });
-  const aliasProductIds = [...new Set(exactAliasMatches.map((alias) => alias.productId).filter(Boolean))];
-  if (aliasProductIds.length === 1) {
-    return { productId: aliasProductIds[0], status: 'matched', score: 100, source: 'alias' };
-  }
-  if (aliasProductIds.length > 1) {
-    return { productId: '', status: 'ambiguous', score: 95, source: 'alias', warning: '商品別名に複数候補があります。' };
-  }
-
-  const codeMatches = activeProducts.filter((product) => {
-    const code = normalizeProductCode(product.productCode ?? product.product_code ?? '');
-    return code && code.toLowerCase() === productNameKey.toLowerCase();
-  });
-  if (codeMatches.length === 1) {
-    return { productId: codeMatches[0].id, status: 'matched', score: 90, source: 'product_code' };
-  }
-  if (codeMatches.length > 1) {
-    return { productId: '', status: 'ambiguous', score: 85, source: 'product_code', warning: '商品コードに複数候補があります。' };
-  }
-
-  const nameBrandMatches = activeProducts.filter((product) =>
-    normalizeInboundText(product.name) === productNameKey &&
-    normalizeInboundText(product.brandName ?? product.brand_name) === brandKey
-  );
-  if (nameBrandMatches.length === 1) {
-    return { productId: nameBrandMatches[0].id, status: 'matched', score: 80, source: 'name_brand' };
-  }
-  if (nameBrandMatches.length > 1) {
-    return { productId: '', status: 'ambiguous', score: 75, source: 'name_brand', warning: '商品名＋ブランドに複数候補があります。' };
-  }
-
-  const nameMatches = activeProducts.filter((product) => normalizeInboundText(product.name) === productNameKey);
-  if (nameMatches.length === 1) {
-    return { productId: nameMatches[0].id, status: 'matched', score: 70, source: 'name' };
-  }
-  if (nameMatches.length > 1) {
-    return { productId: '', status: 'ambiguous', score: 65, source: 'name', warning: '商品名に複数候補があります。' };
-  }
-
-  return { productId: '', status: 'unmatched', score: 0, source: 'none' };
+  void aliases;
+  void supplierName;
+  const match = matchInboundProduct(line, products);
+  return {
+    productId: match.matchedProductId,
+    status: match.productMatchStatus === 'review' ? 'ambiguous' : match.productMatchStatus,
+    score: match.productMatchStatus === 'matched' ? 100 : 0,
+    source: line.productCode ? 'product_code' : 'none',
+    warning: match.productMatchMessage,
+  };
 }
 
 export function useInboundShipments(userId = '', products = []) {
