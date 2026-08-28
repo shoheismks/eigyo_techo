@@ -699,10 +699,23 @@ export default function InventoryPage({
     setError('');
 
     try {
-      const { parseDeliveryNoticePdfFile } = await import('../services/deliveryNoticePdfParser.js');
-      const preview = await parseDeliveryNoticePdfFile(file);
+      const { parseInboundDocumentFile } = await import('../services/inboundDocuments/inboundDocumentParser.js');
+      const result = await parseInboundDocumentFile(file);
+      const preview = result.preview || {
+        documentType: result.classification.documentType,
+        classification: result.classification,
+        normalizedDocument: result.normalizedDocument,
+        fileName: file.name,
+        fileHash: result.normalizedDocument.fileHash,
+        pageCount: result.normalizedDocument.pageCount,
+        issueDate: '',
+        documentNumber: '',
+        supplier: '',
+        lines: [],
+        warnings: result.normalizedDocument.warnings,
+      };
       setDeliveryNoticePreview(preview);
-      setToast('デリバリー予定案内PDFを解析しました。在庫にはまだ反映していません。');
+      setToast('入荷関連PDFを解析しました。在庫にはまだ反映していません。');
     } catch (parseError) {
       setDeliveryNoticePreview(null);
       setDeliveryNoticeError(parseError.message || 'PDF解析に失敗しました。');
@@ -742,6 +755,10 @@ export default function InventoryPage({
 
   async function handleSaveDeliveryNoticePreview() {
     if (!matchedDeliveryNoticePreview) return;
+    if (!['delivery_notice', 'standard_excel_import'].includes(matchedDeliveryNoticePreview.documentType)) {
+      setDeliveryNoticeError('この書類は確認専用です。入荷予定としては保存できません。');
+      return;
+    }
     setDeliveryNoticeSaving(true);
     setDeliveryNoticeError('');
     setToast('');
@@ -1387,6 +1404,7 @@ export default function InventoryPage({
         />
       )}
 
+
       {inboundAliasSelection && (
         <InboundProductAliasDialog
           line={inboundAliasSelection.line}
@@ -1914,6 +1932,20 @@ function PreviewProductMatch({ line, onAddProduct, onLinkAlias }) {
   );
 }
 
+function inboundDocumentTypeLabel(type) {
+  return {
+    delivery_notice: 'デリバリー予定案内',
+    standard_excel_import: '標準Excel',
+    product_price_list: '商品単価表',
+    warehouse_receipt_candidate: '画像PDF（要確認）',
+    unknown: '未判定',
+  }[type] || '未判定';
+}
+
+function inboundDocumentConfidenceLabel(confidence) {
+  return { high: '高', medium: '中', low: '低' }[confidence] || '-';
+}
+
 function DeliveryNoticeImportPanel({
   onUpload,
   onExcelUpload,
@@ -1968,6 +2000,18 @@ function DeliveryNoticeImportPanel({
     { key: 'packing', label: 'Packing', minWidth: '210px', render: (row) => row.packingFrom || row.packingTo ? `${row.packingFrom || '-'} ～ ${row.packingTo || '-'}` : '-' },
     { key: 'expiry', label: '賞味期限', minWidth: '120px', render: (row) => row.expiryDate || '-' },
     { key: 'warehouse', label: '倉庫', minWidth: '160px', render: (row) => row.warehouse || '-' },
+    { key: 'warnings', label: '確認事項', minWidth: '180px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
+  ];
+
+  const priceListColumns = [
+    { key: 'lineNumber', label: '行', width: '64px', render: (row) => row.lineNumber || '-' },
+    { key: 'productCode', label: '商品コード', minWidth: '120px', render: (row) => row.productCode || '-' },
+    { key: 'productName', label: '商品名', minWidth: '220px', render: (row) => row.productName || '-' },
+    { key: 'productMatch', label: '商品照合', minWidth: '300px', render: (row) => <PreviewProductMatch line={row} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /> },
+    { key: 'baseUnitPrice', label: '基礎単価', width: '110px', render: (row) => row.baseUnitPrice !== '' ? formatPrice(row.baseUnitPrice) : '-' },
+    { key: 'coefficient', label: '係数', width: '90px', render: (row) => row.coefficient !== '' ? row.coefficient : '-' },
+    { key: 'additionalCost', label: '諸費用', width: '100px', render: (row) => row.additionalCost !== '' ? formatPrice(row.additionalCost) : '-' },
+    { key: 'billedUnitPrice', label: '請求単価', width: '120px', render: (row) => row.billedUnitPrice !== '' ? `${formatPrice(row.billedUnitPrice)} ${row.currency}/${row.priceUnit}` : '-' },
     { key: 'warnings', label: '確認事項', minWidth: '180px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
   ];
 
@@ -2138,6 +2182,8 @@ function DeliveryNoticeImportPanel({
       {preview && (
         <div className="delivery-notice-preview">
           <div className="delivery-notice-summary">
+            <div className="summary-card"><span>判定書類</span><strong>{inboundDocumentTypeLabel(preview.documentType)}</strong></div>
+            <div className="summary-card"><span>判定精度</span><strong>{inboundDocumentConfidenceLabel(preview.classification?.confidence)}</strong></div>
             <div className="summary-card"><span>発行日</span><strong>{preview.issueDate || '-'}</strong></div>
             <div className="summary-card"><span>帳票番号</span><strong>{preview.documentNumber || '-'}</strong></div>
             <div className="summary-card"><span>仕入先</span><strong>{preview.supplier || '-'}</strong></div>
@@ -2164,23 +2210,25 @@ function DeliveryNoticeImportPanel({
             <span className="info-badge muted">未取得項目は確認事項で確認</span>
           </div>
 
-          <div className="delivery-notice-actions">
-            <button type="button" className="primary-button" disabled={saving || parsing} onClick={onSavePreview}>
-              入荷予定として保存
-            </button>
-            <span className="inline-helper">保存しても在庫数量には加算されません。</span>
-          </div>
+          {['delivery_notice', 'standard_excel_import'].includes(preview.documentType) ? (
+            <>
+              <div className="delivery-notice-actions">
+                <button type="button" className="primary-button" disabled={saving || parsing} onClick={onSavePreview}>
+                  入荷予定として保存
+                </button>
+                <span className="inline-helper">保存しても在庫数量には加算されません。</span>
+              </div>
 
-          <DesktopTable
-            className="inventory-common-table delivery-notice-detail-table"
-            columns={detailColumns}
-            rows={preview.lines}
-            getRowKey={(row) => row.id}
-            minWidth={2160}
-          />
+              <DesktopTable
+                className="inventory-common-table delivery-notice-detail-table"
+                columns={detailColumns}
+                rows={preview.lines}
+                getRowKey={(row) => row.id}
+                minWidth={2160}
+              />
 
-          <div className="card-list-mobile delivery-notice-card-list">
-            {preview.lines.map((line) => (
+              <div className="card-list-mobile delivery-notice-card-list">
+                {preview.lines.map((line) => (
               <article className="product-card delivery-notice-card" key={line.id}>
                 <div className="company-heading">
                   <p>{line.contractNo || '契約No未取得'} / {line.brand || 'ブランド未取得'}</p>
@@ -2207,8 +2255,43 @@ function DeliveryNoticeImportPanel({
                   </div>
                 )}
               </article>
-            ))}
-          </div>
+                ))}
+              </div>
+            </>
+          ) : preview.documentType === 'product_price_list' ? (
+            <>
+              <p className="notice-text">商品単価表は確認専用です。このStepではクラウドへ保存しません。</p>
+              <DesktopTable
+                className="inventory-common-table delivery-notice-detail-table product-price-list-preview-table"
+                columns={priceListColumns}
+                rows={preview.lines}
+                getRowKey={(row) => row.id}
+                minWidth={1340}
+              />
+              <div className="card-list-mobile delivery-notice-card-list product-price-list-card-list">
+                {preview.lines.map((line) => (
+                  <article className="product-card delivery-notice-card" key={line.id}>
+                    <div className="company-heading">
+                      <p>{line.productCode || '商品コード未取得'}</p>
+                      <h3>{line.productName || '商品名未取得'}</h3>
+                    </div>
+                    <dl className="company-details">
+                      <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /></dd></div>
+                      <div><dt>基礎単価</dt><dd>{line.baseUnitPrice !== '' ? `${formatPrice(line.baseUnitPrice)} JPY/KG` : '-'}</dd></div>
+                      <div><dt>係数</dt><dd>{line.coefficient !== '' ? line.coefficient : '-'}</dd></div>
+                      <div><dt>諸費用</dt><dd>{line.additionalCost !== '' ? formatPrice(line.additionalCost) : '-'}</dd></div>
+                      <div><dt>請求単価</dt><dd>{line.billedUnitPrice !== '' ? `${formatPrice(line.billedUnitPrice)} JPY/KG` : '-'}</dd></div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="empty-state delivery-notice-empty">
+              <h3>この書類形式はまだ解析できません</h3>
+              <p>{preview.warnings.join(' / ') || '次のStepで対応予定です。'}</p>
+            </div>
+          )}
         </div>
       )}
 
