@@ -169,6 +169,15 @@ export const TABLE_CONFIG = {
     defaultSort: { key: 'updatedAt', direction: 'desc' },
     displayName: '\u4ed5\u5165\u5148\u5546\u54c1\u5225\u540d',
   },
+  product_aliases: {
+    orderColumn: 'updated_at',
+    realtime: false,
+    audit: true,
+    softDelete: true,
+    searchable: ['alias_name', 'supplier_name_snapshot', 'supplier_product_code'],
+    defaultSort: { key: 'updatedAt', direction: 'desc' },
+    displayName: '\u5546\u54c1\u5225\u540d',
+  },
   inbound_receipts: {
     orderColumn: 'received_at',
     realtime: true,

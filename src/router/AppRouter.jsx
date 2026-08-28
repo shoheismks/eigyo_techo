@@ -64,6 +64,9 @@ export default function AppRouter({
   updateCustomer,
   removeCustomer,
   products,
+  productAliases,
+  addProductAlias,
+  deactivateProductAlias,
   productSyncState,
   productSyncError,
   productLegacyLocalDataWarning,
@@ -587,6 +590,8 @@ export default function AppRouter({
         inboundReceiptLines={inboundReceiptLines}
         inboundScheduleChanges={inboundScheduleChanges}
         supplierProductAliases={supplierProductAliases}
+        productAliases={productAliases}
+        addProductAlias={addProductAlias}
         saveInboundShipmentPreview={saveInboundShipmentPreview}
         updateInboundShipmentLine={updateInboundShipmentLine}
         addSupplierProductAlias={addSupplierProductAlias}
@@ -626,6 +631,9 @@ export default function AppRouter({
         productAssets={productAssets}
         customers={customers}
         suppliers={suppliers}
+        productAliases={productAliases}
+        addProductAlias={addProductAlias}
+        deactivateProductAlias={deactivateProductAlias}
         addProduct={addProduct}
         updateProduct={updateProduct}
         addBrand={addBrand}
@@ -801,6 +809,8 @@ export default function AppRouter({
         backupDatasets={{
           customers,
           products,
+          suppliers,
+          productAliases,
           productAssets,
           brands,
           customerProductPrices,
@@ -819,7 +829,6 @@ export default function AppRouter({
           stocktakeLines,
           contacts,
           businessCards,
-          suppliers,
           projects,
           complaints,
           samples,
@@ -837,6 +846,12 @@ export default function AppRouter({
         restoreHandlers={{
           customers: { records: customers, add: addCustomer, update: updateCustomer },
           products: { records: products, add: addProduct, update: updateProduct },
+          suppliers: { records: suppliers, add: addSupplier, update: updateSupplier },
+          productAliases: {
+            records: productAliases,
+            add: addProductAlias,
+            update: (_id, record) => addProductAlias(record),
+          },
           productAssets: { records: productAssets, add: addProductAsset, update: updateProductAsset },
           brands: { records: brands, add: addBrand, update: updateBrand },
           customerProductPrices: { records: customerProductPrices, add: addCustomerProductPrice, update: updateCustomerProductPrice },
@@ -850,7 +865,6 @@ export default function AppRouter({
           supplierProductAliases: { records: supplierProductAliases, add: addSupplierProductAlias, update: () => {} },
           contacts: { records: contacts, add: addContact, update: updateContact },
           businessCards: { records: businessCards, add: addBusinessCard, update: updateBusinessCard },
-          suppliers: { records: suppliers, add: addSupplier, update: updateSupplier },
           projects: { records: projects, add: addProject, update: updateProject },
           complaints: { records: complaints, add: addComplaint, update: updateComplaint },
           samples: { records: samples, add: addSample, update: updateSample },

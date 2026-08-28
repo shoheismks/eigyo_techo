@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase.js';
 import { canUseCloud, fetchRecords, upsertRecords } from '../../../shared/services/recordSyncService.js';
-import { matchInboundProduct } from '../services/inboundProductMatcher.js';
+import { matchInboundLineForPersistence } from '../services/inboundProductMatcher.js';
 
 const SHIPMENTS_TABLE = 'inbound_shipments';
 const LINES_TABLE = 'inbound_shipment_lines';
@@ -458,20 +458,21 @@ export function inboundScheduleChangeFromRow(row) {
   });
 }
 
-export function matchInboundLineToProduct(line, products = [], aliases = [], supplierName = '') {
-  void aliases;
-  void supplierName;
-  const match = matchInboundProduct(line, products);
-  return {
-    productId: match.matchedProductId,
-    status: match.productMatchStatus === 'review' ? 'ambiguous' : match.productMatchStatus,
-    score: match.productMatchStatus === 'matched' ? 100 : 0,
-    source: line.productCode ? 'product_code' : 'none',
-    warning: match.productMatchMessage,
-  };
+export function matchInboundLineToProduct(
+  line,
+  products = [],
+  productAliases = [],
+  supplierName = '',
+  suppliers = [],
+) {
+  return matchInboundLineForPersistence(line, products, {
+    productAliases,
+    suppliers,
+    supplierName,
+  });
 }
 
-export function useInboundShipments(userId = '', products = []) {
+export function useInboundShipments(userId = '', products = [], productAliases = [], suppliers = []) {
   const [shipments, setShipments] = useState([]);
   const [lines, setLines] = useState([]);
   const [aliases, setAliases] = useState([]);
@@ -579,7 +580,13 @@ export function useInboundShipments(userId = '', products = []) {
     }, userId);
 
     const nextLines = (preview.lines || []).map((parsedLine, index) => {
-      const match = matchInboundLineToProduct(parsedLine, products, aliases, shipment.supplierName);
+      const match = matchInboundLineToProduct(
+        parsedLine,
+        products,
+        productAliases,
+        shipment.supplierName,
+        suppliers,
+      );
       const warnings = [...normalizeWarnings(parsedLine.warnings)];
       if (match.warning) warnings.push(match.warning);
       if (match.status === 'unmatched') warnings.push('商品マスターと照合できませんでした。');

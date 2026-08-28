@@ -1,0 +1,28 @@
+.inbound-alias-modal { width: min(760px, calc(100vw - 32px)); max-height: min(880px, calc(100dvh - 32px)); overflow-y: auto; }
+.inbound-alias-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.inbound-alias-compare section { border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-width: 0; }
+.inbound-alias-compare h3, .inbound-alias-differences h3 { margin: 0 0 8px; font-size: 0.9rem; }
+.inbound-alias-compare p { margin: 4px 0; overflow-wrap: anywhere; }
+.inbound-alias-search { display: grid; gap: 6px; }
+.inbound-alias-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: 180px; overflow-y: auto; }
+.inbound-alias-results button { display: grid; gap: 3px; text-align: left; min-height: 54px; padding: 9px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; color: inherit; }
+.inbound-alias-results button.selected { border-color: var(--theme-accent); box-shadow: 0 0 0 1px var(--theme-accent); }
+.inbound-alias-results span { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+.inbound-alias-scope { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.inbound-alias-scope label { display: flex; align-items: center; gap: 8px; }
+.inbound-alias-differences { border-left: 3px solid var(--warning); padding-left: 10px; }
+.inbound-alias-differences p { margin: 5px 0; overflow-wrap: anywhere; }
+.inbound-alias-actions { position: sticky; bottom: -1px; background: var(--panel); padding-top: 10px; padding-bottom: max(2px, env(safe-area-inset-bottom)); }
+.inbound-product-candidates { display: grid; gap: 6px; width: 100%; }
+.inbound-product-candidate { display: grid; gap: 2px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.inbound-product-candidate span { font-size: 0.75rem; color: var(--muted); }
+.inbound-product-match-source { font-size: 0.75rem; color: var(--muted); }
+.inbound-product-match-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+@media (max-width: 767px) {
+  .inbound-alias-backdrop { align-items: flex-end; padding: 0; }
+  .inbound-alias-modal { width: 100%; max-width: none; max-height: calc(100dvh - 12px); border-radius: 6px 6px 0 0; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .inbound-alias-compare, .inbound-alias-results { grid-template-columns: 1fr; }
+  .inbound-alias-results { max-height: 150px; }
+  .inbound-alias-results button { min-height: 48px; }
+}

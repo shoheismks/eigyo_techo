@@ -21,6 +21,7 @@ import {
 import { buildInboundAnalysis } from '../services/inboundAnalysisService.js';
 import { matchInboundPreview, productMatchStatusLabel } from '../services/inboundProductMatcher.js';
 import InboundProductCreateDialog from '../components/InboundProductCreateDialog.jsx';
+import InboundProductAliasDialog from '../components/InboundProductAliasDialog.jsx';
 
 const TABS = [
   { key: 'list', label: '在庫一覧' },
@@ -292,6 +293,8 @@ export default function InventoryPage({
   inboundReceiptLines = [],
   inboundScheduleChanges = [],
   supplierProductAliases = [],
+  productAliases = [],
+  addProductAlias,
   saveInboundShipmentPreview,
   updateInboundShipmentLine,
   addSupplierProductAlias,
@@ -323,7 +326,9 @@ export default function InventoryPage({
   const [deliveryNoticeSaving, setDeliveryNoticeSaving] = useState(false);
   const [deliveryNoticeError, setDeliveryNoticeError] = useState('');
   const [inboundProductLine, setInboundProductLine] = useState(null);
+  const [inboundAliasSelection, setInboundAliasSelection] = useState(null);
   const [previewAddedProducts, setPreviewAddedProducts] = useState([]);
+  const [previewAddedAliases, setPreviewAddedAliases] = useState([]);
   const [selectedInboundShipmentId, setSelectedInboundShipmentId] = useState('');
   const [receiptShipmentId, setReceiptShipmentId] = useState('');
   const [receiptForm, setReceiptForm] = useState(() => buildReceiptForm(null));
@@ -363,9 +368,14 @@ export default function InventoryPage({
     return [...products, ...previewAddedProducts.filter((product) => !productIds.has(product.id))];
   }, [previewAddedProducts, products]);
 
+  const previewProductAliases = useMemo(() => {
+    const aliasIds = new Set(productAliases.map((alias) => alias.id));
+    return [...productAliases, ...previewAddedAliases.filter((alias) => !aliasIds.has(alias.id))];
+  }, [previewAddedAliases, productAliases]);
+
   const matchedDeliveryNoticePreview = useMemo(
-    () => matchInboundPreview(deliveryNoticePreview, previewProducts),
-    [deliveryNoticePreview, previewProducts],
+    () => matchInboundPreview(deliveryNoticePreview, previewProducts, { productAliases: previewProductAliases, suppliers }),
+    [deliveryNoticePreview, previewProductAliases, previewProducts, suppliers],
   );
 
   useEffect(() => {
@@ -757,6 +767,17 @@ export default function InventoryPage({
     setPreviewAddedProducts((current) => [...current.filter((product) => product.id !== createdProduct.id), createdProduct]);
     setInboundProductLine(null);
     setToast('商品マスタへ登録し、取込明細を再照合しました。');
+  }
+
+  async function handleInboundAliasCreated(aliasInput) {
+    const createdAlias = await addProductAlias?.(aliasInput);
+    if (!createdAlias) throw new Error('Aliasを登録できませんでした。');
+    setPreviewAddedAliases((current) => [
+      ...current.filter((alias) => alias.id !== createdAlias.id),
+      createdAlias,
+    ]);
+    setInboundAliasSelection(null);
+    setToast('商品Aliasを登録し、取込明細を再照合しました。');
   }
 
   async function handleInboundLineChange(line, updates) {
@@ -1233,6 +1254,7 @@ export default function InventoryPage({
           onLineChange={handleInboundLineChange}
           onSaveAlias={handleSaveInboundAlias}
           onAddProduct={setInboundProductLine}
+          onLinkAlias={(line, product = null) => setInboundAliasSelection({ line, product })}
           onOpenReceipt={openInboundReceiptDialog}
           onOpenReverseReceipt={openReverseReceiptDialog}
           onOpenScheduleChange={openScheduleChangeDialog}
@@ -1362,6 +1384,20 @@ export default function InventoryPage({
           userId={userId}
           onClose={() => setInboundProductLine(null)}
           onCreated={handleInboundProductCreated}
+        />
+      )}
+
+      {inboundAliasSelection && (
+        <InboundProductAliasDialog
+          line={inboundAliasSelection.line}
+          initialProduct={inboundAliasSelection.product}
+          products={previewProducts}
+          productAliases={previewProductAliases}
+          suppliers={suppliers}
+          preview={matchedDeliveryNoticePreview}
+          userId={userId}
+          onClose={() => setInboundAliasSelection(null)}
+          onConfirm={handleInboundAliasCreated}
         />
       )}
     </main>
@@ -1826,7 +1862,14 @@ function previewProductMatchBadgeClass(status) {
   return 'warning';
 }
 
-function PreviewProductMatch({ line, onAddProduct }) {
+function productMatchSourceLabel(source) {
+  if (source === 'product_code') return '商品コード一致';
+  if (source === 'supplier_code_alias' || source === 'name_alias') return 'Alias一致';
+  return '';
+}
+
+function PreviewProductMatch({ line, onAddProduct, onLinkAlias }) {
+  const sourceLabel = productMatchSourceLabel(line.productMatchSource);
   return (
     <div className="inbound-product-match">
       <span className={`info-badge ${previewProductMatchBadgeClass(line.productMatchStatus)}`}>
@@ -1837,16 +1880,35 @@ function PreviewProductMatch({ line, onAddProduct }) {
           {line.matchedProduct.productCode || line.productCode} / {line.matchedProduct.name || '商品名未設定'}
         </span>
       )}
+      {sourceLabel && <span className="inbound-product-match-source">{sourceLabel}</span>}
       {line.productMatchMessage && <span className="inline-helper">{line.productMatchMessage}</span>}
       {line.productMatchDifferences?.map((difference) => (
         <span className="inbound-product-difference" key={difference.label}>
           {difference.label}: 帳票「{difference.imported}」 / マスタ「{difference.registered}」
         </span>
       ))}
-      {line.productMatchStatus === 'unmatched' && (
+      {line.productMatchStatus === 'candidate' && line.productMatchCandidates?.length > 0 && (
+        <div className="inbound-product-candidates">
+          {line.productMatchCandidates.slice(0, 3).map((candidate) => (
+            <div className="inbound-product-candidate" key={candidate.id}>
+              <span><strong>{candidate.name || '商品名未設定'}</strong><small>{candidate.productCode || 'コードなし'} / {candidate.brandName || '-'}</small></span>
+              <button type="button" className="ghost-button compact-button" onClick={() => onLinkAlias?.(line, candidate)}>
+                同じ商品として登録
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {line.productMatchStatus === 'candidate' && (
         <button type="button" className="ghost-button compact-button" onClick={() => onAddProduct?.(line)}>
-          商品マスタへ追加
+          別の商品として登録
         </button>
+      )}
+      {line.productMatchStatus === 'unmatched' && (
+        <div className="inbound-product-match-actions">
+          <button type="button" className="ghost-button compact-button" onClick={() => onAddProduct?.(line)}>商品マスタへ追加</button>
+          <button type="button" className="ghost-button compact-button" onClick={() => onLinkAlias?.(line)}>既存商品と紐付け</button>
+        </div>
       )}
     </div>
   );
@@ -1859,6 +1921,7 @@ function DeliveryNoticeImportPanel({
   onLineChange,
   onSaveAlias,
   onAddProduct,
+  onLinkAlias,
   onSelectInboundShipment,
   parsing,
   saving,
@@ -1894,7 +1957,7 @@ function DeliveryNoticeImportPanel({
     { key: 'brand', label: 'ブランド', minWidth: '120px', render: (row) => row.brand || '-' },
     { key: 'productCode', label: '商品コード', minWidth: '120px', render: (row) => row.productCode || '-' },
     { key: 'productName', label: '商品名', minWidth: '240px', render: (row) => row.productName || '-' },
-    { key: 'productMatch', label: '商品照合', minWidth: '260px', render: (row) => <PreviewProductMatch line={row} onAddProduct={onAddProduct} /> },
+    { key: 'productMatch', label: '商品照合', minWidth: '300px', render: (row) => <PreviewProductMatch line={row} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /> },
     { key: 'productType', label: '種別', minWidth: '120px', render: (row) => row.productType || '-' },
     { key: 'pieces', label: '個数', width: '80px', render: (row) => formatPrice(row.pieceCount) || '-' },
     { key: 'weight', label: '重量', width: '100px', render: (row) => row.weight !== '' ? `${formatPrice(row.weight)} ${row.unit || ''}` : '-' },
@@ -2126,7 +2189,7 @@ function DeliveryNoticeImportPanel({
                 <dl className="company-details">
                   <div><dt>行番号</dt><dd>{line.lineNumber || '-'}</dd></div>
                   <div><dt>商品コード</dt><dd>{line.productCode || '-'}</dd></div>
-                  <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} /></dd></div>
+                  <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /></dd></div>
                   <div><dt>種別</dt><dd>{line.productType || '-'}</dd></div>
                   <div><dt>個数</dt><dd>{formatPrice(line.pieceCount) || '-'}</dd></div>
                   <div><dt>重量</dt><dd>{line.weight !== '' ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>

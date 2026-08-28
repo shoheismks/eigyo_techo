@@ -4,6 +4,8 @@ const BACKUP_VERSION = 1;
 const DATASET_KEYS = [
   'customers',
   'products',
+  'suppliers',
+  'productAliases',
   'productAssets',
   'brands',
   'customerProductPrices',
@@ -22,7 +24,6 @@ const DATASET_KEYS = [
   'stocktakeLines',
   'contacts',
   'businessCards',
-  'suppliers',
   'projects',
   'complaints',
   'samples',

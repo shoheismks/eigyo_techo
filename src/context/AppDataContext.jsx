@@ -14,6 +14,7 @@ import { useInvoices } from '../modules/invoices/hooks/useInvoices.js';
 import { useBrands } from '../modules/products/hooks/useBrands.js';
 import { useProductAssets } from '../modules/products/hooks/useProductAssets.js';
 import { useProducts } from '../modules/products/hooks/useProducts.js';
+import { useProductAliases } from '../modules/products/hooks/useProductAliases.js';
 import { useCustomerProductPrices } from '../modules/prices/hooks/useCustomerProductPrices.js';
 import { useQuotes } from '../modules/quotes/hooks/useQuotes.js';
 import { useSalesOrders } from '../modules/salesOrders/hooks/useSalesOrders.js';
@@ -36,7 +37,14 @@ export function AppDataProvider({ userId, children }) {
   const brandsState = useBrands(userId);
   const pricesState = useCustomerProductPrices(userId);
   const inventoryState = useInventory(userId);
-  const inboundShipmentsState = useInboundShipments(userId, productsState.products);
+  const suppliersState = useSuppliers(userId);
+  const productAliasesState = useProductAliases(userId);
+  const inboundShipmentsState = useInboundShipments(
+    userId,
+    productsState.products,
+    productAliasesState.productAliases,
+    suppliersState.records,
+  );
   const adoptionsState = useAdoptions(userId);
   const samplesState = useSamples(userId);
   const quotesState = useQuotes(userId);
@@ -47,7 +55,6 @@ export function AppDataProvider({ userId, children }) {
   const issuersState = useIssuers(userId);
   const projectsState = useProjects(userId);
   const contactsState = useContacts(userId);
-  const suppliersState = useSuppliers(userId);
   const businessCardsState = useBusinessCards(userId);
   const complaintsState = useComplaints(userId);
   const eventsState = useEvents(userId);
@@ -74,6 +81,13 @@ export function AppDataProvider({ userId, children }) {
     productSyncState: productsState.productSyncState,
     productSyncError: productsState.productSyncError,
     productLegacyLocalDataWarning: productsState.productLegacyLocalDataWarning,
+
+    productAliases: toArray(productAliasesState.productAliases),
+    addProductAlias: productAliasesState.addProductAlias,
+    deactivateProductAlias: productAliasesState.deactivateProductAlias,
+    reloadProductAliases: productAliasesState.reloadProductAliases,
+    productAliasSyncState: productAliasesState.syncState,
+    productAliasSyncError: productAliasesState.syncError,
 
     productAssets: toArray(productAssetsState.records),
     addProductAsset: productAssetsState.addRecord,

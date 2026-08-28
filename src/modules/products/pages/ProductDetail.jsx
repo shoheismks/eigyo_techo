@@ -40,6 +40,7 @@ import {
   formatPlannedQuantity,
 } from '../../inventory/services/plannedInventoryService.js';
 import { calculateProjectProductProposal } from '../../deals/services/projectProductProposalService.js';
+import ProductAliasManager from '../components/ProductAliasManager.jsx';
 
 function fileLabel(file) {
   return file?.name ? `${file.name} (${Math.ceil((file.size ?? 0) / 1024)}KB)` : '未添付';
@@ -108,6 +109,9 @@ export default function ProductDetail({
   productAssets = [],
   customers = [],
   suppliers = [],
+  productAliases = [],
+  addProductAlias,
+  deactivateProductAlias,
   addProduct,
   updateProduct,
   addBrand,
@@ -459,7 +463,8 @@ export default function ProductDetail({
   }
 
   function handleAddInventory(event) {
-    event.preventDefault();
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
     if (!addInventory || isNew) {
       return;
     }
@@ -476,6 +481,14 @@ export default function ProductDetail({
       userId,
     }, userId));
     setInventoryForm(normalizeInventory({ ...emptyInventory, productId: form.id, userId }, userId));
+  }
+
+  function handleInventoryFormKeyDown(event) {
+    if (event.key !== 'Enter' || event.target?.tagName === 'TEXTAREA') {
+      return;
+    }
+
+    handleAddInventory(event);
   }
 
   async function handleFile(field, file) {
@@ -912,6 +925,18 @@ export default function ProductDetail({
           </label>
         </section>
 
+        {!isNew && (
+          <ProductAliasManager
+            product={product}
+            products={products}
+            suppliers={suppliers}
+            productAliases={productAliases}
+            addProductAlias={addProductAlias}
+            deactivateProductAlias={deactivateProductAlias}
+            userId={userId}
+          />
+        )}
+
         <section className="detail-section product-assets-section">
           <div className="section-heading">
             <div>
@@ -1162,7 +1187,7 @@ export default function ProductDetail({
           {isNew ? (
             <p className="inline-helper">商品を保存すると、この商品に複数の在庫を登録できます。</p>
           ) : (
-            <form className="sample-form" onSubmit={handleAddInventory}>
+            <div className="sample-form" onKeyDown={handleInventoryFormKeyDown}>
               <label className="field-label">
                 在庫コード
                 <input
@@ -1248,8 +1273,8 @@ export default function ProductDetail({
                 <textarea value={inventoryForm.memo} onChange={(event) => updateInventoryField('memo', event.target.value)} />
               </label>
 
-              <button className="primary-button" type="submit">在庫を追加</button>
-            </form>
+              <button className="primary-button" type="button" onClick={handleAddInventory}>在庫を追加</button>
+            </div>
           )}
 
           {relatedInventories.length > 0 && (
