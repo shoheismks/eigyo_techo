@@ -200,7 +200,9 @@ async function openInbound(page) {
   if (!(await group.locator('.sidebar-subnav').isVisible().catch(() => false))) await group.locator('.sidebar-group-button').click();
   await group.locator('.sidebar-subnav button').first().click();
   await page.getByRole('button', { name: '入荷予定', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '入荷予定PDF取込' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '入荷予定', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '＋ 新しく取り込む' }).click();
+  await expect(page.getByRole('heading', { name: '入荷予定を取り込む' })).toBeVisible();
 }
 
 async function workbookBuffer(code) {

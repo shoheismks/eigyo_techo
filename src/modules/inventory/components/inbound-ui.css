@@ -1,0 +1,79 @@
+.inbound-plan-list {
+  display: grid;
+  gap: 16px;
+}
+
+.inbound-plan-list-heading {
+  align-items: flex-start;
+}
+
+.inbound-plan-search {
+  max-width: 520px;
+}
+
+.inbound-plan-table {
+  width: 100%;
+}
+
+.inbound-plan-card-list {
+  display: none;
+}
+
+.inbound-plan-card {
+  border-left: 4px solid var(--accent);
+}
+
+.inbound-import-choice {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inbound-import-choice label {
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  justify-content: stretch;
+  min-height: 112px;
+  padding: 16px;
+  text-align: left;
+}
+
+.inbound-import-choice strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.inbound-import-choice span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.inbound-view-back {
+  justify-self: start;
+}
+
+@media (max-width: 767px) {
+  .inbound-plan-list-heading {
+    align-items: stretch;
+    display: grid;
+    gap: 12px;
+  }
+
+  .inbound-plan-list-heading .primary-button,
+  .inbound-plan-search {
+    max-width: none;
+    width: 100%;
+  }
+
+  .inbound-plan-card-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .inbound-import-choice {
+    grid-template-columns: 1fr;
+  }
+}

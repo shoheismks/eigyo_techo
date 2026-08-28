@@ -22,6 +22,8 @@ import { buildInboundAnalysis } from '../services/inboundAnalysisService.js';
 import { matchInboundPreview, productMatchStatusLabel } from '../services/inboundProductMatcher.js';
 import InboundProductCreateDialog from '../components/InboundProductCreateDialog.jsx';
 import InboundProductAliasDialog from '../components/InboundProductAliasDialog.jsx';
+import InboundPlanList from '../components/InboundPlanList.jsx';
+import '../components/inbound-ui.css';
 
 const TABS = [
   { key: 'list', label: '在庫一覧' },
@@ -34,6 +36,37 @@ const TABS = [
 ];
 
 const ALL = 'all';
+const INBOUND_VIEWS = new Set(['list', 'import', 'detail']);
+
+function inboundViewFromUrl() {
+  if (typeof window === 'undefined') return { view: 'list', shipmentId: '' };
+  const params = new URLSearchParams(window.location.search);
+  const view = INBOUND_VIEWS.has(params.get('view')) ? params.get('view') : 'list';
+  return { view, shipmentId: view === 'detail' ? params.get('id') || '' : '' };
+}
+
+function initialInventoryTab() {
+  if (typeof window !== 'undefined') {
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (TABS.some((tab) => tab.key === urlTab)) return urlTab;
+  }
+  return localStorage.getItem('eigyo-techo-inventory-tab') || 'list';
+}
+
+function writeInboundViewUrl(view, shipmentId = '', { replace = false } = {}) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('tab', 'arrival');
+  if (view === 'list') {
+    url.searchParams.delete('view');
+    url.searchParams.delete('id');
+  } else {
+    url.searchParams.set('view', view);
+    if (view === 'detail' && shipmentId) url.searchParams.set('id', shipmentId);
+    else url.searchParams.delete('id');
+  }
+  window.history[replace ? 'replaceState' : 'pushState']({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
 const ADJUSTMENT_REASONS = ['棚卸差異', '破損', '廃棄', 'サンプル使用', '入力ミス修正', 'その他'];
 const SCHEDULE_CHANGE_REASONS = ['通関遅延', '船便遅延', '書類不備', '検査', '倉庫都合', '仕入先都合', 'その他'];
 const SCHEDULE_CHANGE_ALLOWED_STATUSES = new Set(['pending', 'partially_received']);
@@ -315,7 +348,7 @@ export default function InventoryPage({
   user = null,
   userId = '',
 }) {
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('eigyo-techo-inventory-tab') || 'list');
+  const [activeTab, setActiveTab] = useState(initialInventoryTab);
   const [keyword, setKeyword] = useState(() => localStorage.getItem('eigyo-techo-inventory-keyword') || '');
   const [filter, setFilter] = useState(() => localStorage.getItem('eigyo-techo-inventory-filter') || ALL);
   const [form, setForm] = useState(() => emptyMovementForm(initialAction || {}, user));
@@ -329,7 +362,9 @@ export default function InventoryPage({
   const [inboundAliasSelection, setInboundAliasSelection] = useState(null);
   const [previewAddedProducts, setPreviewAddedProducts] = useState([]);
   const [previewAddedAliases, setPreviewAddedAliases] = useState([]);
-  const [selectedInboundShipmentId, setSelectedInboundShipmentId] = useState('');
+  const initialInboundLocation = useMemo(() => inboundViewFromUrl(), []);
+  const [inboundView, setInboundView] = useState(initialInboundLocation.view);
+  const [selectedInboundShipmentId, setSelectedInboundShipmentId] = useState(initialInboundLocation.shipmentId);
   const [receiptShipmentId, setReceiptShipmentId] = useState('');
   const [receiptForm, setReceiptForm] = useState(() => buildReceiptForm(null));
   const [receiptSaving, setReceiptSaving] = useState(false);
@@ -383,15 +418,27 @@ export default function InventoryPage({
     setActiveTab(initialAction.tab || 'inbound');
     if (initialAction.inboundShipmentId) {
       setSelectedInboundShipmentId(initialAction.inboundShipmentId);
+      setInboundView('detail');
+      writeInboundViewUrl('detail', initialAction.inboundShipmentId, { replace: true });
     }
     setForm(emptyMovementForm(initialAction, user));
     onInitialHandled?.();
   }, [initialAction, onInitialHandled, user]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const next = inboundViewFromUrl();
+      setInboundView(next.view);
+      setSelectedInboundShipmentId(next.shipmentId);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const selectedProduct = products.find((product) => product.id === form.productId);
   const selectedInventory = inventories.find((inventory) => inventory.id === form.inventoryId);
   const adjustmentInventory = inventories.find((inventory) => inventory.id === adjustmentInventoryId);
-  const selectedInboundShipment = inboundShipments.find((shipment) => shipment.id === selectedInboundShipmentId) || inboundShipments[0];
+  const selectedInboundShipment = inboundShipments.find((shipment) => shipment.id === selectedInboundShipmentId) || null;
   const receiptShipment = inboundShipments.find((shipment) => shipment.id === receiptShipmentId);
   const reverseReceipt = inboundReceipts.find((receipt) => receipt.id === reverseReceiptId);
   const reverseReceiptLines = inboundReceiptLines.filter((line) => line.inboundReceiptId === reverseReceiptId);
@@ -766,18 +813,48 @@ export default function InventoryPage({
 
     try {
       const result = await saveInboundShipmentPreview?.(matchedDeliveryNoticePreview);
+      const shipmentId = result?.shipmentId || '';
       if (result?.status === 'duplicate') {
-        setSelectedInboundShipmentId(result.shipmentId);
+        setSelectedInboundShipmentId(shipmentId);
         setToast('このPDFはすでに取り込み済みです。既存の入荷予定を表示しました。');
       } else {
-        setSelectedInboundShipmentId(result?.shipmentId || '');
+        setSelectedInboundShipmentId(shipmentId);
         setToast('入荷予定として保存しました。まだ在庫数量には反映していません。');
+      }
+      if (shipmentId) {
+        setInboundView('detail');
+        writeInboundViewUrl('detail', shipmentId);
       }
     } catch (saveError) {
       setDeliveryNoticeError(saveError.message || '入荷予定の保存に失敗しました。');
     } finally {
       setDeliveryNoticeSaving(false);
     }
+  }
+
+  function openInboundList({ replace = false } = {}) {
+    setInboundView('list');
+    setSelectedInboundShipmentId('');
+    setDeliveryNoticePreview(null);
+    setDeliveryNoticeError('');
+    writeInboundViewUrl('list', '', { replace });
+  }
+
+  function openInboundImport() {
+    setInboundView('import');
+    setSelectedInboundShipmentId('');
+    setDeliveryNoticePreview(null);
+    setDeliveryNoticeError('');
+    writeInboundViewUrl('import');
+  }
+
+  function openInboundDetail(shipmentId) {
+    if (!shipmentId) return;
+    setInboundView('detail');
+    setSelectedInboundShipmentId(shipmentId);
+    setDeliveryNoticePreview(null);
+    setDeliveryNoticeError('');
+    writeInboundViewUrl('detail', shipmentId);
   }
 
   async function handleInboundProductCreated(createdProduct) {
@@ -1150,6 +1227,7 @@ export default function InventoryPage({
               setActiveTab(tab.key);
               setError('');
               setToast('');
+              if (tab.key === 'arrival') openInboundList({ replace: true });
             }}
           >
             {tab.label}
@@ -1253,6 +1331,7 @@ export default function InventoryPage({
 
       {activeTab === 'arrival' && (
         <DeliveryNoticeImportPanel
+          view={inboundView}
           onUpload={handleDeliveryNoticeUpload}
           onExcelUpload={handleStandardExcelUpload}
           onSavePreview={handleSaveDeliveryNoticePreview}
@@ -1265,7 +1344,9 @@ export default function InventoryPage({
           inboundReceiptLines={inboundReceiptLines}
           inboundScheduleChanges={inboundScheduleChanges}
           selectedInboundShipment={selectedInboundShipment}
-          onSelectInboundShipment={setSelectedInboundShipmentId}
+          onOpenImport={openInboundImport}
+          onBackToList={openInboundList}
+          onSelectInboundShipment={openInboundDetail}
           products={previewProducts}
           aliases={supplierProductAliases}
           onLineChange={handleInboundLineChange}
@@ -1947,6 +2028,7 @@ function inboundDocumentConfidenceLabel(confidence) {
 }
 
 function DeliveryNoticeImportPanel({
+  view = 'list',
   onUpload,
   onExcelUpload,
   onSavePreview,
@@ -1954,6 +2036,8 @@ function DeliveryNoticeImportPanel({
   onSaveAlias,
   onAddProduct,
   onLinkAlias,
+  onOpenImport,
+  onBackToList,
   onSelectInboundShipment,
   parsing,
   saving,
@@ -1971,17 +2055,16 @@ function DeliveryNoticeImportPanel({
   syncState = '',
   syncError = '',
 }) {
-  const shipmentColumns = [
-    { key: 'createdAt', label: '取込日', minWidth: '120px', render: (row) => String(row.createdAt || '').slice(0, 10) || '-' },
-    { key: 'supplierName', label: '仕入先', minWidth: '180px', render: (row) => row.supplierName || '-' },
-    { key: 'documentNumber', label: '帳票番号', minWidth: '120px', render: (row) => row.documentNumber || '-' },
-    { key: 'contractNo', label: '契約No', minWidth: '120px', render: (row) => [...new Set((row.lines || []).map((line) => line.contractNo).filter(Boolean))].join(' / ') || '-' },
-    { key: 'customs', label: '通関予定', minWidth: '120px', render: (row) => (row.lines || [])[0]?.customsClearancePlannedDate || '-' },
-    { key: 'lineCount', label: '明細数', width: '90px', render: (row) => row.lines?.length || 0 },
-    { key: 'unmatched', label: '未照合', width: '90px', render: (row) => (row.lines || []).filter((line) => line.matchStatus !== 'matched' && line.matchStatus !== 'manual' && line.status !== 'excluded').length },
-    { key: 'received', label: '入荷状況', minWidth: '130px', render: (row) => `${(row.lines || []).filter((line) => line.status === 'received').length}/${row.lines?.length || 0}` },
-    { key: 'status', label: 'Status', width: '110px', render: (row) => <span className={`info-badge ${inboundStatusBadgeClass(row.status)}`}>{inboundStatusLabel(row.status)}</span> },
-  ];
+  if (view === 'list') {
+    return (
+      <InboundPlanList
+        shipments={inboundShipments}
+        error={syncError}
+        onImport={onOpenImport}
+        onOpenDetail={onSelectInboundShipment}
+      />
+    );
+  }
 
   const detailColumns = [
     { key: 'lineNumber', label: '行', width: '64px', render: (row) => row.lineNumber || '-' },
@@ -2145,19 +2228,34 @@ function DeliveryNoticeImportPanel({
 
   return (
     <section className="detail-section delivery-notice-import-panel">
+      <button type="button" className="ghost-button inbound-view-back" onClick={() => onBackToList?.()}>
+        ← 入荷予定一覧
+      </button>
+
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Delivery notice PDF</p>
-          <h2>入荷予定PDF取込</h2>
-          <p className="inline-helper">この画面では入荷予定の登録と商品照合まで行います。入荷確定をするまで在庫数量は変わりません。</p>
+          <p className="eyebrow">{view === 'import' ? 'New inbound plan' : 'Inbound plan detail'}</p>
+          <h2>{view === 'import' ? '入荷予定を取り込む' : '入荷予定詳細'}</h2>
+          <p className="inline-helper">
+            {view === 'import'
+              ? 'PDFまたは標準Excelを解析し、保存前に内容を確認します。'
+              : '保存済みの入荷予定、商品照合、入荷状況を確認できます。'}
+          </p>
         </div>
-        <div className="delivery-notice-upload-actions">
-          <label className="primary-button delivery-notice-upload-button">
-            PDFアップロード
+      </div>
+
+      {view === 'import' && (
+        <div className="inbound-import-choice">
+          <label className="delivery-notice-upload-button">
+            <strong>PDFから取り込む</strong>
+            <span>入荷案内PDF、商品単価表など</span>
+            <span className="primary-button">PDFを選択</span>
             <input type="file" accept="application/pdf,.pdf" onChange={onUpload} />
           </label>
-          <label className="secondary-button delivery-notice-upload-button standard-excel-upload-button">
-            標準Excel取込
+          <label className="delivery-notice-upload-button standard-excel-upload-button">
+            <strong>標準Excelから取り込む</strong>
+            <span>IMPORT_TEMPLATE形式</span>
+            <span className="secondary-button">Excelを選択</span>
             <input
               type="file"
               accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
@@ -2165,21 +2263,28 @@ function DeliveryNoticeImportPanel({
             />
           </label>
         </div>
-      </div>
+      )}
 
-      {parsing && <p className="notice-text">ファイルを解析しています...</p>}
-      {saving && <p className="notice-text">入荷予定として保存しています...</p>}
-      {error && <p className="error-text">{error}</p>}
+      {view === 'import' && parsing && <p className="notice-text">ファイルを解析しています...</p>}
+      {view === 'import' && saving && <p className="notice-text">入荷予定として保存しています...</p>}
+      {view === 'import' && error && <p className="error-text">{error}</p>}
       {syncError && <p className="error-text">{syncError}</p>}
 
-      {!preview && !parsing && inboundShipments.length === 0 && (
+      {view === 'detail' && !selectedInboundShipment && (
         <div className="empty-state delivery-notice-empty">
-          <h3>PDFまたは標準Excelを選択してください</h3>
+          <h3>入荷予定が見つかりません</h3>
+          <p>一覧へ戻り、確認する入荷予定を選択してください。</p>
+        </div>
+      )}
+
+      {view === 'import' && !preview && !parsing && (
+        <div className="empty-state delivery-notice-empty">
+          <h3>取込方法を選択してください</h3>
           <p>入荷関連PDF、またはIMPORT_TEMPLATEシートを持つ標準Excelを解析し、保存前に明細を確認できます。</p>
         </div>
       )}
 
-      {preview && (
+      {view === 'import' && preview && (
         <div className="delivery-notice-preview">
           <div className="delivery-notice-summary">
             <div className="summary-card"><span>判定書類</span><strong>{inboundDocumentTypeLabel(preview.documentType)}</strong></div>
@@ -2295,68 +2400,7 @@ function DeliveryNoticeImportPanel({
         </div>
       )}
 
-      {inboundShipments.length > 0 && (
-        <div className="delivery-notice-saved">
-          <div className="section-heading">
-            <div>
-              <h3>保存済み入荷予定</h3>
-              <p className="inline-helper">PDF単位で保存した入荷予定です。入荷確定までは在庫数量に影響しません。</p>
-            </div>
-            <span className="info-badge muted">{syncState || 'supabase'}</span>
-          </div>
-
-          <DesktopTable
-            className="inventory-common-table delivery-notice-shipment-table"
-            columns={shipmentColumns}
-            rows={inboundShipments}
-            getRowKey={(row) => row.id}
-            minWidth={1040}
-            actions={(shipment) => (
-              <>
-                <button type="button" className="ghost-button" onClick={() => onSelectInboundShipment?.(shipment.id)}>
-                  詳細
-                </button>
-                <button type="button" className="primary-button" disabled={!shipment.lines?.some(canReceiveInboundLine)} onClick={() => onOpenReceipt?.(shipment)}>
-                  入荷確定
-                </button>
-              </>
-            )}
-          />
-
-          <div className="card-list-mobile delivery-notice-card-list">
-            {inboundShipments.map((shipment) => (
-              <button
-                type="button"
-                className={`product-card delivery-notice-card delivery-notice-card-button ${selectedInboundShipment?.id === shipment.id ? 'active' : ''}`}
-                key={shipment.id}
-                onClick={() => onSelectInboundShipment?.(shipment.id)}
-              >
-                <div className="company-heading">
-                  <p>{String(shipment.createdAt || '').slice(0, 10)} / {inboundStatusLabel(shipment.status)}</p>
-                  <h3>{shipment.supplierName || '仕入先未取得'}</h3>
-                </div>
-                <dl className="company-details">
-                  <div><dt>帳票番号</dt><dd>{shipment.documentNumber || '-'}</dd></div>
-                  <div><dt>契約No</dt><dd>{[...new Set((shipment.lines || []).map((line) => line.contractNo).filter(Boolean))].join(' / ') || '-'}</dd></div>
-                  <div><dt>通関予定</dt><dd>{shipment.lines?.[0]?.customsClearancePlannedDate || '-'}</dd></div>
-                  <div><dt>明細数</dt><dd>{shipment.lines?.length || 0}</dd></div>
-                  <div><dt>未照合</dt><dd>{(shipment.lines || []).filter((line) => line.matchStatus !== 'matched' && line.matchStatus !== 'manual' && line.status !== 'excluded').length}</dd></div>
-                  <div><dt>入荷状況</dt><dd>{(shipment.lines || []).filter((line) => line.status === 'received').length}/{shipment.lines?.length || 0}</dd></div>
-                </dl>
-                <div className="card-actions">
-                  <span className={`info-badge ${inboundStatusBadgeClass(shipment.status)}`}>{inboundStatusLabel(shipment.status)}</span>
-                  <span className="ghost-button">詳細</span>
-                  {shipment.lines?.some(canReceiveInboundLine) && (
-                    <span className="primary-button">入荷確定</span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedInboundShipment && (
+      {view === 'detail' && selectedInboundShipment && (
         <div className="delivery-notice-detail-editor">
           <div className="section-heading">
             <div>
@@ -2440,7 +2484,7 @@ function DeliveryNoticeImportPanel({
         </div>
       )}
 
-      {selectedInboundShipment && scheduleChangeRows.length > 0 && (
+      {view === 'detail' && selectedInboundShipment && scheduleChangeRows.length > 0 && (
         <div className="delivery-notice-schedule-history">
           <div className="section-heading">
             <h3>予定変更履歴</h3>
@@ -2464,7 +2508,7 @@ function DeliveryNoticeImportPanel({
         </div>
       )}
 
-      {selectedInboundShipment && receiptRows.length > 0 && (
+      {view === 'detail' && selectedInboundShipment && receiptRows.length > 0 && (
         <div className="delivery-notice-receipts">
           <div className="section-heading">
             <h3>入荷確定履歴</h3>
