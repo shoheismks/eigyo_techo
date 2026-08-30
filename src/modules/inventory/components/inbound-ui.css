@@ -55,6 +55,120 @@
   justify-self: start;
 }
 
+.inbound-import-flow,
+.inbound-import-stage {
+  display: grid;
+  gap: 16px;
+}
+
+.inbound-import-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbound-import-stepper li {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  position: relative;
+}
+
+.inbound-import-stepper li:not(:last-child)::after {
+  background: var(--line);
+  content: '';
+  height: 1px;
+  left: 42px;
+  position: absolute;
+  right: 8px;
+  top: 16px;
+}
+
+.inbound-import-stepper li > span {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 32px;
+  height: 32px;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.inbound-import-stepper li.current,
+.inbound-import-stepper li.complete {
+  color: var(--text);
+}
+
+.inbound-import-stepper li.current > span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.inbound-import-stepper li.complete > span {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.inbound-import-stepper li.unavailable {
+  opacity: 0.45;
+}
+
+.inbound-content-summary .summary-card strong {
+  overflow-wrap: anywhere;
+}
+
+.inbound-date-details,
+.inbound-save-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inbound-document-readonly {
+  border-left: 3px solid var(--warning);
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.inbound-document-readonly p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.warning-text {
+  color: var(--warning);
+  font-weight: 700;
+  margin: 0;
+}
+
+.inbound-product-progress {
+  background: var(--line);
+  height: 6px;
+  overflow: hidden;
+}
+
+.inbound-product-progress span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+  transition: width 160ms ease;
+}
+
+.inbound-flow-actions {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding-top: 16px;
+}
+
 @media (max-width: 767px) {
   .inbound-plan-list-heading {
     align-items: stretch;
@@ -75,5 +189,48 @@
 
   .inbound-import-choice {
     grid-template-columns: 1fr;
+  }
+
+  .inbound-import-stepper {
+    gap: 4px;
+  }
+
+  .inbound-import-stepper li {
+    display: grid;
+    font-size: 0.72rem;
+    gap: 3px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .inbound-import-stepper li:not(:last-child)::after {
+    left: calc(50% + 18px);
+    right: calc(-50% + 18px);
+  }
+
+  .inbound-import-stepper li > span {
+    height: 30px;
+    width: 30px;
+  }
+
+  .inbound-import-stepper li strong {
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .inbound-date-details,
+  .inbound-save-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .inbound-flow-actions {
+    align-items: stretch;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .inbound-flow-actions button {
+    width: 100%;
   }
 }

@@ -23,6 +23,7 @@ import { matchInboundPreview, productMatchStatusLabel } from '../services/inboun
 import InboundProductCreateDialog from '../components/InboundProductCreateDialog.jsx';
 import InboundProductAliasDialog from '../components/InboundProductAliasDialog.jsx';
 import InboundPlanList from '../components/InboundPlanList.jsx';
+import InboundImportFlow from '../components/InboundImportFlow.jsx';
 import '../components/inbound-ui.css';
 
 const TABS = [
@@ -848,6 +849,11 @@ export default function InventoryPage({
     writeInboundViewUrl('import');
   }
 
+  function resetInboundImport() {
+    setDeliveryNoticePreview(null);
+    setDeliveryNoticeError('');
+  }
+
   function openInboundDetail(shipmentId) {
     if (!shipmentId) return;
     setInboundView('detail');
@@ -1345,6 +1351,7 @@ export default function InventoryPage({
           inboundScheduleChanges={inboundScheduleChanges}
           selectedInboundShipment={selectedInboundShipment}
           onOpenImport={openInboundImport}
+          onResetImport={resetInboundImport}
           onBackToList={openInboundList}
           onSelectInboundShipment={openInboundDetail}
           products={previewProducts}
@@ -1920,9 +1927,9 @@ function inboundStatusLabel(status) {
 function matchStatusLabel(status) {
   const labels = {
     matched: '自動照合',
-    manual: '手動照合',
-    ambiguous: '要確認',
-    unmatched: '未照合',
+    manual: '確認済み（手動）',
+    ambiguous: '複数候補を確認',
+    unmatched: '商品確認が必要',
   };
   return labels[status] || status || '-';
 }
@@ -1962,9 +1969,17 @@ function previewProductMatchBadgeClass(status) {
 }
 
 function productMatchSourceLabel(source) {
-  if (source === 'product_code') return '商品コード一致';
-  if (source === 'supplier_code_alias' || source === 'name_alias') return 'Alias一致';
+  if (source === 'product_code') return '商品コードで確認';
+  if (source === 'supplier_code_alias' || source === 'name_alias') return '登録済みの表記で確認';
   return '';
+}
+
+function previewProductMatchLabel(line) {
+  const status = line.productMatchStatus || line.matchStatus;
+  if (status === 'manual') return '確認済み（手動）';
+  if (status === 'unmatched') return '商品確認が必要';
+  if (status === 'review' || status === 'ambiguous') return '複数候補を確認';
+  return productMatchStatusLabel(status);
 }
 
 function PreviewProductMatch({ line, onAddProduct, onLinkAlias }) {
@@ -1972,7 +1987,7 @@ function PreviewProductMatch({ line, onAddProduct, onLinkAlias }) {
   return (
     <div className="inbound-product-match">
       <span className={`info-badge ${previewProductMatchBadgeClass(line.productMatchStatus)}`}>
-        {productMatchStatusLabel(line.productMatchStatus)}
+        {previewProductMatchLabel(line)}
       </span>
       {line.matchedProduct && (
         <span className="inbound-product-match-name">
@@ -2013,18 +2028,51 @@ function PreviewProductMatch({ line, onAddProduct, onLinkAlias }) {
   );
 }
 
-function inboundDocumentTypeLabel(type) {
-  return {
-    delivery_notice: 'デリバリー予定案内',
-    standard_excel_import: '標準Excel',
-    product_price_list: '商品単価表',
-    warehouse_receipt_candidate: '画像PDF（要確認）',
-    unknown: '未判定',
-  }[type] || '未判定';
+function InboundPreviewCards({ lines = [], showProductMatch = false, onAddProduct, onLinkAlias }) {
+  return (
+    <div className="card-list-mobile delivery-notice-card-list">
+      {lines.map((line) => (
+        <article className="product-card delivery-notice-card" key={line.id}>
+          <div className="company-heading">
+            <p>{line.contractNo || '契約No未取得'} / {line.brand || 'ブランド未取得'}</p>
+            <h3>{line.productName || '商品名未取得'}</h3>
+          </div>
+          <dl className="company-details">
+            <div><dt>行番号</dt><dd>{line.lineNumber || '-'}</dd></div>
+            <div><dt>商品コード</dt><dd>{line.productCode || '-'}</dd></div>
+            {showProductMatch && <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /></dd></div>}
+            <div><dt>個数</dt><dd>{formatPrice(line.pieceCount) || '-'}</dd></div>
+            <div><dt>重量</dt><dd>{line.weight !== '' ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
+            <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>
+            <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
+            <div><dt>賞味期限</dt><dd>{line.expiryDate || '-'}</dd></div>
+          </dl>
+          {line.warnings?.length > 0 && <div className="delivery-notice-line-warnings">{line.warnings.map((warning) => <span className="info-badge muted" key={warning}>{warning}</span>)}</div>}
+        </article>
+      ))}
+    </div>
+  );
 }
 
-function inboundDocumentConfidenceLabel(confidence) {
-  return { high: '高', medium: '中', low: '低' }[confidence] || '-';
+function PriceListPreview({ lines = [], columns = [] }) {
+  return (
+    <>
+      <DesktopTable className="inventory-common-table delivery-notice-detail-table product-price-list-preview-table" columns={columns} rows={lines} getRowKey={(row) => row.id} minWidth={1180} />
+      <div className="card-list-mobile delivery-notice-card-list product-price-list-card-list">
+        {lines.map((line) => (
+          <article className="product-card delivery-notice-card" key={line.id}>
+            <div className="company-heading"><p>{line.productCode || '商品コード未取得'}</p><h3>{line.productName || '商品名未取得'}</h3></div>
+            <dl className="company-details">
+              <div><dt>基礎単価</dt><dd>{line.baseUnitPrice !== '' ? `${formatPrice(line.baseUnitPrice)} JPY/KG` : '-'}</dd></div>
+              <div><dt>係数</dt><dd>{line.coefficient !== '' ? line.coefficient : '-'}</dd></div>
+              <div><dt>諸費用</dt><dd>{line.additionalCost !== '' ? formatPrice(line.additionalCost) : '-'}</dd></div>
+              <div><dt>請求単価</dt><dd>{line.billedUnitPrice !== '' ? `${formatPrice(line.billedUnitPrice)} JPY/KG` : '-'}</dd></div>
+            </dl>
+          </article>
+        ))}
+      </div>
+    </>
+  );
 }
 
 function DeliveryNoticeImportPanel({
@@ -2037,6 +2085,7 @@ function DeliveryNoticeImportPanel({
   onAddProduct,
   onLinkAlias,
   onOpenImport,
+  onResetImport,
   onBackToList,
   onSelectInboundShipment,
   parsing,
@@ -2097,6 +2146,8 @@ function DeliveryNoticeImportPanel({
     { key: 'billedUnitPrice', label: '請求単価', width: '120px', render: (row) => row.billedUnitPrice !== '' ? `${formatPrice(row.billedUnitPrice)} ${row.currency}/${row.priceUnit}` : '-' },
     { key: 'warnings', label: '確認事項', minWidth: '180px', render: (row) => row.warnings.length ? row.warnings.join(' / ') : 'なし' },
   ];
+  const contentColumns = detailColumns.filter((column) => column.key !== 'productMatch');
+  const priceContentColumns = priceListColumns.filter((column) => column.key !== 'productMatch');
 
   const savedLineColumns = [
     { key: 'lineNo', label: '行', width: '64px', render: (line) => line.lineNo || '-' },
@@ -2245,158 +2296,42 @@ function DeliveryNoticeImportPanel({
       </div>
 
       {view === 'import' && (
-        <div className="inbound-import-choice">
-          <label className="delivery-notice-upload-button">
-            <strong>PDFから取り込む</strong>
-            <span>入荷案内PDF、商品単価表など</span>
-            <span className="primary-button">PDFを選択</span>
-            <input type="file" accept="application/pdf,.pdf" onChange={onUpload} />
-          </label>
-          <label className="delivery-notice-upload-button standard-excel-upload-button">
-            <strong>標準Excelから取り込む</strong>
-            <span>IMPORT_TEMPLATE形式</span>
-            <span className="secondary-button">Excelを選択</span>
-            <input
-              type="file"
-              accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
-              onChange={onExcelUpload}
-            />
-          </label>
-        </div>
+        <InboundImportFlow
+          preview={preview}
+          parsing={parsing}
+          saving={saving}
+          error={error}
+          onUpload={onUpload}
+          onExcelUpload={onExcelUpload}
+          onReset={onResetImport}
+          onSave={onSavePreview}
+          renderContent={() => (
+            ['delivery_notice', 'standard_excel_import'].includes(preview?.documentType) ? (
+              <>
+                <DesktopTable className="inventory-common-table delivery-notice-detail-table inbound-content-table" columns={contentColumns} rows={preview.lines} getRowKey={(row) => row.id} minWidth={1800} />
+                <InboundPreviewCards lines={preview.lines} />
+              </>
+            ) : preview?.documentType === 'product_price_list' ? (
+              <PriceListPreview lines={preview.lines} columns={priceContentColumns} />
+            ) : (
+              <div className="empty-state delivery-notice-empty"><h3>読み取り内容を確認してください</h3><p>{preview?.warnings?.join(' / ') || 'この書類形式は入荷予定として保存できません。'}</p></div>
+            )
+          )}
+          renderProductCheck={() => (
+            <>
+              <DesktopTable className="inventory-common-table delivery-notice-detail-table inbound-product-check-table" columns={detailColumns} rows={preview.lines} getRowKey={(row) => row.id} minWidth={2160} />
+              <InboundPreviewCards lines={preview.lines} showProductMatch onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} />
+            </>
+          )}
+        />
       )}
 
-      {view === 'import' && parsing && <p className="notice-text">ファイルを解析しています...</p>}
-      {view === 'import' && saving && <p className="notice-text">入荷予定として保存しています...</p>}
-      {view === 'import' && error && <p className="error-text">{error}</p>}
       {syncError && <p className="error-text">{syncError}</p>}
 
       {view === 'detail' && !selectedInboundShipment && (
         <div className="empty-state delivery-notice-empty">
           <h3>入荷予定が見つかりません</h3>
           <p>一覧へ戻り、確認する入荷予定を選択してください。</p>
-        </div>
-      )}
-
-      {view === 'import' && !preview && !parsing && (
-        <div className="empty-state delivery-notice-empty">
-          <h3>取込方法を選択してください</h3>
-          <p>入荷関連PDF、またはIMPORT_TEMPLATEシートを持つ標準Excelを解析し、保存前に明細を確認できます。</p>
-        </div>
-      )}
-
-      {view === 'import' && preview && (
-        <div className="delivery-notice-preview">
-          <div className="delivery-notice-summary">
-            <div className="summary-card"><span>判定書類</span><strong>{inboundDocumentTypeLabel(preview.documentType)}</strong></div>
-            <div className="summary-card"><span>判定精度</span><strong>{inboundDocumentConfidenceLabel(preview.classification?.confidence)}</strong></div>
-            <div className="summary-card"><span>発行日</span><strong>{preview.issueDate || '-'}</strong></div>
-            <div className="summary-card"><span>帳票番号</span><strong>{preview.documentNumber || '-'}</strong></div>
-            <div className="summary-card"><span>仕入先</span><strong>{preview.supplier || '-'}</strong></div>
-            <div className="summary-card"><span>明細数</span><strong>{preview.lines.length}</strong></div>
-          </div>
-
-          <dl className="company-details delivery-notice-file-details">
-            <div><dt>ファイル名</dt><dd>{preview.fileName || '-'}</dd></div>
-            <div><dt>ファイル識別子</dt><dd>{preview.fileHash || '-'}</dd></div>
-            <div><dt>ページ数</dt><dd>{preview.pageCount || 0}</dd></div>
-          </dl>
-
-          {preview.warnings.length > 0 && (
-            <div className="delivery-notice-warning-box">
-              <h3>ファイル全体の確認事項</h3>
-              <ul>
-                {preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-              </ul>
-            </div>
-          )}
-
-          <div className="section-heading">
-            <h3>解析明細</h3>
-            <span className="info-badge muted">未取得項目は確認事項で確認</span>
-          </div>
-
-          {['delivery_notice', 'standard_excel_import'].includes(preview.documentType) ? (
-            <>
-              <div className="delivery-notice-actions">
-                <button type="button" className="primary-button" disabled={saving || parsing} onClick={onSavePreview}>
-                  入荷予定として保存
-                </button>
-                <span className="inline-helper">保存しても在庫数量には加算されません。</span>
-              </div>
-
-              <DesktopTable
-                className="inventory-common-table delivery-notice-detail-table"
-                columns={detailColumns}
-                rows={preview.lines}
-                getRowKey={(row) => row.id}
-                minWidth={2160}
-              />
-
-              <div className="card-list-mobile delivery-notice-card-list">
-                {preview.lines.map((line) => (
-              <article className="product-card delivery-notice-card" key={line.id}>
-                <div className="company-heading">
-                  <p>{line.contractNo || '契約No未取得'} / {line.brand || 'ブランド未取得'}</p>
-                  <h3>{line.productName || '商品名未取得'}</h3>
-                </div>
-                <dl className="company-details">
-                  <div><dt>行番号</dt><dd>{line.lineNumber || '-'}</dd></div>
-                  <div><dt>商品コード</dt><dd>{line.productCode || '-'}</dd></div>
-                  <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /></dd></div>
-                  <div><dt>種別</dt><dd>{line.productType || '-'}</dd></div>
-                  <div><dt>個数</dt><dd>{formatPrice(line.pieceCount) || '-'}</dd></div>
-                  <div><dt>重量</dt><dd>{line.weight !== '' ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
-                  <div><dt>単価</dt><dd>{line.unitPrice !== '' ? `${formatPrice(line.unitPrice)} ${line.currency || ''}${line.priceUnit ? `/${line.priceUnit}` : ''}` : '-'}</dd></div>
-                  <div><dt>原産国</dt><dd>{line.originCountry || '-'}</dd></div>
-                  <div><dt>工場No</dt><dd>{line.factoryNo || '-'}</dd></div>
-                  <div><dt>通関予定</dt><dd>{line.customsClearancePlannedDate || '-'}</dd></div>
-                  <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
-                  <div><dt>賞味期限</dt><dd>{line.expiryDate || '-'}</dd></div>
-                  <div><dt>倉庫</dt><dd>{line.warehouse || '-'}</dd></div>
-                </dl>
-                {line.warnings.length > 0 && (
-                  <div className="delivery-notice-line-warnings">
-                    {line.warnings.map((warning) => <span className="info-badge muted" key={warning}>{warning}</span>)}
-                  </div>
-                )}
-              </article>
-                ))}
-              </div>
-            </>
-          ) : preview.documentType === 'product_price_list' ? (
-            <>
-              <p className="notice-text">商品単価表は確認専用です。このStepではクラウドへ保存しません。</p>
-              <DesktopTable
-                className="inventory-common-table delivery-notice-detail-table product-price-list-preview-table"
-                columns={priceListColumns}
-                rows={preview.lines}
-                getRowKey={(row) => row.id}
-                minWidth={1340}
-              />
-              <div className="card-list-mobile delivery-notice-card-list product-price-list-card-list">
-                {preview.lines.map((line) => (
-                  <article className="product-card delivery-notice-card" key={line.id}>
-                    <div className="company-heading">
-                      <p>{line.productCode || '商品コード未取得'}</p>
-                      <h3>{line.productName || '商品名未取得'}</h3>
-                    </div>
-                    <dl className="company-details">
-                      <div><dt>商品照合</dt><dd><PreviewProductMatch line={line} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} /></dd></div>
-                      <div><dt>基礎単価</dt><dd>{line.baseUnitPrice !== '' ? `${formatPrice(line.baseUnitPrice)} JPY/KG` : '-'}</dd></div>
-                      <div><dt>係数</dt><dd>{line.coefficient !== '' ? line.coefficient : '-'}</dd></div>
-                      <div><dt>諸費用</dt><dd>{line.additionalCost !== '' ? formatPrice(line.additionalCost) : '-'}</dd></div>
-                      <div><dt>請求単価</dt><dd>{line.billedUnitPrice !== '' ? `${formatPrice(line.billedUnitPrice)} JPY/KG` : '-'}</dd></div>
-                    </dl>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="empty-state delivery-notice-empty">
-              <h3>この書類形式はまだ解析できません</h3>
-              <p>{preview.warnings.join(' / ') || '次のStepで対応予定です。'}</p>
-            </div>
-          )}
         </div>
       )}
 

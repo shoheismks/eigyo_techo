@@ -205,6 +205,18 @@ async function openInbound(page) {
   await expect(page.getByRole('heading', { name: '入荷予定を取り込む' })).toBeVisible();
 }
 
+async function openProductCheck(page) {
+  await expect(page.getByRole('heading', { name: '内容確認', exact: true })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: '商品確認へ' }).click();
+  await expect(page.getByRole('heading', { name: '商品確認', exact: true })).toBeVisible();
+}
+
+async function restartImport(page) {
+  await page.getByRole('button', { name: '内容確認へ戻る' }).click();
+  await page.getByRole('button', { name: '取込をやり直す' }).click();
+  await expect(page.locator('.standard-excel-upload-button input[type="file"]')).toBeVisible();
+}
+
 async function workbookBuffer(code) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('IMPORT_TEMPLATE');
@@ -287,6 +299,7 @@ test('preview registers a confirmed alias once and immediately rematches identic
   }));
   const input = page.locator('.standard-excel-upload-button input[type="file"]');
   await input.setInputFiles({ name: `E2E_ALIAS_${token}.xlsx`, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook });
+  await openProductCheck(page);
   await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(2);
   await expect(page.locator('.delivery-notice-detail-table').getByText(aliasName, { exact: true })).toHaveCount(2);
   await expect(page.locator('.delivery-notice-detail-table').getByRole('button', { name: '同じ商品として登録' }).first()).toBeVisible();
@@ -307,7 +320,7 @@ test('preview registers a confirmed alias once and immediately rematches identic
   await dialog.getByRole('button', { name: 'Aliasを登録' }).click();
   await expect(dialog).toBeHidden({ timeout: 20_000 });
   await expect(page.locator('.delivery-notice-detail-table').getByText('照合済み', { exact: true })).toHaveCount(2);
-  await expect(page.locator('.delivery-notice-detail-table').getByText('Alias一致', { exact: true })).toHaveCount(2);
+  await expect(page.locator('.delivery-notice-detail-table').getByText('登録済みの表記で確認', { exact: true })).toHaveCount(2);
   await expect(page.locator('.delivery-notice-detail-table').getByText(aliasName, { exact: true })).toHaveCount(2);
 
   const aliasWrites = writes.filter((entry) => entry.includes('/product_aliases'));
@@ -315,8 +328,10 @@ test('preview registers a confirmed alias once and immediately rematches identic
   expect(writes.filter((entry) => !entry.includes('/product_aliases'))).toEqual([]);
 
   writes.length = 0;
-  await input.setInputFiles({ name: `E2E_ALIAS_${token}.xlsx`, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook });
-  await expect(page.locator('.delivery-notice-detail-table').getByText('Alias一致', { exact: true })).toHaveCount(2);
+  await restartImport(page);
+  await page.locator('.standard-excel-upload-button input[type="file"]').setInputFiles({ name: `E2E_ALIAS_${token}.xlsx`, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook });
+  await openProductCheck(page);
+  await expect(page.locator('.delivery-notice-detail-table').getByText('登録済みの表記で確認', { exact: true })).toHaveCount(2);
   expect(writes).toEqual([]);
 
   for (const width of [1440, 430, 390, 375, 320]) {
@@ -390,12 +405,15 @@ test('HS5220 matching and explicit product creation', async ({ page }) => {
 
   const input = page.locator('.standard-excel-upload-button input[type="file"]');
   await input.setInputFiles(HS5220);
+  await openProductCheck(page);
   await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(7);
   await expect(page.locator('.delivery-notice-detail-table').getByText('照合済み', { exact: true })).toHaveCount(7);
   expect(writes).toEqual([]);
 
   const code = `000E2E${Date.now()}`;
-  await input.setInputFiles({ name: 'E2E_MATCH.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(await workbookBuffer(code)) });
+  await restartImport(page);
+  await page.locator('.standard-excel-upload-button input[type="file"]').setInputFiles({ name: 'E2E_MATCH.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(await workbookBuffer(code)) });
+  await openProductCheck(page);
   await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(2);
   const addProductButtons = page.locator('.delivery-notice-detail-table').getByRole('button', { name: /商品マスタへ追加|別の商品として登録/ });
   await expect(addProductButtons).toHaveCount(2);

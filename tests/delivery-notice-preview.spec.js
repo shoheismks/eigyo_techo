@@ -182,7 +182,7 @@ test.describe('delivery notice preview integration', () => {
     });
     expect(normalized.lines.every((line) => !line.customsClearancePlannedDate.value)).toBe(true);
     const withoutProductMatchColumn = (rows) => rows.map((row) => row.filter((_, index) => index !== 5));
-    expect(withoutProductMatchColumn(renderedDisplay)).toEqual(withoutProductMatchColumn(expectedDisplay));
+    expect(renderedDisplay).toEqual(withoutProductMatchColumn(expectedDisplay));
     expect(writes).toEqual([]);
   });
 
@@ -191,7 +191,7 @@ test.describe('delivery notice preview integration', () => {
     await openInboundArrival(page);
     await uploadInboundDocument(page, FA610_PATH);
 
-    await expect(page.getByText('デリバリー予定案内', { exact: true })).toBeVisible();
+    await expect(page.getByText('入荷予定案内', { exact: true })).toBeVisible();
     await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(10);
     const parsed = await page.evaluate(async () => {
       const module = await import('/src/modules/inventory/services/inboundDocuments/inboundDocumentParser.js');
@@ -229,8 +229,8 @@ test.describe('delivery notice preview integration', () => {
     await openInboundArrival(page);
     await uploadInboundDocument(page, PRICE_LIST_PATH);
 
-    await expect(page.getByText('商品単価表', { exact: true })).toBeVisible();
-    await expect(page.getByText('高', { exact: true })).toBeVisible();
+    await expect(page.getByText('商品価格表', { exact: true })).toBeVisible();
+    await expect(page.getByText('高', { exact: true })).toHaveCount(0);
     await expect(page.locator('.product-price-list-preview-table tbody tr')).toHaveCount(10);
     await expect(page.getByRole('button', { name: '入荷予定として保存' })).toHaveCount(0);
 
@@ -268,7 +268,7 @@ test.describe('delivery notice preview integration', () => {
     await openInboundArrival(page);
     await uploadInboundDocument(page, WAREHOUSE_RECEIPT_PATH);
 
-    await expect(page.getByText('画像PDF（要確認）', { exact: true })).toBeVisible();
+    await expect(page.getByText('倉庫受領書の可能性', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '入荷予定として保存' })).toHaveCount(0);
     expect(writes).toEqual([]);
   });
