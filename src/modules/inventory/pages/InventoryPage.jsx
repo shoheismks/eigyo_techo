@@ -22,6 +22,7 @@ import { buildInboundAnalysis } from '../services/inboundAnalysisService.js';
 import { matchInboundPreview, productMatchStatusLabel } from '../services/inboundProductMatcher.js';
 import InboundProductCreateDialog from '../components/InboundProductCreateDialog.jsx';
 import InboundProductAliasDialog from '../components/InboundProductAliasDialog.jsx';
+import InboundProductReview from '../components/InboundProductReview.jsx';
 import InboundPlanList from '../components/InboundPlanList.jsx';
 import InboundImportFlow from '../components/InboundImportFlow.jsx';
 import '../components/inbound-ui.css';
@@ -2318,10 +2319,7 @@ function DeliveryNoticeImportPanel({
             )
           )}
           renderProductCheck={() => (
-            <>
-              <DesktopTable className="inventory-common-table delivery-notice-detail-table inbound-product-check-table" columns={detailColumns} rows={preview.lines} getRowKey={(row) => row.id} minWidth={2160} />
-              <InboundPreviewCards lines={preview.lines} showProductMatch onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} />
-            </>
+            <InboundProductReview lines={preview.lines} onAddProduct={onAddProduct} onLinkAlias={onLinkAlias} />
           )}
         />
       )}

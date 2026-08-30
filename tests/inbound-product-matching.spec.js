@@ -300,13 +300,14 @@ test('preview registers a confirmed alias once and immediately rematches identic
   const input = page.locator('.standard-excel-upload-button input[type="file"]');
   await input.setInputFiles({ name: `E2E_ALIAS_${token}.xlsx`, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook });
   await openProductCheck(page);
-  await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(2);
-  await expect(page.locator('.delivery-notice-detail-table').getByText(aliasName, { exact: true })).toHaveCount(2);
-  await expect(page.locator('.delivery-notice-detail-table').getByRole('button', { name: '同じ商品として登録' }).first()).toBeVisible();
+  const review = page.locator('.inbound-product-review');
+  await expect(review.locator('.inbound-review-card')).toHaveCount(2);
+  await expect(review.getByText(aliasName, { exact: true })).toHaveCount(2);
+  await expect(review.getByRole('button', { name: 'この商品と同じ表記として登録' }).first()).toBeVisible();
 
   writes.length = 0;
-  await page.locator('.delivery-notice-detail-table').getByRole('button', { name: '同じ商品として登録' }).first().click();
-  const dialog = page.getByRole('dialog', { name: '同じ商品として登録' });
+  await review.getByRole('button', { name: 'この商品と同じ表記として登録' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'この商品と同じ表記として登録' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(fixture.product.name, { exact: true })).toBeVisible();
   await expect(dialog.getByLabel(/この仕入先のみ/)).toBeChecked();
@@ -314,14 +315,16 @@ test('preview registers a confirmed alias once and immediately rematches identic
   for (const width of [1440, 430, 390, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Aliasを登録' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'この表記を登録' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   }
-  await dialog.getByRole('button', { name: 'Aliasを登録' }).click();
+  await dialog.getByRole('button', { name: 'この表記を登録' }).click();
   await expect(dialog).toBeHidden({ timeout: 20_000 });
-  await expect(page.locator('.delivery-notice-detail-table').getByText('照合済み', { exact: true })).toHaveCount(2);
-  await expect(page.locator('.delivery-notice-detail-table').getByText('登録済みの表記で確認', { exact: true })).toHaveCount(2);
-  await expect(page.locator('.delivery-notice-detail-table').getByText(aliasName, { exact: true })).toHaveCount(2);
+  await expect(review.getByText('✓ 商品確認が完了しました', { exact: true })).toBeVisible();
+  await review.getByRole('tab', { name: /確認済み 2/ }).click();
+  await expect(review.getByText('確認済み', { exact: true })).toHaveCount(2);
+  await expect(review.getByText('登録済みの表記で確認', { exact: true })).toHaveCount(2);
+  await expect(review.getByText(aliasName, { exact: true })).toHaveCount(2);
 
   const aliasWrites = writes.filter((entry) => entry.includes('/product_aliases'));
   expect(aliasWrites).toHaveLength(1);
@@ -331,7 +334,8 @@ test('preview registers a confirmed alias once and immediately rematches identic
   await restartImport(page);
   await page.locator('.standard-excel-upload-button input[type="file"]').setInputFiles({ name: `E2E_ALIAS_${token}.xlsx`, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook });
   await openProductCheck(page);
-  await expect(page.locator('.delivery-notice-detail-table').getByText('登録済みの表記で確認', { exact: true })).toHaveCount(2);
+  await page.locator('.inbound-product-review').getByRole('tab', { name: /確認済み 2/ }).click();
+  await expect(page.locator('.inbound-product-review').getByText('登録済みの表記で確認', { exact: true })).toHaveCount(2);
   expect(writes).toEqual([]);
 
   for (const width of [1440, 430, 390, 375, 320]) {
@@ -406,20 +410,22 @@ test('HS5220 matching and explicit product creation', async ({ page }) => {
   const input = page.locator('.standard-excel-upload-button input[type="file"]');
   await input.setInputFiles(HS5220);
   await openProductCheck(page);
-  await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(7);
-  await expect(page.locator('.delivery-notice-detail-table').getByText('照合済み', { exact: true })).toHaveCount(7);
+  const review = page.locator('.inbound-product-review');
+  await expect(review.getByRole('tab', { name: /要確認 7/ })).toBeVisible();
+  await expect(review.getByText('帳票の読み取り内容を確認してください', { exact: true })).toHaveCount(7);
+  await expect(review.getByRole('button', { name: 'この商品と同じ表記として登録' })).toHaveCount(0);
   expect(writes).toEqual([]);
 
   const code = `000E2E${Date.now()}`;
   await restartImport(page);
   await page.locator('.standard-excel-upload-button input[type="file"]').setInputFiles({ name: 'E2E_MATCH.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(await workbookBuffer(code)) });
   await openProductCheck(page);
-  await expect(page.locator('.delivery-notice-detail-table tbody tr')).toHaveCount(2);
-  const addProductButtons = page.locator('.delivery-notice-detail-table').getByRole('button', { name: /商品マスタへ追加|別の商品として登録/ });
+  await expect(review.locator('.inbound-review-card')).toHaveCount(2);
+  const addProductButtons = review.getByRole('button', { name: '新商品として登録' });
   await expect(addProductButtons).toHaveCount(2);
   await addProductButtons.first().click();
 
-  const dialog = page.getByRole('dialog', { name: '商品マスタへ追加' });
+  const dialog = page.getByRole('dialog', { name: '新商品として登録' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel('商品コード')).toHaveValue(code);
   await expect(dialog.getByLabel('商品名')).toHaveValue('E2E Matching Product');
@@ -427,8 +433,10 @@ test('HS5220 matching and explicit product creation', async ({ page }) => {
   await dialog.getByLabel('温度帯').selectOption('冷凍');
   await dialog.getByRole('button', { name: '内容を確認して登録' }).click();
   await expect(dialog).toBeHidden({ timeout: 20_000 });
-  await expect(page.locator('.delivery-notice-detail-table').getByText('照合済み', { exact: true })).toHaveCount(2);
-  await expect(page.locator('.delivery-notice-detail-table').getByRole('button', { name: /商品マスタへ追加|別の商品として登録/ })).toHaveCount(0);
+  await expect(review.getByText('✓ 商品確認が完了しました', { exact: true })).toBeVisible();
+  await review.getByRole('tab', { name: /確認済み 2/ }).click();
+  await expect(review.getByText('確認済み', { exact: true })).toHaveCount(2);
+  await expect(review.getByRole('button', { name: '新商品として登録' })).toHaveCount(0);
 
   for (const width of [1440, 430, 390, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });

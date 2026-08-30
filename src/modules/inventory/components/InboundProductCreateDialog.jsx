@@ -53,7 +53,7 @@ export default function InboundProductCreateDialog({ line, products = [], addPro
   return createPortal(
     <div className="modal-backdrop inbound-product-create-backdrop" role="presentation" onMouseDown={onClose}>
       <form className="modal-panel inbound-product-create-modal" role="dialog" aria-modal="true" aria-labelledby="inbound-product-create-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
-        <div className="customer-editor-header"><div><p className="eyebrow">Product master</p><h2 id="inbound-product-create-title">商品マスタへ追加</h2></div><button type="button" className="ghost-button" onClick={onClose}>閉じる</button></div>
+        <div className="customer-editor-header"><div><p className="eyebrow">商品マスタ</p><h2 id="inbound-product-create-title">新商品として登録</h2></div><button type="button" className="ghost-button" onClick={onClose}>閉じる</button></div>
         <p className="inline-helper">帳票から取得できた値だけを初期入力しています。登録前に内容を確認してください。</p>
         <div className="inbound-product-create-grid">
           <label>商品コード<input value={form.productCode} onChange={(event) => setField('productCode', event.target.value)} required /></label>

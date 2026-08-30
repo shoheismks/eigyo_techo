@@ -135,7 +135,7 @@ export default function InboundProductAliasDialog({
     <div className="modal-backdrop inbound-alias-backdrop" role="presentation" onMouseDown={onClose}>
       <form className="modal-panel inbound-alias-modal" role="dialog" aria-modal="true" aria-labelledby="inbound-alias-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
         <div className="customer-editor-header">
-          <div><p className="eyebrow">Product alias</p><h2 id="inbound-alias-title">同じ商品として登録</h2></div>
+          <div><p className="eyebrow">商品表記の登録</p><h2 id="inbound-alias-title">この商品と同じ表記として登録</h2></div>
           <button type="button" className="ghost-button" onClick={onClose}>閉じる</button>
         </div>
 
@@ -144,7 +144,7 @@ export default function InboundProductAliasDialog({
           <section><h3>正式商品</h3><p><strong>{selectedProduct ? productName(selectedProduct) : '未選択'}</strong></p><p>{selectedProduct ? productCode(selectedProduct) || '商品コードなし' : '-'}</p><p>{selectedProduct?.brandName || '-'} / {selectedProduct?.origin || '-'} / {selectedProduct?.category || '-'}</p></section>
         </div>
 
-        <label className="inbound-alias-search">既存商品を検索<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="商品コード、商品名、ブランド" /></label>
+        <label className="inbound-alias-search">別の商品を検索<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="商品コード、商品名、ブランド" /></label>
         <div className="inbound-alias-results" role="listbox" aria-label="正式商品候補">
           {searchResults.map((product) => (
             <button type="button" className={product.id === selectedProductId ? 'selected' : ''} key={product.id} onClick={() => setSelectedProductId(product.id)}>
@@ -164,7 +164,7 @@ export default function InboundProductAliasDialog({
         <dl className="company-details inbound-alias-meta"><div><dt>仕入先</dt><dd>{preview?.supplier || '-'}</dd></div><div><dt>登録元書類</dt><dd>{preview?.documentNumber || preview?.fileName || '-'}</dd></div></dl>
         {differences.length > 0 && <div className="inbound-alias-differences"><h3>差異</h3>{differences.map(([label, imported, registered]) => <p key={label}>{label}: 帳票「{value(imported)}」 / マスタ「{value(registered)}」</p>)}</div>}
         {error && <p className="form-error-message">{error}</p>}
-        <div className="customer-editor-actions inbound-alias-actions"><button type="button" className="ghost-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? '登録中...' : 'Aliasを登録'}</button></div>
+        <div className="customer-editor-actions inbound-alias-actions"><button type="button" className="ghost-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? '登録中...' : 'この表記を登録'}</button></div>
       </form>
     </div>,
     document.body,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { inboundProductReviewCounts } from './InboundProductReview.jsx';
 
 const STEPS = [
   { key: 'upload', label: '取込' },
@@ -34,11 +35,6 @@ function writeStepUrl(step, replace = false) {
   window.history[replace ? 'replaceState' : 'pushState']({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-function lineIsConfirmed(line) {
-  const status = line.productMatchStatus || line.matchStatus;
-  return Boolean(line.matchedProductId) && ['matched', 'manual'].includes(status);
-}
-
 function uniqueValues(values) {
   return [...new Set(values.filter(Boolean))];
 }
@@ -59,8 +55,8 @@ export default function InboundImportFlow({
   const [step, setStep] = useState(() => preview ? requestedStep() : 'upload');
   const progress = useMemo(() => {
     const lines = preview?.lines || [];
-    const confirmed = lines.filter(lineIsConfirmed).length;
-    return { confirmed, total: lines.length, remaining: Math.max(lines.length - confirmed, 0) };
+    const counts = inboundProductReviewCounts(lines);
+    return { confirmed: counts.confirmed, total: counts.total, remaining: counts.review, excluded: counts.excluded };
   }, [preview]);
   const contracts = useMemo(() => uniqueValues((preview?.lines || []).map((line) => line.contractNo)), [preview]);
   const customsDates = useMemo(

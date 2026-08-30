@@ -169,6 +169,148 @@
   padding-top: 16px;
 }
 
+.inbound-product-review {
+  display: grid;
+  gap: 16px;
+  margin-inline: auto;
+  max-width: 980px;
+  width: 100%;
+}
+
+.inbound-review-tabs {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 4px;
+}
+
+.inbound-review-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  min-height: 44px;
+  padding: 8px 14px;
+}
+
+.inbound-review-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.inbound-review-tabs span {
+  background: var(--surface);
+  border-radius: 999px;
+  display: inline-block;
+  margin-left: 4px;
+  min-width: 24px;
+  padding: 2px 7px;
+}
+
+.inbound-review-list {
+  display: grid;
+  gap: 12px;
+}
+
+.inbound-review-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.inbound-review-card.needs-review { border-left-color: var(--warning); }
+.inbound-review-card.confirmed { border-left-color: var(--success); }
+
+.inbound-review-card > header,
+.inbound-review-card > header > div {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.inbound-review-card h4,
+.inbound-review-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.inbound-review-card h4 { font-size: 1rem; }
+.inbound-review-card header p,
+.inbound-review-source { color: var(--muted); font-size: 0.82rem; }
+.inbound-review-mark { font-size: 1.1rem; font-weight: 800; line-height: 1.35; }
+
+.inbound-review-facts {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.inbound-review-facts div { min-width: 0; }
+.inbound-review-facts dt { color: var(--muted); font-size: 0.75rem; }
+.inbound-review-facts dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.inbound-review-message { font-weight: 700; }
+
+.inbound-review-candidates {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inbound-review-candidate {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.inbound-review-candidate div { display: grid; gap: 3px; min-width: 0; }
+.inbound-review-candidate span,
+.inbound-review-candidate p { color: var(--muted); font-size: 0.78rem; overflow-wrap: anywhere; }
+.inbound-review-candidate button { white-space: normal; }
+
+.inbound-review-differences {
+  border-left: 3px solid var(--warning);
+  display: grid;
+  gap: 4px;
+  padding-left: 10px;
+}
+
+.inbound-review-differences p { color: var(--muted); font-size: 0.8rem; }
+
+.inbound-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inbound-review-complete {
+  align-items: center;
+  background: color-mix(in srgb, var(--success) 10%, var(--panel));
+  border-left: 4px solid var(--success);
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.inbound-review-complete span { color: var(--muted); }
+
+.inbound-review-card details summary {
+  color: var(--accent);
+  cursor: pointer;
+  min-height: 36px;
+  padding-block: 8px;
+}
+
 @media (max-width: 767px) {
   .inbound-plan-list-heading {
     align-items: stretch;
@@ -233,4 +375,31 @@
   .inbound-flow-actions button {
     width: 100%;
   }
+
+  .inbound-review-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .inbound-review-tabs button {
+    font-size: 0.78rem;
+    min-width: 0;
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
+
+  .inbound-review-tabs span {
+    margin-left: 1px;
+    min-width: 20px;
+    padding-inline: 5px;
+  }
+
+  .inbound-review-card { padding: 13px; }
+  .inbound-review-card > header { align-items: flex-start; }
+  .inbound-review-card > header > .info-badge { flex: 0 0 auto; }
+  .inbound-review-candidates,
+  .inbound-review-facts { grid-template-columns: 1fr; }
+  .inbound-review-actions { display: grid; grid-template-columns: 1fr; }
+  .inbound-review-actions button,
+  .inbound-review-candidate button { min-height: 44px; width: 100%; }
 }
