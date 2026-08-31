@@ -25,6 +25,7 @@ import InboundProductAliasDialog from '../components/InboundProductAliasDialog.j
 import InboundProductReview from '../components/InboundProductReview.jsx';
 import InboundPlanList from '../components/InboundPlanList.jsx';
 import InboundImportFlow from '../components/InboundImportFlow.jsx';
+import InboundPlanDetail, { InboundSavedProductReview } from '../components/InboundPlanDetail.jsx';
 import '../components/inbound-ui.css';
 
 const TABS = [
@@ -62,10 +63,16 @@ function writeInboundViewUrl(view, shipmentId = '', { replace = false } = {}) {
   if (view === 'list') {
     url.searchParams.delete('view');
     url.searchParams.delete('id');
+    url.searchParams.delete('section');
   } else {
     url.searchParams.set('view', view);
-    if (view === 'detail' && shipmentId) url.searchParams.set('id', shipmentId);
-    else url.searchParams.delete('id');
+    if (view === 'detail' && shipmentId) {
+      url.searchParams.set('id', shipmentId);
+      url.searchParams.set('section', 'overview');
+    } else {
+      url.searchParams.delete('id');
+      url.searchParams.delete('section');
+    }
   }
   window.history[replace ? 'replaceState' : 'pushState']({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
@@ -1915,8 +1922,9 @@ function InventoryProductSelect({ value, products, onChange }) {
 function inboundStatusLabel(status) {
   const labels = {
     draft: '下書き',
-    matching: '照合中',
-    confirmed: '確定前',
+    matching: '商品確認が必要',
+    confirmed: '入荷待ち',
+    pending: '入荷待ち',
     partially_received: '一部入荷',
     received: '入荷済',
     cancelled: '取消',
@@ -2276,25 +2284,58 @@ function DeliveryNoticeImportPanel({
     })
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 
+  const detailHistoryRows = [
+    ...scheduleChangeRows.map((change) => ({
+      id: `schedule-${change.id}`,
+      type: 'schedule',
+      occurredAt: change.createdAt,
+      change,
+    })),
+    ...receiptRows.flatMap((receipt) => [
+      {
+        id: `receipt-${receipt.id}`,
+        type: 'receipt',
+        occurredAt: receipt.receivedAt,
+        receipt,
+      },
+      ...(receipt.voidedAt ? [{
+        id: `receipt-void-${receipt.id}`,
+        type: 'receipt-void',
+        occurredAt: receipt.voidedAt,
+        receipt,
+      }] : []),
+    ]),
+  ].sort((a, b) => String(b.occurredAt || '').localeCompare(String(a.occurredAt || '')));
+
   const hasReceivableLines = (selectedInboundShipment?.lines || []).some(canReceiveInboundLine);
+  const savedLines = selectedInboundShipment?.lines || [];
+  const savedContracts = [...new Set(savedLines.map((line) => line.contractNo).filter(Boolean))];
+  const originalCustomsDates = [...new Set(savedLines.map(scheduleOriginalDate).filter(Boolean))];
+  const currentCustomsDates = [...new Set(savedLines.map(scheduleCurrentDate).filter(Boolean))];
+  const warehouseArrivalDates = [...new Set(savedLines.map((line) => line.warehouseArrivalDate).filter(Boolean))];
+  const warehouseNames = [...new Set(savedLines.map((line) => line.warehouseName).filter(Boolean))];
+  const totalPieces = savedLines.reduce((sum, line) => sum + parseNumber(line.plannedPieces ?? line.quantityPieces), 0);
+  const totalWeight = savedLines.reduce((sum, line) => sum + parseNumber(line.plannedWeight ?? line.weight), 0);
+  const inventoryLineColumns = savedLineColumns.filter((column) => [
+    'rawProduct', 'lineStatus', 'pieces', 'receivedPieces', 'remainingPieces', 'weight',
+    'receivedWeight', 'remainingWeight', 'unitPrice', 'expiry', 'warehouse',
+  ].includes(column.key));
 
   return (
     <section className="detail-section delivery-notice-import-panel">
-      <button type="button" className="ghost-button inbound-view-back" onClick={() => onBackToList?.()}>
-        ← 入荷予定一覧
-      </button>
-
-      <div className="section-heading">
+      {view === 'import' && (
+        <>
+          <button type="button" className="ghost-button inbound-view-back" onClick={() => onBackToList?.()}>← 入荷予定一覧</button>
+          <div className="section-heading">
+            <div><p className="eyebrow">New inbound plan</p><h2>入荷予定を取り込む</h2><p className="inline-helper">PDFまたは標準Excelを解析し、保存前に内容を確認します。</p></div>
+          </div>
+        </>
+      )}
+      {view === 'detail' && !selectedInboundShipment && (
         <div>
-          <p className="eyebrow">{view === 'import' ? 'New inbound plan' : 'Inbound plan detail'}</p>
-          <h2>{view === 'import' ? '入荷予定を取り込む' : '入荷予定詳細'}</h2>
-          <p className="inline-helper">
-            {view === 'import'
-              ? 'PDFまたは標準Excelを解析し、保存前に内容を確認します。'
-              : '保存済みの入荷予定、商品照合、入荷状況を確認できます。'}
-          </p>
+          <button type="button" className="ghost-button inbound-view-back" onClick={() => onBackToList?.()}>← 入荷予定一覧</button>
         </div>
-      </div>
+      )}
 
       {view === 'import' && (
         <InboundImportFlow
@@ -2334,144 +2375,65 @@ function DeliveryNoticeImportPanel({
       )}
 
       {view === 'detail' && selectedInboundShipment && (
-        <div className="delivery-notice-detail-editor">
-          <div className="section-heading">
-            <div>
-              <h3>入荷予定詳細・商品照合</h3>
-              <p className="inline-helper">{selectedInboundShipment.sourceFileName || '-'} / {selectedInboundShipment.fileHash || '-'}</p>
-            </div>
-            <div className="delivery-notice-actions">
-              <span className={`info-badge ${inboundStatusBadgeClass(selectedInboundShipment.status)}`}>{inboundStatusLabel(selectedInboundShipment.status)}</span>
-              <button type="button" className="primary-button" disabled={!hasReceivableLines} onClick={() => onOpenReceipt?.(selectedInboundShipment)}>
-                入荷確定
-              </button>
-            </div>
-          </div>
-
-          <DesktopTable
-            className="inventory-common-table delivery-notice-line-editor-table"
-            columns={savedLineColumns}
-            rows={selectedInboundShipment.lines || []}
-            getRowKey={(row) => row.id}
-            minWidth={1840}
-          />
-
-          <div className="card-list-mobile delivery-notice-card-list">
-            {(selectedInboundShipment.lines || []).map((line) => (
-              <article className="product-card delivery-notice-card" key={line.id}>
-                <div className="company-heading">
-                  <p>{line.contractNo || '契約No未取得'} / {line.brandNameRaw || 'ブランド未取得'}</p>
-                  <h3>{line.productNameRaw || '商品名未取得'}</h3>
-                  <span className={`info-badge ${matchBadgeClass(line.matchStatus)}`}>{matchStatusLabel(line.matchStatus)}</span>
-                </div>
-                <label className="field-label">
-                  商品照合
-                  <select value={line.matchedProductId || ''} onChange={(event) => onLineChange?.(line, { matchedProductId: event.target.value })}>
-                    <option value="">未照合</option>
-                    {products.map((product) => (
-                      <option value={product.id} key={product.id}>
-                        {product.productCode ? `${product.productCode} / ` : ''}{productDisplayName(product, '商品名未設定')}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <dl className="company-details">
-                  <div><dt>個数</dt><dd>{formatPrice(line.quantityPieces) || '-'}</dd></div>
-                  <div><dt>入荷済個数</dt><dd>{formatQuantity(line.receivedPiecesTotal)}</dd></div>
-                  <div><dt>残個数</dt><dd>{formatQuantity(lineRemainingPieces(line))}</dd></div>
-                  <div><dt>重量</dt><dd>{line.weight !== null ? `${formatPrice(line.weight)} ${line.unit || ''}` : '-'}</dd></div>
-                  <div><dt>入荷済重量</dt><dd>{formatQuantity(line.receivedWeightTotal, line.unit)}</dd></div>
-                  <div><dt>残重量</dt><dd>{formatQuantity(lineRemainingWeight(line), line.unit)}</dd></div>
-                  <div><dt>単価</dt><dd>{line.unitPrice !== null ? `${formatPrice(line.unitPrice)} ${line.currency || ''}` : '-'}</dd></div>
-                  <div><dt>当初通関予定</dt><dd>{scheduleOriginalDate(line) || '-'}</dd></div>
-                  <div><dt>現在通関予定</dt><dd>{scheduleCurrentDate(line) || '-'}</dd></div>
-                  <div>
-                    <dt>差分</dt>
-                    <dd><span className={`info-badge ${scheduleDelayBadgeClass(scheduleDelayDays(line))}`}>{scheduleDelayLabel(scheduleDelayDays(line))}</span></dd>
-                  </div>
-                  <div><dt>Packing</dt><dd>{line.packingFrom || '-'} ～ {line.packingTo || '-'}</dd></div>
+        <InboundPlanDetail
+          shipment={selectedInboundShipment}
+          contracts={savedContracts.join(' / ')}
+          statusLabel={inboundStatusLabel(selectedInboundShipment.status)}
+          statusClass={inboundStatusBadgeClass(selectedInboundShipment.status)}
+          currentCustomsDate={currentCustomsDates.join(' / ')}
+          onBack={() => onBackToList?.()}
+          sections={{
+            overview: (
+              <div className="inbound-detail-overview">
+                <dl className="company-details inbound-overview-grid">
+                  <div><dt>仕入先</dt><dd>{selectedInboundShipment.supplierName || '-'}</dd></div>
+                  <div><dt>帳票番号</dt><dd>{selectedInboundShipment.documentNumber || '-'}</dd></div>
+                  <div><dt>契約No</dt><dd>{savedContracts.join(' / ') || '-'}</dd></div>
+                  <div><dt>発行日</dt><dd>{selectedInboundShipment.issueDate || '-'}</dd></div>
+                  <div><dt>当初通関予定</dt><dd>{originalCustomsDates.join(' / ') || '-'}</dd></div>
+                  <div><dt>現在通関予定</dt><dd>{currentCustomsDates.join(' / ') || '-'}</dd></div>
+                  <div><dt>倉庫入庫予定</dt><dd>{warehouseArrivalDates.join(' / ') || '-'}</dd></div>
+                  <div><dt>倉庫</dt><dd>{warehouseNames.join(' / ') || '-'}</dd></div>
+                  <div><dt>明細数</dt><dd>{savedLines.length}件</dd></div>
+                  <div><dt>合計個数</dt><dd>{formatQuantity(totalPieces)}</dd></div>
+                  <div><dt>合計重量</dt><dd>{formatQuantity(totalWeight, 'KG')}</dd></div>
                 </dl>
-                <div className="inventory-form-grid compact-grid">
-                  <label className="field-label">重量<input inputMode="decimal" defaultValue={line.weight ?? ''} onBlur={(event) => onLineChange?.(line, { weight: event.target.value })} /></label>
-                  <label className="field-label">単価<input inputMode="decimal" defaultValue={line.unitPrice ?? ''} onBlur={(event) => onLineChange?.(line, { unitPrice: event.target.value })} /></label>
-                  <label className="field-label">賞味期限<input type="date" defaultValue={line.expiryDate || ''} onBlur={(event) => onLineChange?.(line, { expiryDate: event.target.value })} /></label>
-                  <label className="field-label">倉庫<input defaultValue={line.warehouseName || ''} onBlur={(event) => onLineChange?.(line, { warehouseName: event.target.value })} /></label>
+                <div className="inbound-overview-schedules">
+                  <div className="section-heading"><h3>通関予定</h3></div>
+                  {savedLines.map((line) => <article className="inbound-schedule-summary" key={line.id}><div><strong>{line.contractNo || '契約No未取得'} / {line.productNameRaw || '商品名未取得'}</strong><p>{scheduleOriginalDate(line) || '-'} → {scheduleCurrentDate(line) || '-'}</p></div><button type="button" className="ghost-button" disabled={!canChangeInboundSchedule(line)} onClick={() => onOpenScheduleChange?.(line)}>予定変更</button></article>)}
                 </div>
-                <div className="card-actions">
-                  <button type="button" className="ghost-button" onClick={() => onLineChange?.(line, { status: line.status === 'excluded' ? 'draft' : 'excluded' })}>
-                    {line.status === 'excluded' ? '除外を戻す' : '明細除外'}
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => onSaveAlias?.(line)}>別名保存</button>
-                  <button type="button" className="ghost-button" disabled={!canChangeInboundSchedule(line)} onClick={() => onOpenScheduleChange?.(line)}>
-                    予定変更
-                  </button>
-                </div>
-                {line.warnings?.length > 0 && (
-                  <div className="delivery-notice-line-warnings">
-                    {line.warnings.map((warning) => <span className="info-badge muted" key={warning}>{warning}</span>)}
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {view === 'detail' && selectedInboundShipment && scheduleChangeRows.length > 0 && (
-        <div className="delivery-notice-schedule-history">
-          <div className="section-heading">
-            <h3>予定変更履歴</h3>
-            <span className="info-badge muted">{scheduleChangeRows.length}件</span>
-          </div>
-          <div className="delivery-schedule-change-list">
-            {scheduleChangeRows.map((change) => (
-              <article className="delivery-schedule-change-card" key={change.id}>
-                <div>
-                  <strong>{change.oldDate || '-'} → {change.newDate || '-'}</strong>
-                  <p>{change.line?.contractNo || '契約No未取得'} / {change.line?.productNameRaw || '商品名未取得'}</p>
-                  <p>理由: {change.reason || '-'}{change.memo ? ` / ${change.memo}` : ''}</p>
-                  <p>変更日時: {String(change.createdAt || '').replace('T', ' ').slice(0, 16) || '-'}</p>
-                </div>
-                <span className={`info-badge ${scheduleDelayBadgeClass(change.delayDays)}`}>
-                  {scheduleDelayLabel(change.delayDays)}
-                </span>
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {view === 'detail' && selectedInboundShipment && receiptRows.length > 0 && (
-        <div className="delivery-notice-receipts">
-          <div className="section-heading">
-            <h3>入荷確定履歴</h3>
-            <span className="info-badge muted">{receiptRows.length}件</span>
-          </div>
-          <div className="delivery-receipt-list">
-            {receiptRows.map((receipt) => (
-              <article className="delivery-receipt-card" key={receipt.id}>
-                <div>
-                  <strong>{receipt.receiptNo || receipt.id}</strong>
-                  <p>{String(receipt.receivedAt || '').slice(0, 10)} / {receipt.warehouseName || '-'}</p>
-                  {receipt.voidedAt && <p>取消済み: {String(receipt.voidedAt).slice(0, 10)} / {receipt.voidReason || '-'}</p>}
-                </div>
-                <div className="delivery-receipt-actions">
-                  <span className={`info-badge ${receipt.voidedAt ? 'muted' : 'ready'}`}>
-                    {receipt.voidedAt ? '取消済み' : `${receipt.lines.length}明細`}
-                  </span>
-                  <button
-                    type="button"
-                    className="ghost-button receipt-reverse-button"
-                    disabled={Boolean(receipt.voidedAt)}
-                    onClick={() => onOpenReverseReceipt?.(receipt)}
-                  >
-                    入荷取消
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
+              </div>
+            ),
+            products: (
+              <div className="inbound-detail-products">
+                <div className="section-heading"><div><h3>商品確認</h3><p className="inline-helper">保存済み入荷予定の商品対応を確認します。</p></div></div>
+                <InboundSavedProductReview lines={savedLines} products={products} onLineChange={onLineChange} onSaveAlias={onSaveAlias} />
+              </div>
+            ),
+            inventory: (
+              <div className="inbound-detail-inventory">
+                <div className="section-heading"><div><h3>入荷・在庫</h3><p className="inline-helper">予定、入荷済み、残数量を確認します。</p></div><button type="button" className="primary-button" disabled={!hasReceivableLines} onClick={() => onOpenReceipt?.(selectedInboundShipment)}>入荷を確定</button></div>
+                <DesktopTable className="inventory-common-table inbound-inventory-table" columns={inventoryLineColumns} rows={savedLines} getRowKey={(row) => row.id} minWidth={1180} />
+                <div className="card-list-mobile inbound-inventory-card-list">{savedLines.map((line) => <article className="product-card inbound-inventory-card" key={line.id}><div className="company-heading"><h3>{line.productNameRaw || '商品名未取得'}</h3><span className={`info-badge ${inboundStatusBadgeClass(line.status)}`}>{inboundLineStatusLabel(line.status)}</span></div><dl className="company-details"><div><dt>予定個数</dt><dd>{formatQuantity(line.plannedPieces ?? line.quantityPieces)}</dd></div><div><dt>入荷済個数</dt><dd>{formatQuantity(line.receivedPiecesTotal)}</dd></div><div><dt>残個数</dt><dd>{formatQuantity(lineRemainingPieces(line))}</dd></div><div><dt>予定重量</dt><dd>{formatQuantity(line.plannedWeight ?? line.weight, line.unit)}</dd></div><div><dt>入荷済重量</dt><dd>{formatQuantity(line.receivedWeightTotal, line.unit)}</dd></div><div><dt>残重量</dt><dd>{formatQuantity(lineRemainingWeight(line), line.unit)}</dd></div></dl></article>)}</div>
+                {receiptRows.length > 0 && <div className="delivery-notice-receipts"><div className="section-heading"><h3>入荷履歴</h3><span className="info-badge muted">{receiptRows.length}件</span></div><div className="delivery-receipt-list">{receiptRows.map((receipt) => <article className="delivery-receipt-card" key={receipt.id}><div><strong>{receipt.receiptNo || receipt.id}</strong><p>{String(receipt.receivedAt || '').slice(0, 10)} / {receipt.warehouseName || '-'}</p>{receipt.voidedAt && <p>取消済み: {String(receipt.voidedAt).slice(0, 10)} / {receipt.voidReason || '-'}</p>}</div><div className="delivery-receipt-actions"><span className={`info-badge ${receipt.voidedAt ? 'muted' : 'ready'}`}>{receipt.voidedAt ? '取消済み' : `${receipt.lines.length}明細`}</span><button type="button" className="ghost-button receipt-reverse-button" disabled={Boolean(receipt.voidedAt)} onClick={() => onOpenReverseReceipt?.(receipt)}>入荷取消</button></div></article>)}</div></div>}
+              </div>
+            ),
+            history: (
+              <div className="inbound-detail-history">
+                {detailHistoryRows.length === 0 && <div className="empty-state"><h3>変更履歴はありません</h3></div>}
+                {detailHistoryRows.map((event) => {
+                  if (event.type === 'schedule') {
+                    const change = event.change;
+                    return <article className="inbound-history-card" key={event.id}><div><span className="info-badge warning">通関予定変更</span><strong>{change.oldDate || '-'} → {change.newDate || '-'}</strong><p>{change.line?.contractNo || '契約No未取得'} / {change.line?.productNameRaw || '商品名未取得'}</p><p>理由: {change.reason || '-'}{change.memo ? ` / ${change.memo}` : ''}</p></div><time>{String(event.occurredAt || '').replace('T', ' ').slice(0, 16) || '-'}</time></article>;
+                  }
+                  const receipt = event.receipt;
+                  const isVoid = event.type === 'receipt-void';
+                  return <article className="inbound-history-card" key={event.id}><div><span className={`info-badge ${isVoid ? 'muted' : 'ready'}`}>{isVoid ? '入荷取消' : '入荷確定'}</span><strong>{receipt.receiptNo || receipt.id}</strong><p>{receipt.warehouseName || '-'} / {receipt.lines.length}明細</p>{isVoid && <p>取消理由: {receipt.voidReason || '-'}</p>}</div><time>{String(event.occurredAt || '').replace('T', ' ').slice(0, 16) || '-'}</time></article>;
+                })}
+              </div>
+            ),
+          }}
+        />
       )}
     </section>
   );

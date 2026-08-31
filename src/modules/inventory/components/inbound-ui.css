@@ -311,6 +311,82 @@
   padding-block: 8px;
 }
 
+.inbound-plan-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.inbound-plan-detail-header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.inbound-plan-detail-header h2,
+.inbound-plan-detail-header p { margin: 0; overflow-wrap: anywhere; }
+.inbound-plan-detail-header > div { display: grid; gap: 4px; min-width: 0; }
+.inbound-plan-detail-header > div > p:last-child { color: var(--muted); }
+.inbound-plan-detail-header dl { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(110px, auto)); margin: 0; }
+.inbound-plan-detail-header dt { color: var(--muted); font-size: 0.75rem; }
+.inbound-plan-detail-header dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+
+.inbound-detail-tabs {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.inbound-detail-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 9px 16px;
+  white-space: nowrap;
+}
+
+.inbound-detail-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.inbound-detail-section,
+.inbound-detail-overview,
+.inbound-detail-inventory,
+.inbound-detail-history {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.inbound-overview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.inbound-overview-schedules { display: grid; gap: 8px; }
+.inbound-schedule-summary { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; padding: 10px 0; }
+.inbound-schedule-summary p { color: var(--muted); margin: 3px 0 0; }
+
+.inbound-saved-product-review,
+.inbound-saved-product-list { display: grid; gap: 12px; }
+.inbound-saved-product-card { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 6px; display: grid; gap: 12px; padding: 14px; }
+.inbound-saved-product-card.review { border-left-color: var(--warning); }
+.inbound-saved-product-card.confirmed { border-left-color: var(--success); }
+.inbound-saved-product-card header { align-items: flex-start; display: flex; gap: 12px; justify-content: space-between; }
+.inbound-saved-product-card h4,
+.inbound-saved-product-card p { margin: 0; overflow-wrap: anywhere; }
+.inbound-saved-product-card header p { color: var(--muted); font-size: 0.8rem; margin-top: 3px; }
+
+.inbound-inventory-card-list { display: none; }
+.inbound-history-card { align-items: flex-start; border-left: 3px solid var(--line); display: flex; gap: 16px; justify-content: space-between; padding: 10px 12px; }
+.inbound-history-card > div { display: grid; gap: 5px; min-width: 0; }
+.inbound-history-card p { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+.inbound-history-card time { color: var(--muted); flex: 0 0 auto; font-size: 0.78rem; }
+
 @media (max-width: 767px) {
   .inbound-plan-list-heading {
     align-items: stretch;
@@ -402,4 +478,18 @@
   .inbound-review-actions { display: grid; grid-template-columns: 1fr; }
   .inbound-review-actions button,
   .inbound-review-candidate button { min-height: 44px; width: 100%; }
+
+  .inbound-plan-detail-header { display: grid; gap: 14px; }
+  .inbound-plan-detail-header dl { grid-template-columns: 1fr; gap: 9px; }
+  .inbound-detail-tabs { margin-inline: -2px; }
+  .inbound-detail-tabs button { padding-inline: 12px; }
+  .inbound-overview-grid { grid-template-columns: 1fr; }
+  .inbound-schedule-summary { align-items: stretch; display: grid; }
+  .inbound-schedule-summary button { min-height: 44px; width: 100%; }
+  .inbound-inventory-table { display: none; }
+  .inbound-inventory-card-list { display: grid; gap: 12px; }
+  .inbound-detail-inventory > .section-heading { align-items: stretch; display: grid; gap: 10px; }
+  .inbound-detail-inventory > .section-heading button { min-height: 44px; width: 100%; }
+  .inbound-history-card { display: grid; gap: 8px; }
+  .inbound-history-card time { justify-self: start; }
 }

@@ -69,7 +69,9 @@ test('inbound plans separate list, import, and detail views', async ({ page }) =
     await expect(page).toHaveURL(/view=detail&id=/);
     await expect(page.getByRole('heading', { name: '入荷予定詳細', exact: true })).toBeVisible();
     await expect(page.locator('.delivery-notice-detail-editor')).toBeVisible();
-    await expect(page.getByRole('button', { name: '入荷確定' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '入荷を確定' })).toHaveCount(0);
+    await page.getByRole('button', { name: '入荷・在庫', exact: true }).click();
+    await expect(page.getByRole('button', { name: '入荷を確定' })).toBeVisible();
     await page.getByRole('button', { name: '← 入荷予定一覧' }).click();
     await expect(page.getByRole('heading', { name: '入荷予定', exact: true })).toBeVisible();
   }
